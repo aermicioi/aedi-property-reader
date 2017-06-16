@@ -1,0 +1,10 @@
+{
+	"name" : "aedi-property-reader",
+	"description" : "Aedi multipurpose property file reader",
+	"type" : "sourceLibrary",
+	"dependencies" : {
+		"aedi": "~>0.2.0",
+		"std_data_json": "~>0.18.2",
+		"pry": "~>0.3.2"
+	}
+}
