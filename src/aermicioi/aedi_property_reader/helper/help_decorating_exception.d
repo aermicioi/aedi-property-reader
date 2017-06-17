@@ -27,5 +27,20 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.test.arg;
 
+module aermicioi.aedi_property_reader.helper.help_decorating_exception;
+
+import aermicioi.aedi.exception.di_exception;
+
+class HelpDecoratingException : AediException {
+    
+    pure nothrow this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable next = null)
+    {
+        super(msg, file, line, next);
+    }
+
+    nothrow this(string msg, Throwable next, string file = __FILE__, size_t line = __LINE__)
+    {
+        super(msg, file, line, next);
+    }
+}

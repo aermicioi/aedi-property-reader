@@ -29,266 +29,85 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.arg.arg_container;
 
-import aermicioi.aedi;
+import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.generic_convertor_container;
-import aermicioi.aedi_property_reader.env.env_factory;
-import std.process;
+import aermicioi.aedi_property_reader.arg.arg_factory;
+import aermicioi.aedi_property_reader.helper.help_decorating_exception;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi.storage.alias_aware;
 import std.range;
-import std.typecons;
-import std.range;
+import std.algorithm;
+import std.utf;
 
-interface HelpMessageFormatter : InputRange!char, OutputRange!HelpMessage {
+class GetoptIdentityLocator : Locator!(string, string) {
     
-}
-
-interface HelpMessage {
+    private {
+        string[] args;
+    }
     
     public {
-        string identity() @safe nothrow;
-        string message() @safe nothrow;
-    }
-}
-
-/**
-A decorating container, that on an exception from decorated container will output
-an usage message to output, and halt the operation.
-**/
-template UsageDecoratingContainer(T) {
-    /**
-    Set which the switchable container will decorate for T. By default
-    Locator!() and Subscribable!ContainerInstantiationEventType is included.
-    **/
-    alias InheritanceSet = NoDuplicates!(Filter!(
-        templateOr!(
-            partialSuffixed!(
-                isDerived,
-                Storage!(ObjectFactory, string)
-            ),
-            partialSuffixed!(
-                isDerived,
-                AliasAware!string
-            ),
-            partialSuffixed!(
-                isDerived,
-                FactoryLocator!ObjectFactory
-            )
-        ),
-        InterfacesTuple!T),
-        Container,
-        MutableDecorator!T,
-        Decorator!Container,
-        Storage!(HelpMessage, string)
-    );
-    
-    class UsageDecoratingContainer : InheritanceSet {
         
-        private {
-            T decorated_;
-            HelpMessageFormatter formatter_;
-            OutputRange!char sink_;
-            ObjectStorage!(HelpMessage, string) messages;
+        this() {
+            import core.runtime;
+            this(Runtime.args());
         }
         
-        public {
-            @property {
-            	UsageDecoratingContainer decorated(T decorated) @safe nothrow {
-            		this.decorated_ = decorated;
-            	
-            		return this;
-            	}
-            	
-            	T decorated() @safe nothrow {
-            		return this.decorated_;
-            	}
-            	
-            	UsageDecoratingContainer formatter(type formatter) @safe nothrow {
-            		this.formatter_ = formatter;
-            	
-            		return this;
-            	}
-            	
-            	type formatter() @safe nothrow {
-            		return this.formatter_;
-            	}
-            	
-            	UsageDecoratingContainer sink(OutputRange!char sink) @safe nothrow {
-            		this.sink_ = sink;
-            	
-            		return this;
-            	}
-            	
-            	OutputRange!char sink() @safe nothrow {
-            		return this.sink_;
-            	}
-            }
-            
-            UsageDecoratingContainer set(HelpMessage message, string key) {
-            	this.messages.set(message, key);
-            
-            	return this;
-            }
-            
-            UsageDecoratingContainer remove(string key) {
-            	this.messages.remove(key);
-            
-            	return this;
-            }
-            
-            Object get(string key) {
-                try {
-                    
-                    return this.decorated.get(key);
-                } catch(AediException e) {
-                    
-                    this.print();
-                }
-            }
-            
-            bool has(in string key) inout {
-                return this.decorated_.has(key);
-            }
-            
-            UsageDecoratingContainer subscribe(
-                ContainerInstantiationEventType event,
-                void delegate() subscriber
-            ) {
-                this.subscribers[event] ~= subscriber;
-                
-                return this;
-            }
-            
-            UsageDecoratingContainer instantiate() {
-                
-                try {
-                    this.decorated.instantiate();
-                } catch (AediException e) {
-                    
-                    this.print();
-                }
-                
-                return this;
-            }
-            
-            static if (is(T : Storage!(ObjectFactory, string))) {
-
-                UsageDecoratingContainer!T set(ObjectFactory element, string identity) {
-                    decorated.set(element, identity);
-                    
-                    return this;
-                }
-                
-                UsageDecoratingContainer!T remove(string identity) {
-                    decorated.remove(identity);
-                    
-                    return this;
-                }
-            }
-            
-            static if (is(T : AliasAware!string)) {
-                UsageDecoratingContainer!T link(string identity, string alias_) {
-                    decorated.link(identity, alias_);
-                    
-                    return this;
-                }
-                
-                UsageDecoratingContainer!T unlink(string alias_) {
-                    decorated.unlink(alias_);
-                    
-                    return this;
-                }
-                
-                const(string) resolve(in string alias_) const {
-                    return decorated_.resolve(alias_);
-                }
-            }
-            
-            static if (is(T : FactoryLocator!ObjectFactory)) {
-                
-                ObjectFactory getFactory(string identity) {
-                    return this.decorated.getFactory(identity);
-                }
-                
-                InputRange!(Tuple!(ObjectFactory, string)) getFactories() {
-                    return this.decorated.getFactories();
-                }
-            }
+        this(string[] args) {
+            this.args = args;
         }
         
-        private {
-            
-            void print() {
-                foreach (message; this.messages) {
-                    this.formatter.put(message);
-                }
-                
-                put(this.sink, this.formatter);
-                
-//                    TODO a better solution at handling it should be devised.
-                import std.c.process;
-                exit(1);
-            }
-        }
-    }
-}
-
-class CommandLineArgumentLocator : Locator!(string, string) {
-    public {
-        
-        /**
-		Get a command line argument.
+		/**
+		Get an Type that is associated with key.
 		
 		Params:
-			path = the element id.
+			identity = the element id.
 			
 		Throws:
 			NotFoundException in case if the element wasn't found.
 		
 		Returns:
-			string element if it is available.
+			Type element if it is available.
 		**/
-        string get(string path) {
-            import std.getopt;
-            import core.runtime;
-            
-            string[] args = Runtime.args;
-            string argument;
-            
-            try {
-                auto result = getopt(
-                    args,
-                    config.passThrough, config.required, path, &argument
-                );
-            } catch (GetOptException e) {
-                throw new NotFoundException("Could not find argument in supplied command line arguments identified by: " ~ path);
+        string get(string identity) {
+            if (!this.has(identity)) {
+                
+                throw new NotFoundException("Could not find argument in command line");
             }
             
-            return argument;
+            return identity;
         }
         
         /**
-        Check if command line argument is present.
+        Check if an element is present in Locator by key id.
         
+        Note:
+        	This check should be done for elements that locator actually contains, and
+        	not in chained locator (when locator is also a DelegatingLocator) for example.
         Params:
-        	path = identity of element.
+        	identity = identity of element.
         	
     	Returns:
     		bool true if an element by key is present in Locator.
         **/
-        bool has(in string path) inout {
-            import std.getopt;
-            import core.runtime;
+        bool has(in string identity) inout {
+            foreach (const arg; this.args[1 .. $]) {
+                if (arg.startsWith('-')) {
+
+                    if (arg.stripLeft('-').until('=').equal(identity)) {
+                        return true;
+                    }
+                    
+                    if (!arg.startsWith("--") && (identity.length == 1)) {
+                        if (arg.stripLeft('-').until('=').canFind(identity)) {
+                            return true;
+                        }
+                    }
+                }
+            }
             
-            string[] args = Runtime.args;
-            string argument;
-            
-            auto result = getopt(
-                args,
-                config.passThrough, path, &argument
-            );
-            
-            return argument !is null;
+            return false;
         }
     }
 }
 
-alias CommandArgumentConvertorContainer = GenericConvertorContainer!(string, StringConvertorFactory);
+alias GetoptConvertorConvertorContainer = GenericConvertorContainer!(string, GetoptConvertorFactory);

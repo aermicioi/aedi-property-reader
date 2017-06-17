@@ -101,3 +101,39 @@ class ConvertorFactoryString(ToType) : ConvertorFactory!(string, ToType) {
         }
     }
 }
+
+class FailingConvertorFactory(ToType) : ConvertorFactory!(string, ToType) {
+    public {
+        string convertible_;
+        Locator!() locator_;
+    }
+    
+    public {
+        @property {
+        	
+            FailingConvertorFactory!ToType convertible(string convertible) @safe nothrow {
+            	this.convertible_ = convertible;
+            
+            	return this;
+            }
+            
+            string convertible() @safe nothrow {
+            	return this.convertible_;
+            }
+            
+            FailingConvertorFactory!ToType locator(Locator!() locator) @safe nothrow {
+            	this.locator_ = locator;
+            
+            	return this;
+            }
+            
+            TypeInfo type() {
+                return typeid(ToType);
+            }
+        }
+        
+        ToType factory() {
+            throw new Exception("");
+        }
+    }
+}
