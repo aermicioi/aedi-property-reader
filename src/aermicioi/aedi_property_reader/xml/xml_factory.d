@@ -143,7 +143,7 @@ package {
         } catch (ConvException e) {
             throw new InvalidCastException(
                 "Could not convert xml " ~ 
-                json.toString() ~ 
+                xml.toString() ~ 
                 " value to type " ~ 
                 fullyQualifiedName!T, 
                 e
@@ -165,7 +165,7 @@ package {
         } catch (ConvException e) {
             throw new InvalidCastException(
                 "Could not convert xml " ~ 
-                json.toString() ~ 
+                xml.toString() ~ 
                 " value to type " ~ 
                 fullyQualifiedName!T, 
                 e
