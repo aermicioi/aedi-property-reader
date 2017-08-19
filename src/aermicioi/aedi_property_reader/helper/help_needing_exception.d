@@ -30,23 +30,47 @@ Authors:
 module aermicioi.aedi_property_reader.helper.help_needing_exception;
 
 import aermicioi.aedi_property_reader.helper.help_decorating_information_provider;
+
+/**
+An exception that bubbles up to main function where it can be catched for proper
+handling of wrong passed arguments, or missing arguments from command line or any other
+source of properties.
+**/
 class HelpNeedingException : Exception {
     private {
         HelpInformationProvider[] providers;
     }
     
     public {
+        /**
+        Constructor for HelpNeedingException
+        
+        Params: 
+            providers = a list of help providers used to print exception message.
+            file = file in which exception occured.
+            line = line at which exception was thrown.
+            throwable = next exception in chain of exceptions.
+        **/
         @nogc @safe pure nothrow this(HelpInformationProvider[] providers, string file = __FILE__, size_t line = __LINE__, Throwable next = null)
         {
             this.providers = providers;
             super(msg, file, line, next);
         }
     
+        /**
+        ditto
+        **/
         @nogc @safe pure nothrow this(HelpInformationProvider[] providers, Throwable next, string file = __FILE__, size_t line = __LINE__)
         {
             this(providers, file, line, next);
         }
         
+        /**
+        Convert exception into a nice printable version.
+        
+        Params: 
+            sink = sink to where to print exception.
+        **/
         override void toString(scope void delegate(in char[]) sink) const {
             foreach (provider; this.providers) {
                 provider.message(sink);

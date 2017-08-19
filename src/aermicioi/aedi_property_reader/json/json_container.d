@@ -37,6 +37,9 @@ import std.json;
 import std.range;
 import std.typecons;
 
+/**
+Json document data source/locator used by converting containers.
+**/
 class JsonLocator : Locator!(JSONValue, string) {
     
     private {
@@ -46,6 +49,15 @@ class JsonLocator : Locator!(JSONValue, string) {
     public {
         
         @property {
+			/**
+			Set json
+			
+			Params: 
+				json = json document used as source
+			
+			Returns:
+				typeof(this)
+			**/
         	JsonLocator json(JSONValue json) @safe nothrow
         	in {
         	    assert(json.type == JSON_TYPE.OBJECT, "Json value for locator should be of object type");
@@ -56,6 +68,12 @@ class JsonLocator : Locator!(JSONValue, string) {
         		return this;
         	}
         	
+			/**
+			Get json
+			
+			Returns:
+				JSONValue
+			**/
         	JSONValue json() @safe nothrow {
         		return this.json_;
         	}
@@ -104,4 +122,7 @@ class JsonLocator : Locator!(JSONValue, string) {
     }
 }
 
+/**
+Generic convertor container version for json documents.
+**/
 alias JsonConvertorContainer = GenericConvertorContainer!(JSONValue, JsonConvertorFactory);

@@ -31,10 +31,33 @@ module aermicioi.aedi_property_reader.convertor_factory;
 
 import aermicioi.aedi.factory;
 
+/**
+An interface for factories that convert some FromType data to ToType component.
+
+Params:
+	FromType = original representation form of data to be converted.
+	ToType = type of component that is built based on FromType data.
+**/
 interface ConvertorFactory(FromType, ToType) : Factory!ToType {
     
     public {
+
+		/**
+		Get convertible data
+		
+		Returns:
+			FromType
+		**/
         FromType convertible() @safe nothrow;
+
+		/**
+		Set convertible
+		
+		Params: 
+			convertible = data that the factory should convert into ToType component
+		Returns:
+			ConvertorFactory!(FromType, ToType)
+		**/
         ConvertorFactory!(FromType, ToType) convertible(FromType convertible) @safe nothrow;
     }
 }

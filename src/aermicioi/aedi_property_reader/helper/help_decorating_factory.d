@@ -36,32 +36,65 @@ import aermicioi.aedi.factory.factory;
 import aermicioi.aedi.storage.locator;
 import std.range;
 
+/**
+A decorating factory that on exceptions chains help decorating exception to signal 
+help decorating container to throw help messages if enabled.
+**/
 class HelpDecoratingFactory(T : Factory!Z, Z) : 
     Factory!Z, 
     MutableDecorator!T
 {
     private {
         
-        
         T decorated_;
     }
     
     public {
         @property {
+			/**
+            Set the decorated object for decorator.
+            
+            Params:
+                decorated = decorated data
+            
+            Returns:
+            	this
+            **/
             HelpDecoratingFactory!T decorated(T decorated) @safe nothrow {
             	this.decorated_ = decorated;
             
             	return this;
             }
             
+			/**
+            Get the decorated object.
+            
+            Returns:
+            	T decorated object
+            **/
             T decorated() @safe nothrow {
             	return this.decorated_;
             }
             
+			/**
+    		Get the type info of T that is created.
+    		
+    		Returns:
+    			TypeInfo object of created component.
+    		**/
         	TypeInfo type() {
         	    return this.decorated.type;
         	}
         	
+			/**
+			Set a locator to object.
+			
+			Params:
+				locator = the locator that is set to oject.
+			
+			Returns:
+				LocatorAware.
+			**/
         	HelpDecoratingFactory!T locator(Locator!() locator) @safe nothrow {
         		this.decorated.locator = locator;
         	
@@ -69,11 +102,20 @@ class HelpDecoratingFactory(T : Factory!Z, Z) :
         	}
         }
         
+		/**
+		Instantiates component of type Z.
+		
+		Throws:
+			HelpDecoratingException when an exception from underlying factory is thrown.
+
+		Returns:
+			Z instantiated component.
+		**/
         Z factory() {
             try {
                 return this.decorated.factory;
             } catch (Exception e) {
-                import aermicioi.aedi_property_reader.helper.help_decorating_exception;
+                import aermicioi.aedi_property_reader.helper.help_decorating_exception : HelpDecoratingException;
                 
                 throw new HelpDecoratingException("Error occured in help managed factory", e);
             }
@@ -81,6 +123,10 @@ class HelpDecoratingFactory(T : Factory!Z, Z) :
     }
 }
 
+/**
+A decorating factory that on exceptions chains help decorating exception to signal 
+help decorating container to throw help messages if enabled.
+**/
 class HelpDecoratingConvertorFactory(T : ConvertorFactory!(FromType, ToType), FromType, ToType) : 
     ConvertorFactory!(FromType, ToType), 
     MutableDecorator!T
@@ -91,43 +137,96 @@ class HelpDecoratingConvertorFactory(T : ConvertorFactory!(FromType, ToType), Fr
     
     public {
         @property {
+
+			/**
+            Set the decorated object for decorator.
+            
+            Params:
+                decorated = decorated data
+            
+            Returns:
+            	this
+            **/
             HelpDecoratingConvertorFactory!T decorated(T decorated) @safe nothrow {
             	this.decorated_ = decorated;
             
             	return this;
             }
             
+			/**
+            Get the decorated object.
+            
+            Returns:
+            	T decorated object
+            **/
             T decorated() @safe nothrow {
             	return this.decorated_;
             }
             
-            
+            /**
+			Set convertible
+			
+			Params: 
+				convertible = data that the factory should convert into ToType component
+			Returns:
+				ConvertorFactory!(FromType, ToType)
+			**/
         	HelpDecoratingConvertorFactory!T convertible(string convertible) @safe nothrow {
         		this.decorated.convertible = convertible;
         	
         		return this;
         	}
         	
+			/**
+			Get convertible data
+			
+			Returns:
+				FromType
+			**/
         	string convertible() @safe nothrow {
         		return this.decorated.convertible;
         	}
         	
+			/**
+			Set a locator to object.
+			
+			Params:
+				locator = the locator that is set to oject.
+			
+			Returns:
+				LocatorAware.
+			**/
         	HelpDecoratingConvertorFactory!T locator(Locator!() locator) @safe nothrow {
         		this.decorated.locator = locator;
         	
         		return this;
         	}
         	
+			/**
+    		Get the type info of T that is created.
+    		
+    		Returns:
+    			TypeInfo object of created component.
+    		**/
         	TypeInfo type() {
         	    return this.decorated.type;
         	}
         }
         
+		/**
+		Instantiates component of type ToType.
+		
+		Throws:
+			HelpDecoratingException when an exception from underlying factory is thrown.
+
+		Returns:
+			ToType instantiated component.
+		**/
         ToType factory() {
             try {
                 return this.decorated.factory;
             } catch (Exception e) {
-                import aermicioi.aedi_property_reader.helper.help_decorating_exception;
+                import aermicioi.aedi_property_reader.helper.help_decorating_exception : HelpDecoratingException;
                 
                 throw new HelpDecoratingException("Error occured in help managed factory", e);
             }

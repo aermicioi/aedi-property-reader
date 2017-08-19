@@ -35,10 +35,13 @@ import aermicioi.aedi_property_reader.arg.arg_factory;
 import aermicioi.aedi_property_reader.helper.help_decorating_exception;
 import aermicioi.aedi.exception.not_found_exception;
 import aermicioi.aedi.storage.alias_aware;
-import std.range;
 import std.algorithm;
+import std.range;
 import std.utf;
 
+/**
+Command line arguments data source/locator used by converting containers.
+**/
 class GetoptIdentityLocator : Locator!(string, string) {
     
     private {
@@ -47,26 +50,35 @@ class GetoptIdentityLocator : Locator!(string, string) {
     
     public {
         
+        /**
+        Default constructor for GetoptIdentityLocator
+        **/
         this() {
             import core.runtime;
             this(Runtime.args());
         }
         
+        /**
+        Constructor for GetoptIdentityLocator
+        
+        Params: 
+            args = command line arguments used as source of them.
+        **/
         this(string[] args) {
             this.args = args;
         }
         
 		/**
-		Get an Type that is associated with key.
+		Check if command line argument exists, and return identity of it.
 		
 		Params:
-			identity = the element id.
+			identity = the command line argument id.
 			
 		Throws:
-			NotFoundException in case if the element wasn't found.
+			NotFoundException in case if the command line argument wasn't found.
 		
 		Returns:
-			Type element if it is available.
+			string identity of command line argument if it is available.
 		**/
         string get(string identity) {
             if (!this.has(identity)) {
@@ -78,16 +90,13 @@ class GetoptIdentityLocator : Locator!(string, string) {
         }
         
         /**
-        Check if an element is present in Locator by key id.
+        Check if an command line argument is present in list of arguments by key id.
         
-        Note:
-        	This check should be done for elements that locator actually contains, and
-        	not in chained locator (when locator is also a DelegatingLocator) for example.
         Params:
         	identity = identity of element.
         	
     	Returns:
-    		bool true if an element by key is present in Locator.
+    		bool true if an command line argument by key is present in arguments.
         **/
         bool has(in string identity) inout {
             foreach (const arg; this.args[1 .. $]) {
@@ -110,4 +119,7 @@ class GetoptIdentityLocator : Locator!(string, string) {
     }
 }
 
+/**
+Generic convertor container version for command line arguments.
+**/
 alias GetoptConvertorContainer = GenericConvertorContainer!(string, GetoptConvertorFactory);

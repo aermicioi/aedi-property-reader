@@ -38,6 +38,13 @@ import aermicioi.aedi.exception;
 import std.traits;
 import std.xml;
 
+/**
+A convertor factory that uses custom fromXml family of functions to convert xml Element into To types.
+
+Params:
+	FromType = original representation form of data to be converted.
+	ToType = type of component that is built based on FromType data.
+**/
 class XmlConvertorFactory(To, From : Element = Element) : ConvertorFactory!(Element, To) {
     
     private {
@@ -49,20 +56,49 @@ class XmlConvertorFactory(To, From : Element = Element) : ConvertorFactory!(Elem
     public {
         
         @property {
+            /**
+            Set convertible
+            
+            Params: 
+                convertible = data that the factory should convert into ToType component
+            Returns:
+                XmlConvertorFactory!(To, From)
+            **/
         	XmlConvertorFactory!(To, From) convertible(Element convertible) @safe nothrow {
         		this.convertible_ = convertible;
         	
         		return this;
         	}
         	
+            /**
+            Get convertible data
+            
+            Returns:
+                FromType
+            **/
         	Element convertible() @safe nothrow {
         		return this.convertible_;
         	}
         	
+            /**
+    		Get the type info of T that is created.
+    		
+    		Returns:
+    			TypeInfo object of created component.
+    		**/
         	TypeInfo type() {
         	    return typeid(To);
         	}
         	
+            /**
+            Set a locator to object.
+            
+            Params:
+                locator = the locator that is set to oject.
+            
+            Returns:
+                LocatorAware.
+            **/
         	XmlConvertorFactory!(To, From) locator(Locator!() locator) @safe nothrow {
         		this.locator_ = locator;
         	
@@ -70,6 +106,12 @@ class XmlConvertorFactory(To, From : Element = Element) : ConvertorFactory!(Elem
         	}
         }
         
+        /**
+		Instantiates component of type To.
+		
+		Returns:
+			To instantiated component.
+		**/
         To factory() {
             return fromXml!To(this.convertible());
         }
@@ -77,22 +119,64 @@ class XmlConvertorFactory(To, From : Element = Element) : ConvertorFactory!(Elem
 }
 
 package {
-    import std.conv : to;
+    import std.conv : to, ConvException;
     
+    /**
+    Convert xml Element into T scalar/array/assocarray value.
+    
+    As converting value only text of xml element is taken into consideration.
+
+    Params: 
+        value = storage where to put converted xml Element
+        xml = the data that is to be converted.
+    Throws: 
+        InvalidCastException when the type of value does not match stored data.
+    Returns:
+        value
+    **/
     auto ref T fromXml(T)(auto ref T value, auto ref Element xml) 
         if (isNumeric!T) {
         
-        value = xml.text.to!T;
-        return value;
-    }
+        try {
+
+            value = xml.text.to!T;
+        } catch (ConvException e) {
+            throw new InvalidCastException(
+                "Could not convert xml " ~ 
+                json.toString() ~ 
+                " value to type " ~ 
+                fullyQualifiedName!T, 
+                e
+            );
+        }
         
-    auto ref T fromXml(T)(auto ref T value, auto ref Element xml) 
-        if (isSomeString!T) {
-        
-        value = xml.text.to!T;
         return value;
     }
     
+    /**
+    ditto
+    **/
+    auto ref T fromXml(T)(auto ref T value, auto ref Element xml) 
+        if (isSomeString!T) {
+        
+        try {
+
+            value = xml.text.to!T;
+        } catch (ConvException e) {
+            throw new InvalidCastException(
+                "Could not convert xml " ~ 
+                json.toString() ~ 
+                " value to type " ~ 
+                fullyQualifiedName!T, 
+                e
+            );
+        }
+        return value;
+    }
+    
+    /**
+    ditto
+    **/
     auto ref T fromXml(T : Z[], Z)(auto ref T value, auto ref Element xml)
         if (!isSomeString!T) {
         
@@ -103,6 +187,9 @@ package {
         return value;
     }
     
+    /**
+    ditto
+    **/
     auto ref T fromXml(T : Z[string], Z)(auto ref T value, auto ref Element xml) {
         
         foreach (ref el; xml.elements) {
@@ -113,6 +200,9 @@ package {
         return value;
     }
     
+    /**
+    ditto
+    **/
     T fromXml(T)(auto ref Element xml)
         if (isNumeric!T) {
         
@@ -122,6 +212,9 @@ package {
         return value;
     }
     
+    /**
+    ditto
+    **/
     T fromXml(T)(auto ref Element xml)
         if (isSomeString!T) {
         
@@ -131,6 +224,9 @@ package {
         return value;
     }
     
+    /**
+    ditto
+    **/
     T fromXml(T : Z[], Z)(auto ref Element xml)
         if (!isSomeString!T) {
 
@@ -140,6 +236,9 @@ package {
         return array;
     }
     
+    /**
+    ditto
+    **/
     T fromXml(T : Z[string], Z)(auto ref Element xml) {
         
         T assoc;

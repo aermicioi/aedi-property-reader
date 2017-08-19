@@ -42,19 +42,29 @@ import aermicioi.aedi_property_reader.xml;
 import std.json;
 import std.xml;
 
+/**
+Configuration context for convertor containers, that provides a nice property configuration interface.
+**/
 struct ConvertorContext(T : Storage!(ConvertorFactory!(FromType, Object), string), FromType) {
     
     public {
+        /**
+        Underlying container that is configured
+        **/
         T container;
+
+        alias container this;
         
-        static if (is(T : GenericConvertorContainer!(FromType, DefaultFactory), alias DefaultFactory)) {
-            auto property(ToType)(string path) {
-                import std.traits;
-                
-                return this.property!(DefaultFactory!(ToType, FromType), ToType)(path);
-            }
-        }
+        /**
+        Register a property into converting container
         
+        Params: 
+            path = the path or identity of property
+            ToType = the type of property that is registered
+        
+        Returns:
+            ConvertorFactory!(FromType, ToType)
+        **/
         auto property(Factory : ConvertorFactory!(FromType, ToType), ToType)(string path) {
             
             auto implementation = new Factory;
@@ -64,17 +74,46 @@ struct ConvertorContext(T : Storage!(ConvertorFactory!(FromType, Object), string
             
             return implementation;
         }
+
+        static if (is(T : GenericConvertorContainer!(FromType, DefaultFactory), alias DefaultFactory)) {
+            
+            /**
+            ditto
+            **/
+            auto property(ToType)(string path) {
+                import std.traits;
+                
+                return this.property!(DefaultFactory!(ToType, FromType), ToType)(path);
+            }
+        }
     }
 }
 
+/**
+Create a configuration context for container.
+
+Params:
+    container = container that is to be configured using ConvertorContext
+**/
 auto configure(T : Storage!(ConvertorFactory!(FromType, Object), string), FromType)(T container) {
     return ConvertorContext!(T, FromType)(container);
 }
 
+/**
+Create a convertor container with data source being environment variables.
+
+Params: 
+    locator = source of data for container to use to construct components.
+Returns:
+    EnvironmentConvertorContainer
+**/
 auto environment() {
     return environment(new EnvironmentLocator());
 }
 
+/**
+ditto
+**/
 auto environment(Locator!(string, string) locator) {
     auto container = new EnvironmentConvertorContainer;
     container.locator = locator;
@@ -82,10 +121,21 @@ auto environment(Locator!(string, string) locator) {
     return container;
 }
 
+/**
+Create a convertor container with data source being command line arguments.
+
+Params: 
+    locator = source of data for container to use to construct components.
+Returns:
+    GetoptConvertorContainer
+**/
 auto argument() {
     return argument(new GetoptIdentityLocator());
 }
 
+/**
+ditto
+**/
 auto argument(Locator!(string, string) locator) {
     auto container = new GetoptConvertorContainer;
     container.locator = locator;
@@ -93,10 +143,21 @@ auto argument(Locator!(string, string) locator) {
     return container;
 }
 
+/**
+Create a convertor container with data source being json document.
+
+Params: 
+    locator = source of data for container to use to construct components.
+Returns:
+    JsonConvertorContainer
+**/
 auto json() {
     return json(new JsonLocator());
 }
 
+/**
+ditto
+**/
 auto json(Locator!(JSONValue, string) locator) {
     auto container = new JsonConvertorContainer();
     container.locator = locator;
@@ -104,10 +165,21 @@ auto json(Locator!(JSONValue, string) locator) {
     return container;
 }
 
+/**
+Create a convertor container with data source being xml document.
+
+Params: 
+    locator = source of data for container to use to construct components.
+Returns:
+    XmlConvertorContainer
+**/
 auto xml() {
     return xml(new XmlLocator);
 }
 
+/**
+ditto
+**/
 auto xml(Locator!(Element, string) locator) {
     auto container = new XmlConvertorContainer;
     container.locator = locator;

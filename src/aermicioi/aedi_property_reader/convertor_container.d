@@ -32,11 +32,41 @@ module aermicioi.aedi_property_reader.convertor_container;
 import aermicioi.aedi;
 import aermicioi.aedi_property_reader.convertor_factory;
 
-interface ConvertorContainer(FromType) : Container, Storage!(ConvertorFactory!(FromType, Object)) {
+/**
+An interface for containers that are storing convertor factories.
+
+An interface for containers that are storing convertor factories and are
+able to use a source of FromType data to provision contained factories with
+required FromType data to build components out of it.
+
+Params:
+	FromType = original form of data based on which components are constructed.
+	KeyType = identity's type of converter factory.
+**/
+interface ConvertorContainer(FromType, KeyType = string) : 
+	Container, 
+	Storage!(ConvertorFactory!(FromType, Object), KeyType) {
     
     public {
         @property {
+
+			/**
+			Get locator of FromType data
+			
+			Returns:
+				Locator!(FromType, string)
+			**/
         	Locator!(FromType, string) locator() @safe nothrow;
+
+			/**
+			Set locator
+			
+			Params: 
+				locator = locator that provides container with FromType data for convertor factories
+			
+			Returns:
+				ConvertorContainer!FromType
+			**/
         	ConvertorContainer!FromType locator(Locator!(FromType, string) locator) @safe nothrow;
         }
     }

@@ -44,27 +44,44 @@ import std.range.interfaces;
 import std.typecons;
 import std.algorithm;
 
+/**
+An interface for class that can toggle on or off help information.
+**/
 interface HelpInformationToggable {
     @property {
+        /**
+        Set on or off help information displaying.
+        
+        Params: 
+            helpEnabled = whether help info is enabled or not
+            
+        Returns:
+            typeof(this)
+        **/
     	HelpInformationToggable helpEnabled(bool helpEnabled) @safe nothrow;
     }
 }
 
 /**
-Templated switchable decorated.
+Templated help decorating container.
 
-Templated switchable decorated. This decorated will
-decorate another decorated, and add switching logic 
-to it. Depending in which state (on/off) the switching 
-decorated is. It will instantiate if the decorated is on, 
-and not if decorated is in off mode. This decorated will
-inherit following interfaces only and only if the 
+Templated help decorating container. This decorated will
+decorate a container, and add help information logic 
+to it. Depending if help information is on or off, it
+will display or not help information on stdout for end user. 
+This decorated will inherit following interfaces only and only if the 
 T also implements them:
-    $(OL
-        $(LI Storage!(ObjectFactory, string))
-        $(LI Container)
-        $(LI AliasAware!string)
+    $(UL
+        $(LI $(D_INLINECODE Storage!(ObjectFactory, string)))
+        $(LI $(D_INLINECODE Container))
+        $(LI $(D_INLINECODE AliasAware!string))
+        $(LI $(D_INLINECODE FactoryLocator!ObjectFactory))
     )
+
+Following interface is a must for decorated container:
+$(UL
+    $(LI $(D_INLINECODE Locator!())),
+)
 
 Params:
     T = The decorated that switchable decorated will decorate.
@@ -105,7 +122,7 @@ template HelpDecoratingContainer(T) {
     );
 
     /**
-    Templated switchable decorated.
+    Templated help decorating container.
     **/
     class HelpDecoratingContainer : InheritanceSet {
         private {
@@ -117,24 +134,39 @@ template HelpDecoratingContainer(T) {
         
         public {
             
+            /**
+            Set on or off help information displaying.
+            
+            Params: 
+                helpEnabled = whether help info is enabled or not
+                
+            Returns:
+                typeof(this)
+            **/
             HelpDecoratingContainer helpEnabled(bool helpEnabled) @safe nothrow {
             	this.helpEnabled_ = helpEnabled;
             
             	return this;
             }
             
+            /**
+            Get helpEnabled
+            
+            Returns:
+                bool
+            **/
             bool helpEnabled() @safe nothrow {
             	return this.helpEnabled_;
             }
             
             /**
-            Set the decorated decorated
+            Set the decorated container
             
             Params:
-                decorated = decorated to be decorated
+                decorated = container to be decorated
                 
             Returns:
-                HelpDecoratingContainer!T decorating decorated.
+                HelpDecoratingContainer!T decorating container.
             **/
             HelpDecoratingContainer!T decorated(T decorated) @safe nothrow {
             	this.decorated_ = decorated;
@@ -144,23 +176,39 @@ template HelpDecoratingContainer(T) {
             
             
             /**
-            Get the decorated decorated.
-            
-            Get the decorated decorated.
+            Get the decorated container.
             
             Returns:
-            	inout(T) decorated decorated
+            	inout(T) decorated container
             **/
             T decorated() @safe nothrow {
             	return this.decorated_;
             }
             
+            /**
+            Add a help provider
+            
+            Params: 
+                provider = help provider that supplies help text
+                
+            Returns:
+                typeof(this)
+            **/
             HelpDecoratingContainer addHelpProvider(HelpInformationProvider provider) {
             	this.providers_ ~= provider;
             
             	return this;
             }
             
+            /**
+            Remove a help provider from help decorating container
+            
+            Params: 
+                key = index of provider to be removed
+                
+            Returns:
+                typeof(this)
+            **/
             HelpDecoratingContainer removeHelpProvider(size_t key) {
             	import std.algorithm;
             	this.providers_ = this.providers_.remove(key);
@@ -168,6 +216,16 @@ template HelpDecoratingContainer(T) {
             	return this;
             }
             
+            /**
+            Get help provider used by help decorating container
+            
+            Params: 
+                key = index of fetched provider
+            Throws: 
+                NotFoundException when no decorator is present
+            Returns:
+                HelpInformationProvider
+            **/
             HelpInformationProvider getHelpProvider(size_t key) {
                 
                 if (key >= this.providers_.length) {
@@ -185,7 +243,7 @@ template HelpDecoratingContainer(T) {
                 Prepare decorated to be used.
 
                 Returns:
-                	HelpDecoratingContainer!T decorating decorated
+                	HelpDecoratingContainer!T decorating container
                 **/
                 HelpDecoratingContainer instantiate() {
                     try {
@@ -297,10 +355,31 @@ template HelpDecoratingContainer(T) {
             
             static if (is(T : FactoryLocator!ObjectFactory)) {
                 
+                /**
+                Get factory for constructed component identified by identity.
+                
+                Get factory for constructed component identified by identity.
+                Params:
+                    identity = the identity of data that factory constructs.
+                
+                Throws:
+                    NotFoundException when factory for it is not found.
+                
+                Returns:
+                    T the factory for constructed data.
+                **/
                 ObjectFactory getFactory(string identity) {
                     return this.decorated.getFactory(identity);
                 }
                 
+                /**
+                Get all factories available in container.
+                
+                Get all factories available in container.
+                
+                Returns:
+                    InputRange!(Tuple!(T, string)) a tuple of factory => identity.
+                **/
                 InputRange!(Tuple!(ObjectFactory, string)) getFactories() {
                     return this.decorated.getFactories();
                 }

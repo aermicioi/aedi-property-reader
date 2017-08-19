@@ -31,10 +31,23 @@ module aermicioi.aedi_property_reader.helper.help_decorating_information_provide
 
 import std.range;
 
+/**
+Interface for objects that write help messages into a sink
+**/
 interface HelpInformationProvider {
+
+	/**
+	Write a help message into sink.
+	
+	Params: 
+		sink = the sink where to write the help message
+	**/
     void message(scope void delegate(in char[] ch) sink) const;
 }
 
+/**
+Implementation of HelpInformationProvider that provides help information for command line arguments.
+**/
 class ArgumentInformationProvider : HelpInformationProvider {
     private {
         
@@ -45,37 +58,89 @@ class ArgumentInformationProvider : HelpInformationProvider {
     
     public {
         @property {
+
+			/**
+			Set argument
+			
+			Params: 
+				argument = the argument for which help usage is printed
+			
+			Returns:
+				typeof(this)
+			**/
         	ArgumentInformationProvider argument(string argument) @safe nothrow {
         		this.argument_ = argument;
         	
         		return this;
         	}
         	
+			/**
+			Get argument
+			
+			Returns:
+				string
+			**/
         	string argument() @safe nothrow const {
         		return this.argument_;
         	}
         	
+			/**
+			Set separator
+			
+			Params: 
+				separator = separator string used to separate argument from equal and from message
+			
+			Returns:
+				typeof(this)
+			**/
         	ArgumentInformationProvider separator(string separator) @safe nothrow {
         		this.separator_ = separator;
         	
         		return this;
         	}
         	
+			/**
+			Get separator
+			
+			Returns:
+				string
+			**/
         	string separator() @safe nothrow const {
         		return this.separator_;
         	}
         	
+			/**
+			Set help
+			
+			Params: 
+				help = help message for argument
+			
+			Returns:
+				typeof(this)
+			**/
         	ArgumentInformationProvider help(string help) @safe nothrow {
         		this.help_ = help;
         	
         		return this;
         	}
         	
+			/**
+			Get help
+			
+			Returns:
+				string
+			**/
         	string help() @safe nothrow const {
         		return this.help_;
         	}
         }
         
+		/**
+		Write a help message into sink.
+		
+		Params: 
+			sink = the sink where to write the help message
+		**/
         void message(scope void delegate(in char[] ch) sink) const 	{
             import std.utf;
     		foreach (ch; chain(this.argument, this.separator, this.help).byChar) {

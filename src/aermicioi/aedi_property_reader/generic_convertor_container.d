@@ -35,8 +35,15 @@ import aermicioi.aedi_property_reader.convertor_factory;
 import std.range;
 import std.typecons;
 
+/**
+An implementation of ConvertorContainer.
+
+Params:
+    FromType = original form of data based on which components are constructed.
+    DefaultConvertorFactory = convertor factory that is used by default in this container (used for some generic stuff)
+**/
 class GenericConvertorContainer(FromType, alias DefaultConvertorFactory) : 
-    Container, Storage!(ConvertorFactory!(FromType, Object), string), FactoryLocator!(Factory!Object) {
+    ConvertorContainer!(FromType, string), FactoryLocator!(Factory!Object) {
     
     private {
         
@@ -46,30 +53,69 @@ class GenericConvertorContainer(FromType, alias DefaultConvertorFactory) :
     }
     
     public {
+        
+        /**
+        Default constructor for GenericConvertorContainer!(FromType, DefaultConvertorFactory)
+        **/
         this() {
             this.instantiated = new ObjectStorage!();
             this.convertors = new ObjectStorage!(ConvertorFactory!(FromType, Object), string);
         }
         
         @property {
-        	
+        	/**
+			Set locator
+			
+			Params: 
+				locator = locator that provides container with FromType data for convertor factories
+			
+			Returns:
+				GenericConvertorContainer!(FromType, DefaultConvertorFactory)
+			**/
             GenericConvertorContainer!(FromType, DefaultConvertorFactory) locator(Locator!(FromType, string) locator) @safe nothrow {
             	this.locator_ = locator;
             
             	return this;
             }
             
+            /**
+			Get locator of FromType data
+			
+			Returns:
+				Locator!(FromType, string)
+			**/
             Locator!(FromType, string) locator() @safe nothrow {
             	return this.locator_;
             }
         }
-                
+        
+        /**
+		Save a convertor factory in GenericConvertorContainer by key identity.
+		
+		Params:
+			key = identity of element in GenericConvertorContainer.
+			factory = convertor factory which is to be saved in GenericConvertorContainer.
+			
+		Return:
+			GenericConvertorContainer!(FromType, DefaultConvertorFactory) 
+		**/
         GenericConvertorContainer!(FromType, DefaultConvertorFactory) set(ConvertorFactory!(FromType, Object) factory, string key) {
             this.convertors.set(factory, key);
             
             return this;
         }
         
+        /**
+        Remove an convertor factory from GenericConvertorContainer with identity.
+        
+        Remove an convertor factory from GenericConvertorContainer with identity. If there is no convertor factory by provided identity, then no action is performed.
+        
+        Params:
+        	key = the identity of convertor factory to be removed.
+        	
+    	Return:
+    		GenericConvertorContainer!(FromType, DefaultConvertorFactory)
+        **/
         GenericConvertorContainer!(FromType, DefaultConvertorFactory) remove(string key) {
             this.convertors.remove(key);
             this.instantiated.remove(key);
@@ -77,6 +123,18 @@ class GenericConvertorContainer(FromType, alias DefaultConvertorFactory) :
             return this;
         }
         
+        /**
+		Get a component that is associated with key.
+		
+		Params:
+			key = the component id.
+			
+		Throws:
+			NotFoundException in case if the component wasn't found.
+		
+		Returns:
+			Object, component if it is available.
+		**/
         Object get(string key) {
             
             if (!this.instantiated.has(key)) {
@@ -97,10 +155,24 @@ class GenericConvertorContainer(FromType, alias DefaultConvertorFactory) :
             return this.instantiated.get(key);
         }
         
+        /**
+        Check if a component is present in Locator by key id.
+        
+        Params:
+        	key = identity of element.
+        	
+    	Returns:
+    		bool true if an component by key is present in Locator.
+        **/
         bool has(in string key) inout {
             return this.convertors.has(key) && this.locator_.has(key);
         }
         
+        /**
+        Sets up the internal state of container.
+        
+        Sets up the internal state of container (Ex, for singleton container it will spawn all objects that locator contains).
+        **/
         GenericConvertorContainer!(FromType, DefaultConvertorFactory) instantiate() {
             import std.algorithm : filter;
             foreach (pair; this.convertors.contents.byKeyValue.filter!((pair) => pair.key !in this.instantiated.contents)) {
@@ -115,10 +187,31 @@ class GenericConvertorContainer(FromType, alias DefaultConvertorFactory) :
             return this;
         }
         
+        /**
+        Get factory for constructed component identified by identity.
+        
+        Get factory for constructed component identified by identity.
+        Params:
+        	identity = the identity of component that factory constructs.
+        
+        Throws:
+        	NotFoundException when factory for it is not found.
+        
+        Returns:
+        	T the factory for constructed component.
+        **/
         ObjectFactory getFactory(string identity) {
             return this.convertors.get(identity);
         }
         
+        /**
+        Get all factories available in container.
+        
+        Get all factories available in container.
+        
+        Returns:
+        	InputRange!(Tuple!(T, string)) a tuple of factory => identity.
+        **/
         InputRange!(Tuple!(Factory!(Object), string)) getFactories() {
             import std.algorithm;
             

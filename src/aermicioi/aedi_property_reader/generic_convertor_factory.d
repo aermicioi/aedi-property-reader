@@ -34,7 +34,11 @@ import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.storage.wrapper;
 import aermicioi.aedi_property_reader.convertor_factory;
 
-class GenericObjectWrappingConvertorFactory(T : ConvertorFactory!(FromType, ToType), FromType, ToType) : ConvertorFactory!(FromType, Object), MutableDecorator!T {
+/**
+A factory that wraps any convertor factory into an interface that is compliant with generic convertor container, and rest of aedi containers.
+**/
+class GenericObjectWrappingConvertorFactory(T : ConvertorFactory!(FromType, ToType), FromType, ToType) : 
+	ConvertorFactory!(FromType, Object), MutableDecorator!T {
     
     private {
         T decorated_;
@@ -42,35 +46,85 @@ class GenericObjectWrappingConvertorFactory(T : ConvertorFactory!(FromType, ToTy
     
     public {
         
+		/**
+		Constructor for GenericObjectWrappingConvertorFactory!(T, FromType, ToType)
+		
+		Params: 
+			factory = wrapped factory
+		**/
         this(T factory) {
             this.decorated = factory;
         }
         
         @property {
+			/**
+			Set decorated
+			
+			Params: 
+				decorated = factory that is wrapped
+			
+			Returns:
+				typeof(this)
+			**/
             GenericObjectWrappingConvertorFactory!T decorated(T decorated) @safe nothrow {
             	this.decorated_ = decorated;
             
             	return this;
             }
             
+			/**
+			Get decorated
+			
+			Returns:
+				T
+			**/
             T decorated() @safe nothrow {
             	return this.decorated_;
             }
             
+			/**
+			Set convertible
+			
+			Params: 
+				convertible = data that the factory should convert into ToType component
+			Returns:
+				ConvertorFactory!(FromType, ToType)
+			**/
         	GenericObjectWrappingConvertorFactory!T convertible(FromType convertible) @safe nothrow {
         		this.decorated.convertible = convertible;
         	
         		return this;
         	}
         	
+			/**
+			Get convertible data
+			
+			Returns:
+				FromType
+			**/
         	FromType convertible() @safe nothrow {
         		return this.decorated.convertible;
         	}
         	
+			/**
+    		Get the type info of T that is created.
+    		
+    		Returns:
+    			TypeInfo object of created component.
+    		**/
         	TypeInfo type() {
         	    return decorated.type;
         	}
         	
+			/**
+			Set a locator to object.
+			
+			Params:
+				locator = the locator that is set to oject.
+			
+			Returns:
+				GenericObjectWrappingConvertorFactory!T
+			**/
         	GenericObjectWrappingConvertorFactory!T locator(Locator!() locator) {
         		this.decorated.locator = locator;
         	
@@ -78,6 +132,12 @@ class GenericObjectWrappingConvertorFactory(T : ConvertorFactory!(FromType, ToTy
         	}
         }
         
+		/**
+		Instantiates component of type T.
+		
+		Returns:
+			T instantiated component.
+		**/
         Object factory() {
             
             static if (is(ToType : Object)) {

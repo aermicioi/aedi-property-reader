@@ -33,6 +33,13 @@ import aermicioi.aedi_property_reader.convertor_factory;
 import aermicioi.aedi_property_reader.helper.help_decorating_exception;
 import aermicioi.aedi.storage.locator;
 
+/**
+Convertor Factory for command line arguments.
+
+Params:
+	FromType = original representation form of data to be converted.
+	ToType = type of component that is built based on FromType data.
+**/
 class GetoptConvertorFactory(To, From : string = string) : ConvertorFactory!(From, To) {
     
     private {
@@ -42,11 +49,20 @@ class GetoptConvertorFactory(To, From : string = string) : ConvertorFactory!(Fro
     }
     
     public {
+        /**
+        Default constructor for GetoptConvertorFactory!(To, From)
+        **/
         this() {
             import core.runtime;
             this(Runtime.args());
         }
         
+        /**
+        Constructor for GetoptConvertorFactory!(To, From)
+        
+        Params: 
+            args = source from which constructor creates component.
+        **/
         this(string[] args) {
             this.args = args;
         }
@@ -54,7 +70,7 @@ class GetoptConvertorFactory(To, From : string = string) : ConvertorFactory!(Fro
         @property {
         	
             /**
-            Set identity.
+            Set convertible.
             
             Params:
             	identity = the value to be set
@@ -68,7 +84,7 @@ class GetoptConvertorFactory(To, From : string = string) : ConvertorFactory!(Fro
             }
             
             /**
-            Get identity
+            Get convertible
             
             Returns:
             	string
@@ -92,7 +108,7 @@ class GetoptConvertorFactory(To, From : string = string) : ConvertorFactory!(Fro
             }
             
             /**
-        		Get the type info of To that is created.
+            Get the type info of To that is created.
         		
     		Returns:
     			TypeInfo object of created object.

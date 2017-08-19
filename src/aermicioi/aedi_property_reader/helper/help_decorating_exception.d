@@ -32,6 +32,9 @@ module aermicioi.aedi_property_reader.helper.help_decorating_exception;
 
 import aermicioi.aedi.exception.di_exception;
 
+/**
+An exception thrown from help decorating factory when an exception in decorated container found.
+**/
 class HelpDecoratingException : AediException {
     
     pure nothrow this(string msg, string file = __FILE__, size_t line = __LINE__, Throwable next = null)

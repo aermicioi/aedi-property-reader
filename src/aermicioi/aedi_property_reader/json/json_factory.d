@@ -38,6 +38,13 @@ import aermicioi.aedi.exception;
 import std.json;
 import std.traits;
 
+/**
+A convertor factory that uses custom fromJson family of functions to convert JSONValue into To types.
+
+Params:
+	FromType = original representation form of data to be converted.
+	ToType = type of component that is built based on FromType data.
+**/
 class JsonConvertorFactory(To, From : JSONValue = JSONValue) : ConvertorFactory!(JSONValue, To) {
     
     private {
@@ -49,20 +56,49 @@ class JsonConvertorFactory(To, From : JSONValue = JSONValue) : ConvertorFactory!
     public {
         
         @property {
+            /**
+            Set convertible
+            
+            Params: 
+                convertible = data that the factory should convert into To component
+            Returns:
+                JsonConvertorFactory!(To, From)
+            **/
         	JsonConvertorFactory!(To, From) convertible(JSONValue convertible) @safe nothrow {
         		this.convertible_ = convertible;
         	
         		return this;
         	}
         	
+            /**
+            Get convertible data
+            
+            Returns:
+                JSONValue
+            **/
         	JSONValue convertible() @safe nothrow {
         		return this.convertible_;
         	}
         	
+            /**
+    		Get the type info of T that is created.
+    		
+    		Returns:
+    			TypeInfo object of created component.
+    		**/
         	TypeInfo type() {
         	    return typeid(To);
         	}
         	
+            /**
+            Set a locator to object.
+            
+            Params:
+                locator = the locator that is set to oject.
+            
+            Returns:
+                LocatorAware.
+            **/
         	JsonConvertorFactory!(To, From) locator(Locator!() locator) @safe nothrow {
         		this.locator_ = locator;
         	
@@ -70,6 +106,12 @@ class JsonConvertorFactory(To, From : JSONValue = JSONValue) : ConvertorFactory!
         	}
         }
         
+        /**
+		Instantiates component of type To.
+		
+		Returns:
+			To instantiated component.
+		**/
         To factory() {
             return fromJson!To(this.convertible());
         }
@@ -79,6 +121,17 @@ class JsonConvertorFactory(To, From : JSONValue = JSONValue) : ConvertorFactory!
 package {
     import std.conv : to;
     
+    /**
+    Convert JSONValue into T scalar/array/assocarray value.
+    
+    Params: 
+        value = storage where to put converted JSONValue
+        json = the data that is to be converted.
+    Throws: 
+        InvalidCastException when the type of value does not match stored data.
+    Returns:
+        value
+    **/
     auto ref fromJson(T)(auto ref T value, auto ref JSONValue json) 
         if (isFloatingPoint!T) {
         
@@ -91,6 +144,9 @@ package {
         return value;
     }
         
+    /**
+    ditto
+    **/
     auto ref fromJson(T)(auto ref T value, auto ref JSONValue json) 
         if (isUnsigned!T && isIntegral!T) {
         
@@ -107,7 +163,10 @@ package {
         
         return value;
     }
-        
+    
+    /**
+    ditto
+    **/
     auto ref fromJson(T)(auto ref T value, auto ref JSONValue json) 
         if (!isUnsigned!T && isIntegral!T) {
         
@@ -120,6 +179,9 @@ package {
         return value;
     }
         
+    /**
+    ditto
+    **/
     auto ref fromJson(T)(auto ref T value, auto ref JSONValue json) 
         if (isSomeString!T) {
         
@@ -132,6 +194,9 @@ package {
         return value;
     }
     
+    /**
+    ditto
+    **/
     auto ref fromJson(T : Z[], Z)(auto ref T value, auto ref JSONValue json)
         if (!isSomeString!T) {
         
@@ -145,6 +210,9 @@ package {
         return value;
     }
     
+    /**
+    ditto
+    **/
     auto ref fromJson(T : Z[string], Z)(auto ref T value, auto ref JSONValue json) {
         
         if (json.type != JSON_TYPE.OBJECT) {
@@ -161,6 +229,9 @@ package {
         return value;
     }
     
+    /**
+    ditto
+    **/
     T fromJson(T)(auto ref JSONValue json)
         if (isNumeric!T) {
         
@@ -170,6 +241,9 @@ package {
         return value;
     }
     
+    /**
+    ditto
+    **/
     T fromJson(T)(auto ref JSONValue json)
         if (isSomeString!T) {
         
@@ -178,6 +252,9 @@ package {
         return value;
     }
     
+    /**
+    ditto
+    **/
     T fromJson(T : Z[], Z)(auto ref JSONValue json)
         if (!isSomeString!T) {
         if (json.type != JSON_TYPE.ARRAY) {
@@ -191,6 +268,9 @@ package {
         return array;
     }
     
+    /**
+    ditto
+    **/
     T fromJson(T : Z[string], Z)(auto ref JSONValue json) {
         
         T assoc;

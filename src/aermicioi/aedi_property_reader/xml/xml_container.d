@@ -37,6 +37,9 @@ import std.xml;
 import std.range;
 import std.typecons;
 
+/**
+Xml document data source/locator used by converting containers.
+**/
 class XmlLocator : Locator!(Element) {
     
     private {
@@ -46,12 +49,27 @@ class XmlLocator : Locator!(Element) {
     public {
         
         @property {
+			/**
+			Set xml
+			
+			Params: 
+				xml = xml document used as source of data
+			
+			Returns:
+				typeof(this)
+			**/
         	XmlLocator xml(Element xml) @safe nothrow {
         		this.xml_ = xml;
         	
         		return this;
         	}
         	
+			/**
+			Get xml
+			
+			Returns:
+				Element
+			**/
         	Element xml() @safe nothrow {
         		return this.xml_;
         	}
@@ -100,4 +118,7 @@ class XmlLocator : Locator!(Element) {
     }
 }
 
+/**
+Generic convertor container version for xml documents.
+**/
 alias XmlConvertorContainer = GenericConvertorContainer!(Element, XmlConvertorFactory);

@@ -39,6 +39,13 @@ import std.traits;
 import std.xml;
 import std.conv;
 
+/**
+A convertor factory that uses conv.to method to convert strings into To types.
+
+Params:
+	FromType = original representation form of data to be converted.
+	ToType = type of component that is built based on FromType data.
+**/
 class StringConvertorFactory(To, From : string = string) : ConvertorFactory!(string, To) {
     
     private {
@@ -50,20 +57,49 @@ class StringConvertorFactory(To, From : string = string) : ConvertorFactory!(str
     public {
         
         @property {
+			/**
+			Set convertible
+			
+			Params: 
+				convertible = data that the factory should convert into To component
+			Returns:
+				StringConvertorFactory!(To, From)
+			**/
         	StringConvertorFactory!(To, From) convertible(string convertible) @safe nothrow {
         		this.convertible_ = convertible;
         	
         		return this;
         	}
         	
+			/**
+			Get convertible data
+			
+			Returns:
+				FromType
+			**/
         	string convertible() @safe nothrow {
         		return this.convertible_;
         	}
         	
+			/**
+    		Get the type info of To that is created.
+    		
+    		Returns:
+    			TypeInfo object of created component.
+    		**/
         	TypeInfo type() {
         	    return typeid(To);
         	}
         	
+			/**
+			Set a locator to object.
+			
+			Params:
+				locator = the locator that is set to oject.
+			
+			Returns:
+				LocatorAware.
+			**/
         	StringConvertorFactory!(To, From) locator(Locator!() locator) @safe nothrow {
         		this.locator_ = locator;
         	
@@ -71,6 +107,12 @@ class StringConvertorFactory(To, From : string = string) : ConvertorFactory!(str
         	}
         }
         
+		/**
+		Instantiates component of type To.
+		
+		Returns:
+			To instantiated component.
+		**/
         To factory() {
             return this.convertible.to!To;
         }

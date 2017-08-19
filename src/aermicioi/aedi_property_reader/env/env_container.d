@@ -36,6 +36,9 @@ import std.process;
 import std.range;
 import std.typecons;
 
+/**
+Environment variables data source/locator used by converting containers.
+**/
 class EnvironmentLocator : Locator!(string, string) {
     
     public {
@@ -77,4 +80,7 @@ class EnvironmentLocator : Locator!(string, string) {
     }
 }
 
+/**
+Generic convertor container version for environment variables.
+**/
 alias EnvironmentConvertorContainer = GenericConvertorContainer!(string, StringConvertorFactory);
