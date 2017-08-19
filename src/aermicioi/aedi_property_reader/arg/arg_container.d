@@ -110,4 +110,4 @@ class GetoptIdentityLocator : Locator!(string, string) {
     }
 }
 
-alias GetoptConvertorConvertorContainer = GenericConvertorContainer!(string, GetoptConvertorFactory);
+alias GetoptConvertorContainer = GenericConvertorContainer!(string, GetoptConvertorFactory);

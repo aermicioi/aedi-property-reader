@@ -66,7 +66,7 @@ class MockLocator : Locator!(string, string) {
     }
 }
 
-class ConvertorFactoryString(ToType) : ConvertorFactory!(string, ToType) {
+class ConvertorFactoryString(ToType, FromType : string = string) : ConvertorFactory!(FromType, ToType) {
     private {
         string convertible_;
         Locator!() locator_;
@@ -75,7 +75,7 @@ class ConvertorFactoryString(ToType) : ConvertorFactory!(string, ToType) {
     public {
         @property {
         	
-            ConvertorFactoryString!ToType convertible(string convertible) @safe nothrow {
+            ConvertorFactoryString!(ToType, FromType) convertible(string convertible) @safe nothrow {
             	this.convertible_ = convertible;
             
             	return this;
@@ -85,7 +85,7 @@ class ConvertorFactoryString(ToType) : ConvertorFactory!(string, ToType) {
             	return this.convertible_;
             }
             
-            ConvertorFactoryString!ToType locator(Locator!() locator) @safe nothrow {
+            ConvertorFactoryString!(ToType, FromType) locator(Locator!() locator) @safe nothrow {
             	this.locator_ = locator;
             
             	return this;

@@ -29,10 +29,10 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.generic_convertor_factory;
 
-import aermicioi.aedi_property_reader.convertor_factory;
 import aermicioi.aedi.storage.decorator;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.storage.wrapper;
+import aermicioi.aedi_property_reader.convertor_factory;
 
 class GenericObjectWrappingConvertorFactory(T : ConvertorFactory!(FromType, ToType), FromType, ToType) : ConvertorFactory!(FromType, Object), MutableDecorator!T {
     
@@ -84,7 +84,7 @@ class GenericObjectWrappingConvertorFactory(T : ConvertorFactory!(FromType, ToTy
                 return this.decorated.factory;
             } else {
                 
-                return new Wrapper!ToType(this.decorated.factory);
+                return new WrapperImpl!ToType(this.decorated.factory);
             }
             
         }

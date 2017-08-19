@@ -40,6 +40,15 @@ import aermicioi.aedi;
 import std.exception;
 
 unittest {
+    auto intFactory 	= new GenericObjectWrappingConvertorFactory!(ConvertorFactoryString!(size_t))(new ConvertorFactoryString!(size_t));
+    intFactory.convertible = "200";
+
+    assert(intFactory.convertible == "200");
+    assert(cast(Wrapper!size_t) intFactory.factory() == 200);
+    assert(intFactory.type == typeid(size_t));
+}
+
+unittest {
     
     auto container = new GenericConvertorContainer!(string, ConvertorFactory!(string, Object))();
     auto locator = new MockLocator();

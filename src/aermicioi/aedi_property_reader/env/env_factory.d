@@ -39,7 +39,7 @@ import std.traits;
 import std.xml;
 import std.conv;
 
-class StringConvertorFactory(T) : ConvertorFactory!(string, T) {
+class StringConvertorFactory(To, From : string = string) : ConvertorFactory!(string, To) {
     
     private {
         
@@ -50,7 +50,7 @@ class StringConvertorFactory(T) : ConvertorFactory!(string, T) {
     public {
         
         @property {
-        	StringConvertorFactory!T convertible(string convertible) @safe nothrow {
+        	StringConvertorFactory!(To, From) convertible(string convertible) @safe nothrow {
         		this.convertible_ = convertible;
         	
         		return this;
@@ -61,18 +61,18 @@ class StringConvertorFactory(T) : ConvertorFactory!(string, T) {
         	}
         	
         	TypeInfo type() {
-        	    return typeid(T);
+        	    return typeid(To);
         	}
         	
-        	StringConvertorFactory!T locator(Locator!() locator) @safe nothrow {
+        	StringConvertorFactory!(To, From) locator(Locator!() locator) @safe nothrow {
         		this.locator_ = locator;
         	
         		return this;
         	}
         }
         
-        T factory() {
-            return this.convertible.to!T;
+        To factory() {
+            return this.convertible.to!To;
         }
     }
 }

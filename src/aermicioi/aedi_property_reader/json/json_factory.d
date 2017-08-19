@@ -38,7 +38,7 @@ import aermicioi.aedi.exception;
 import std.json;
 import std.traits;
 
-class JsonConvertorFactory(T) : ConvertorFactory!(JSONValue, T) {
+class JsonConvertorFactory(To, From : JSONValue = JSONValue) : ConvertorFactory!(JSONValue, To) {
     
     private {
         
@@ -49,7 +49,7 @@ class JsonConvertorFactory(T) : ConvertorFactory!(JSONValue, T) {
     public {
         
         @property {
-        	JsonConvertorFactory!T convertible(JSONValue convertible) @safe nothrow {
+        	JsonConvertorFactory!(To, From) convertible(JSONValue convertible) @safe nothrow {
         		this.convertible_ = convertible;
         	
         		return this;
@@ -60,18 +60,18 @@ class JsonConvertorFactory(T) : ConvertorFactory!(JSONValue, T) {
         	}
         	
         	TypeInfo type() {
-        	    return typeid(T);
+        	    return typeid(To);
         	}
         	
-        	JsonConvertorFactory!T locator(Locator!() locator) @safe nothrow {
+        	JsonConvertorFactory!(To, From) locator(Locator!() locator) @safe nothrow {
         		this.locator_ = locator;
         	
         		return this;
         	}
         }
         
-        T factory() {
-            return fromJson!T(this.convertible());
+        To factory() {
+            return fromJson!To(this.convertible());
         }
     }
 }

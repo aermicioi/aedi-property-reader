@@ -29,26 +29,89 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.test.convertor_configurer;
 
-import aermicioi.aedi_property_reader.convertor_configurer;
-import aermicioi.aedi_property_reader.generic_convertor_container;
-import aermicioi.aedi_property_reader.generic_convertor_factory;
-import aermicioi.aedi_property_reader.convertor_container;
-import aermicioi.aedi_property_reader.convertor_factory;
-import aermicioi.aedi_property_reader.test.fixture;
+import aermicioi.aedi;
 import aermicioi.aedi.exception.not_found_exception;
 import aermicioi.aedi.test.fixture;
-import aermicioi.aedi;
+import aermicioi.aedi_property_reader.arg;
+import aermicioi.aedi_property_reader.convertor_configurer;
+import aermicioi.aedi_property_reader.convertor_container;
+import aermicioi.aedi_property_reader.convertor_factory;
+import aermicioi.aedi_property_reader.env;
+import aermicioi.aedi_property_reader.generic_convertor_container;
+import aermicioi.aedi_property_reader.generic_convertor_factory;
+import aermicioi.aedi_property_reader.json;
+import aermicioi.aedi_property_reader.test.fixture;
+import aermicioi.aedi_property_reader.xml;
 import std.exception;
-
+import std.json;
+import std.process : env = environment;
+import std.xml;
 
 unittest {
     auto container = new GenericConvertorContainer!(string, ConvertorFactoryString)();
     auto locator = new MockLocator();
     container.locator = locator;
 
-    container.property!(ConvertorFactoryString!(size_t))("size_t");
-    container.property!(size_t[])("array");
+	with (container.configure) {
+
+		property!(size_t)("size_t");
+		property!(size_t[])("array");
+	}
     
     assert(container.locate!size_t("size_t") == 192);
     assert(container.locate!(size_t[])("array") == [10, 20, 20]);
+}
+
+unittest {
+	auto c = container(
+		argument(),
+		environment(),
+		json(),
+		xml()
+	);
+
+	foreach (child; c.containers) {
+		assert(child !is null);
+	}
+}
+
+unittest {
+	auto c = container(
+		argument(
+			new GetoptIdentityLocator([
+				"commandline",
+				"--string=stringed"
+			])
+		),
+		environment(),
+		json(
+			(new JsonLocator()).json(
+				JSONValue(
+					[
+						"integer" : JSONValue(cast(size_t) 10)
+					]
+				)
+			)
+		),
+		xml(new XmlLocator().xml(
+			(new Document("<root><float>1.0</float></root>"))
+		))
+	);
+
+	env["array"] = "[\"hello\", \" \", \"world!\"]";
+
+	foreach (child; c.containers) {
+		assert(child !is null);
+
+		with (child.configure) {
+			property!(string)("string"); // Not testing it since factory takes arguments from 
+			property!(string[])("array");
+			property!(float)("float");
+			property!(size_t)("integer");
+		}
+	}
+
+	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
+	assert(c.locate!float("float") == 1.0);
+	assert(c.locate!size_t("integer") == 10);
 }

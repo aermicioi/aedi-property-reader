@@ -30,35 +30,87 @@ Authors:
 module aermicioi.aedi_property_reader.convertor_configurer;
 
 import aermicioi.aedi.storage.storage;
+import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.convertor_factory;
+import aermicioi.aedi_property_reader.convertor_container;
 import aermicioi.aedi_property_reader.generic_convertor_factory;
 import aermicioi.aedi_property_reader.generic_convertor_container;
+import aermicioi.aedi_property_reader.env;
+import aermicioi.aedi_property_reader.arg;
+import aermicioi.aedi_property_reader.json;
+import aermicioi.aedi_property_reader.xml;
+import std.json;
+import std.xml;
 
-auto property(
-    ConvertorType : ConvertorFactory!(FromType, ToType), 
-    FromType,
-    ToType,
-    T : Storage!(ConvertorFactory!(FromType, Object), string)
-)(
-    T container, 
-    string path
-) {
-    auto implementation = new ConvertorType;
-    auto wrapper = new GenericObjectWrappingConvertorFactory!ConvertorType(implementation);
+struct ConvertorContext(T : Storage!(ConvertorFactory!(FromType, Object), string), FromType) {
     
-    container.set(wrapper, path);
+    public {
+        T container;
+        
+        static if (is(T : GenericConvertorContainer!(FromType, DefaultFactory), alias DefaultFactory)) {
+            auto property(ToType)(string path) {
+                import std.traits;
+                
+                return this.property!(DefaultFactory!(ToType, FromType), ToType)(path);
+            }
+        }
+        
+        auto property(Factory : ConvertorFactory!(FromType, ToType), ToType)(string path) {
+            
+            auto implementation = new Factory;
+            auto wrapper = new GenericObjectWrappingConvertorFactory!(Factory!(ToType, FromType))(implementation);
+            
+            container.set(wrapper, path);
+            
+            return implementation;
+        }
+    }
+}
+
+auto configure(T : Storage!(ConvertorFactory!(FromType, Object), string), FromType)(T container) {
+    return ConvertorContext!(T, FromType)(container);
+}
+
+auto environment() {
+    return environment(new EnvironmentLocator());
+}
+
+auto environment(Locator!(string, string) locator) {
+    auto container = new EnvironmentConvertorContainer;
+    container.locator = locator;
     
     return container;
 }
 
-auto property(
-    ToType,
-    T : GenericConvertorContainer!(FromType, DefaultConvertorFactory),
-    alias DefaultConvertorFactory,
-    FromType
-)(
-    T container,
-    string path
-) if (is(DefaultConvertorFactory!ToType : ConvertorFactory!(FromType, ToType))) {
-    return container.property!(DefaultConvertorFactory!(ToType))(path);
+auto argument() {
+    return argument(new GetoptIdentityLocator());
+}
+
+auto argument(Locator!(string, string) locator) {
+    auto container = new GetoptConvertorContainer;
+    container.locator = locator;
+    
+    return container;
+}
+
+auto json() {
+    return json(new JsonLocator());
+}
+
+auto json(Locator!(JSONValue, string) locator) {
+    auto container = new JsonConvertorContainer();
+    container.locator = locator;
+    
+    return container;
+}
+
+auto xml() {
+    return xml(new XmlLocator);
+}
+
+auto xml(Locator!(Element, string) locator) {
+    auto container = new XmlConvertorContainer;
+    container.locator = locator;
+    
+    return container;
 }

@@ -29,17 +29,17 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.test.helper.help_decorating_container;
 
-import aermicioi.aedi_property_reader.helper.help_decorating_information_provider;
-import aermicioi.aedi_property_reader.helper.help_decorating_factory;
+import aermicioi.aedi.container.singleton_container;
+import aermicioi.aedi.exception.di_exception;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi.factory.wrapping_factory;
+import aermicioi.aedi.storage.object_storage;
 import aermicioi.aedi_property_reader.helper.help_decorating_container;
 import aermicioi.aedi_property_reader.helper.help_decorating_exception;
+import aermicioi.aedi_property_reader.helper.help_decorating_factory;
+import aermicioi.aedi_property_reader.helper.help_decorating_information_provider;
 import aermicioi.aedi_property_reader.helper.help_needing_exception;
-import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi.exception.di_exception;
 import aermicioi.aedi_property_reader.test.fixture;
-import aermicioi.aedi.storage.object_storage;
-import aermicioi.aedi.factory.decorating_factory;
-import aermicioi.aedi.container.singleton_container;
 import std.exception;
 
 unittest {

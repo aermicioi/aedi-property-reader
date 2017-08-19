@@ -38,7 +38,7 @@ import aermicioi.aedi.exception;
 import std.traits;
 import std.xml;
 
-class XmlConvertorFactory(T) : ConvertorFactory!(Element, T) {
+class XmlConvertorFactory(To, From : Element = Element) : ConvertorFactory!(Element, To) {
     
     private {
         
@@ -49,7 +49,7 @@ class XmlConvertorFactory(T) : ConvertorFactory!(Element, T) {
     public {
         
         @property {
-        	XmlConvertorFactory!T convertible(Element convertible) @safe nothrow {
+        	XmlConvertorFactory!(To, From) convertible(Element convertible) @safe nothrow {
         		this.convertible_ = convertible;
         	
         		return this;
@@ -60,18 +60,18 @@ class XmlConvertorFactory(T) : ConvertorFactory!(Element, T) {
         	}
         	
         	TypeInfo type() {
-        	    return typeid(T);
+        	    return typeid(To);
         	}
         	
-        	XmlConvertorFactory!T locator(Locator!() locator) @safe nothrow {
+        	XmlConvertorFactory!(To, From) locator(Locator!() locator) @safe nothrow {
         		this.locator_ = locator;
         	
         		return this;
         	}
         }
         
-        T factory() {
-            return fromXml!T(this.convertible());
+        To factory() {
+            return fromXml!To(this.convertible());
         }
     }
 }

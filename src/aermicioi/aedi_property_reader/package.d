@@ -35,3 +35,6 @@ public import aermicioi.aedi_property_reader.convertor_factory;
 public import aermicioi.aedi_property_reader.generic_convertor_factory;
 public import aermicioi.aedi_property_reader.generic_convertor_container;
 public import aermicioi.aedi_property_reader.json;
+public import aermicioi.aedi_property_reader.xml;
+public import aermicioi.aedi_property_reader.env;
+public import aermicioi.aedi_property_reader.arg;

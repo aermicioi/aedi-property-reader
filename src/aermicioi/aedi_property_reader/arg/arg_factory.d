@@ -33,7 +33,7 @@ import aermicioi.aedi_property_reader.convertor_factory;
 import aermicioi.aedi_property_reader.helper.help_decorating_exception;
 import aermicioi.aedi.storage.locator;
 
-class GetoptConvertorFactory(T) : ConvertorFactory!(string, T) {
+class GetoptConvertorFactory(To, From : string = string) : ConvertorFactory!(From, To) {
     
     private {
         string identity_;
@@ -59,9 +59,9 @@ class GetoptConvertorFactory(T) : ConvertorFactory!(string, T) {
             Params:
             	identity = the value to be set
             Returns:
-            	GetoptConvertorFactory!T
+            	GetoptConvertorFactory!(To, From)
             **/
-            GetoptConvertorFactory!T convertible(string identity) @safe nothrow {
+            GetoptConvertorFactory!(To, From) convertible(string identity) @safe nothrow {
             	this.identity_ = identity;
             
             	return this;
@@ -85,33 +85,33 @@ class GetoptConvertorFactory(T) : ConvertorFactory!(string, T) {
             Returns:
             	Locator!()
             **/
-            GetoptConvertorFactory!T locator(Locator!() locator) @safe nothrow {
+            GetoptConvertorFactory!(To, From) locator(Locator!() locator) @safe nothrow {
             	this.locator_ = locator;
             
             	return this;
             }
             
             /**
-        		Get the type info of T that is created.
+        		Get the type info of To that is created.
         		
     		Returns:
     			TypeInfo object of created object.
     		**/
             TypeInfo type() {
-                return typeid(T);
+                return typeid(To);
             }
         }
         
         /**
-		Instantiates component of type T.
+		Instantiates component of type To.
 		
 		Returns:
-			T instantiated data of type T.
+			To instantiated data of type To.
 		**/
-        T factory() {
+        To factory() {
             import std.getopt;
 
-            T value;
+            To value;
             string[] args = this.args;
             
             auto help = getopt(args, std.getopt.config.passThrough, this.convertible, &value);
