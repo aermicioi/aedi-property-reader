@@ -1,8 +1,0 @@
-{
-	"name" : "aedi-property-reader",
-	"description" : "Aedi multipurpose property file reader",
-	"type" : "sourceLibrary",
-	"dependencies" : {
-		"aedi": "~>0.3.0",
-	}
-}
