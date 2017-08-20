@@ -1,10 +1,9 @@
-# Aedi property reader, a library for reading configuration properties from multiple sources. 
+# Aedi property reader, a configuration reader
 
 [![Dub license](https://img.shields.io/dub/l/aedi-property-reader.svg)]()
 [![Travis CI](https://img.shields.io/travis/aermicioi/aedi-property-reader/master.svg)](https://travis-ci.org/aermicioi/aedi-property-reader)
 [![Code cov](https://img.shields.io/codecov/c/github/aermicioi/aedi-property-reader.svg)]()
 [![Dub version](https://img.shields.io/dub/v/aedi-property-reader.svg)](https://code.dlang.org/packages/aedi-property-reader)
-[![Dub downloads](https://img.shields.io/dub/dt/aedi-property-reader.svg)](https://code.dlang.org/packages/aedi-property-reader)
 
 Aedi property reader is a config reader, with ability to read from
 xml, json, environment, and command line.
@@ -63,11 +62,11 @@ import aermicioi.aedi_property_reader;
 
 void properties(T : ConvertorContainer!(FromType, ToType), FromType, ToType)(T container) {
 		with (container.configure) { // Create a configuration context for config container
-			property!string("protocol"); // Define $(D_INLINECODE protocol ) property of type $(D_INLINECODE string)
+			property!string("protocol"); // Define `protocol` property of type `string`
 			property!string("host");
 			property!string("resource");
 			property!ushort("port");
-			property!(string[string])("arguments"); // Define $(D_INLINECODE arguments ) property of type $(D_INLINECODE string[string])
+			property!(string[string])("arguments"); // Define `arguments` property of type `string[string]`
 			property!(size_t[])("nope-an-array");
 		}
 }

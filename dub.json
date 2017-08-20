@@ -1,6 +1,6 @@
 {
 	"name" : "aedi-property-reader",
-	"description" : "Aedi multipurpose property file reader",
+	"description" : "Aedi property reader, a library for reading configuration properties from multiple sources.",
 	"type" : "sourceLibrary",
 	"dependencies" : {
 		"aedi": "~>0.3.0",
