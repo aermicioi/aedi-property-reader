@@ -2,6 +2,7 @@
 	"name" : "aedi-property-reader",
 	"description" : "Aedi property reader, a library for reading configuration properties from multiple sources.",
 	"type" : "sourceLibrary",
+	"license": "BSL-1.0",
 	"dependencies" : {
 		"aedi": "~>0.3.0",
 	}
