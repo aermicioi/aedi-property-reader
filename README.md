@@ -32,33 +32,29 @@ Json configuration:
 SDL configuration:
 
 ```sdl
-dependency "aedi-property-reader" version="~>0.3.0"
+dependency "aedi-property-reader" version="~master"
 ```
 
 ## Quickstart
 
-Building an application often requires for it to be able to read configuration information
-out from exterior, being command line arguments, or a json file with properties. 
 Aedi property reader provides an unified interface for reading config properties out of
 a multitude of sources. It is able to read configuration out of following sources:
-$(UL
-	$(LI Command line )
-	$(LI Environment )
-	$(LI Xml document )
-	$(LI Json document )
- )
 
-To use aedi property reader to load configuration information following steps are required:
+- Command line 
+- Environment 
+- Xml document 
+- Json document 
 
-$(OL
-	$(LI Create a config container )
-	$(LI Pass config file, or any required data to it)
-	$(LI Define config properties to be read from source)
-	$(LI Use properties out of config container)
-)
+To use aedi property reader to load configuration following steps are required:
+
+1. Create a config container
+2. Pass config file, or any required data to it
+3. Define config properties to be read from source
+4. Use properties out of config container
 
 The example below shows the simplest use case presented in steps above:
-------------------
+
+```d
 module app;
 import std.stdio;
 
@@ -94,11 +90,21 @@ void main()
 	writeln("Arguments: ", cont.locate!(string[string])("arguments")); // Write property found in configuration
 	writeln("nope-an-array: ", cont.locate!(size_t[])("nope-an-array")); 
 }
-------------------
+```
+
+The output of example, will yield following answers:
+```d
+Dumping network connection information:
+Protocol: http
+Host: host.io
+Port: 8080
+Arguments: ["pass":"json.weak-pass", "user":"json.bold-logic"]
+nope-an-array: [6, 5, 4, 3, 2, 1]
+```
 
 ## Documentation
 
 All public api documentation is available on [aermicioi.github.io/aedi-property-reader/](https://aermicioi.github.io/aedi-property-reader/).
 
-For a more comprehensive understanding of how framework should be used, a set of tutorials are available on
+For a more comprehensive understanding of how library should be used, a set of tutorials are available on
 github [wiki](https://github.com/aermicioi/aedi-property-reader/wiki).
