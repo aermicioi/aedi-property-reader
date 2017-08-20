@@ -12,6 +12,6 @@
 	"copyright": "Copyright © 2017, Alexandru Ermicioi",
 	"license": "BSL-1.0",
 	"versions": [
-		"fallbackSources"
+		"singleSource"
 	]
 }
