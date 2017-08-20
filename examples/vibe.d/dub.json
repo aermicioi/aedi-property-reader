@@ -1,0 +1,18 @@
+{
+	"name": "vibed",
+	"authors": [
+		"Alexandru Ermicioi"
+	],
+	"dependencies": {
+		"vibe-d": "~>0.8.0",
+		"aedi-property-reader": {
+			"path": "../../"
+		}
+	},
+	"description": "A simple example on using aedi-property-reader along vibed for awesomely easy configs",
+	"copyright": "Copyright © 2017, Alexandru Ermicioi",
+	"license": "BSL-1.0",
+	"dflags": [
+		"-J./source/views/"
+	]
+}

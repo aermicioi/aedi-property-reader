@@ -84,18 +84,8 @@ unittest {
 			])
 		),
 		environment(),
-		json(
-			(new JsonLocator()).json(
-				JSONValue(
-					[
-						"integer" : JSONValue(cast(size_t) 10)
-					]
-				)
-			)
-		),
-		xml(new XmlLocator().xml(
-			(new Document("<root><float>1.0</float></root>"))
-		))
+		json(q{{"integer" : 10}}),
+		xml("<root><float>1.0</float></root>")
 	);
 
 	env["array"] = "[\"hello\", \" \", \"world!\"]";
@@ -114,4 +104,35 @@ unittest {
 	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
 	assert(c.locate!float("float") == 1.0);
 	assert(c.locate!size_t("integer") == 10);
+}
+
+unittest {
+	import std.path : dirName;
+	auto j = json(dirName(__FILE__) ~ "/config.json", false);
+
+	with (j.configure) {
+		property!size_t("integer");
+	}
+
+	assert(j.locate!size_t("integer") == 10);
+
+	assertNotThrown(json("unknown"));
+	assertThrown(json("unkown", false));
+}
+
+unittest {
+	import std.path : dirName;
+	auto x = xml(dirName(__FILE__) ~ "/config.xml", false);
+
+	with (x.configure) {
+		property!double("double");
+	}
+
+	assert(x.locate!double("double") == 1.0);
+
+	assertNotThrown(xml("unknown"));
+	assertThrown(xml("unkown", false));
+
+	assertNotThrown(xml(dirName(__FILE__) ~ "/config_malformed.xml", true));
+	assertThrown(xml(dirName(__FILE__) ~ "/config_malformed.xml", false));
 }

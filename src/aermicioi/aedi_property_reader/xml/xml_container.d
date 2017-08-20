@@ -47,6 +47,13 @@ class XmlLocator : Locator!(Element) {
     }
     
     public {
+
+		/**
+		Default constructor for XmlLocator
+		**/
+		this() {
+			this.xml = new Document("<a></a>");
+		}
         
         @property {
 			/**

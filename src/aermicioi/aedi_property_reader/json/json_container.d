@@ -47,6 +47,15 @@ class JsonLocator : Locator!(JSONValue, string) {
     }
     
     public {
+		/**
+		Default constructor for JsonLocator
+
+		Initializes container with an empty json object
+		**/
+		this() {
+			JSONValue[string] obj;
+			this.json = JSONValue(obj);
+		}
         
         @property {
 			/**

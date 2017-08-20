@@ -49,7 +49,7 @@ class HelpNeedingException : Exception {
             providers = a list of help providers used to print exception message.
             file = file in which exception occured.
             line = line at which exception was thrown.
-            throwable = next exception in chain of exceptions.
+            next = next exception in chain of exceptions.
         **/
         @nogc @safe pure nothrow this(HelpInformationProvider[] providers, string file = __FILE__, size_t line = __LINE__, Throwable next = null)
         {

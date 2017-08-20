@@ -136,10 +136,11 @@ package {
     **/
     auto ref T fromXml(T)(auto ref T value, auto ref Element xml) 
         if (isNumeric!T) {
+        import std.string : strip;
         
         try {
 
-            value = xml.text.to!T;
+            value = xml.text.strip.to!T;
         } catch (ConvException e) {
             throw new InvalidCastException(
                 "Could not convert xml " ~ 

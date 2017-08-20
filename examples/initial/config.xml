@@ -1,0 +1,18 @@
+<root>
+    <protocol>https</protocol>
+    <host>heh.not</host>
+    <resource>/endpoint/resource</resource>
+    <port>8081</port>
+    <nope-an-array>
+        <v>1</v>
+        <v>2</v>
+        <v>3</v>
+        <v>4</v>
+        <v>5</v>
+        <v>6</v>
+    </nope-an-array>
+    <arguments>
+        <user>xml.weak-logic</user>
+        <pass>xml.bold-pass</pass>
+    </arguments>
+</root>

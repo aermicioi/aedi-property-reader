@@ -166,6 +166,53 @@ auto json(Locator!(JSONValue, string) locator) {
 }
 
 /**
+Create a convertor container with data source being json document.
+
+Params: 
+    value = source of data for container to use to construct components.
+Returns:
+    JsonConvertorContainer
+**/
+auto json(JSONValue value) {
+    auto locator = new JsonLocator();
+    locator.json = value;
+
+    return json(locator);
+}
+
+/**
+Create a convertor container with data source being json document.
+
+Params: 
+    pathOrData = path to source of data or source data itself in form of string for container to use to construct components.
+    returnEmpty = wheter to return or not a locator with empty data source
+Returns:
+    JsonConvertorContainer
+**/
+auto json(string pathOrData, bool returnEmpty = true) {
+    import std.file;
+
+    if (pathOrData.exists) {
+        pathOrData = pathOrData.readText();
+    }
+
+    try {
+
+        return json(parseJSON(pathOrData));
+    } catch (Exception e) {
+
+        if (returnEmpty) {
+            return json;
+        }
+
+        throw new Exception(
+            "Could not create json convertor container from file or content passed in pathOrData: " ~ pathOrData, 
+            e
+        );
+    }
+}
+
+/**
 Create a convertor container with data source being xml document.
 
 Params: 
@@ -185,4 +232,59 @@ auto xml(Locator!(Element, string) locator) {
     container.locator = locator;
     
     return container;
+}
+
+/**
+Create a convertor container with data source being xml document.
+
+Params: 
+    element = root element used as data source
+Returns:
+    XmlConvertorContainer
+**/
+auto xml(Element element) {
+    auto locator = new XmlLocator;
+    locator.xml = element;
+    return xml(locator);
+}
+
+/**
+Create a convertor container with data source being xml document.
+
+Params: 
+    pathOrData = path to a xml file or xml data itself
+    returnEmpty = wheter to return or not a locator with empty data source
+Returns:
+    XmlConvertorContainer
+**/
+auto xml(string pathOrData, bool returnEmpty = true) {
+    import std.file;
+    try {
+        check(pathOrData);
+        return xml(new Document(pathOrData));
+    } catch (CheckException e) {
+
+    }
+
+    if (pathOrData.exists) {
+        pathOrData = pathOrData.readText();
+
+        try {
+            check(pathOrData);
+            return xml(new Document(pathOrData));
+        } catch(CheckException e) {
+
+            if (returnEmpty) {
+                return xml();
+            }
+
+            throw new Exception("Could not create xml convertor container from file or content passed in pathOrData: " ~ pathOrData, e);
+        }
+    }
+
+    if (returnEmpty) {
+        return xml();
+    }
+
+    throw new Exception("Could not create xml convertor container from file or content passed in pathOrData: " ~ pathOrData);
 }
