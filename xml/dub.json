@@ -1,0 +1,14 @@
+{
+	"name": "xml",
+	"authors": [
+		"Alexandru Ermicioi"
+	],
+	"dependencies": {
+		"aedi": "~>0.3.0",
+		"aedi-property-reader:core": "~>0.1.0"
+	},
+	"targetType": "sourceLibrary",
+	"description": "Xml document locator and factory",
+	"copyright": "Copyright © 2017, Alexandru Ermicioi",
+	"license": "BSL-1.0"
+}

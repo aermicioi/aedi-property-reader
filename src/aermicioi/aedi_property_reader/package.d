@@ -29,11 +29,11 @@ Authors:
 **/
 module aermicioi.aedi_property_reader;
 
-public import aermicioi.aedi_property_reader.convertor_configurer;
-public import aermicioi.aedi_property_reader.convertor_container;
-public import aermicioi.aedi_property_reader.convertor_factory;
-public import aermicioi.aedi_property_reader.generic_convertor_factory;
-public import aermicioi.aedi_property_reader.generic_convertor_container;
+public import aermicioi.aedi_property_reader.core.convertor_configurer;
+public import aermicioi.aedi_property_reader.core.convertor_container;
+public import aermicioi.aedi_property_reader.core.convertor_factory;
+public import aermicioi.aedi_property_reader.core.generic_convertor_factory;
+public import aermicioi.aedi_property_reader.core.generic_convertor_container;
 public import aermicioi.aedi_property_reader.json;
 public import aermicioi.aedi_property_reader.xml;
 public import aermicioi.aedi_property_reader.env;

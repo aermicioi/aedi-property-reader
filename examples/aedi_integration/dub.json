@@ -1,0 +1,14 @@
+{
+	"name": "aedi_integration",
+	"authors": [
+		"Alexandru Ermicioi"
+	],
+	"dependencies": {
+		"aedi-property-reader": {
+			"path": "../../"
+		}
+	},
+	"description": "Integration with aedi framework",
+	"copyright": "Copyright © 2017, Alexandru Ermicioi",
+	"license": "BSL-1.0"
+}

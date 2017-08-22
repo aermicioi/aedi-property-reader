@@ -1,0 +1,13 @@
+{
+	"name": "core",
+	"authors": [
+		"Alexandru Ermicioi"
+	],
+	"description": "Core interfaces and components for aedi property reader",
+	"copyright": "Copyright © 2017, Alexandru Ermicioi",
+	"license": "BSL-1.0",
+	"targetType": "sourceLibrary",
+	"dependencies": {
+		"aedi": "~>0.3.0"
+	}
+}

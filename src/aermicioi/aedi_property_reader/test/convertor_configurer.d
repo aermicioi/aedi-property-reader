@@ -32,35 +32,20 @@ module aermicioi.aedi_property_reader.test.convertor_configurer;
 import aermicioi.aedi;
 import aermicioi.aedi.exception.not_found_exception;
 import aermicioi.aedi.test.fixture;
+import aermicioi.aedi_property_reader.core.convertor_configurer;
+import aermicioi.aedi_property_reader.core.convertor_container;
+import aermicioi.aedi_property_reader.core.convertor_factory;
+import aermicioi.aedi_property_reader.core.generic_convertor_container;
+import aermicioi.aedi_property_reader.core.generic_convertor_factory;
 import aermicioi.aedi_property_reader.arg;
-import aermicioi.aedi_property_reader.convertor_configurer;
-import aermicioi.aedi_property_reader.convertor_container;
-import aermicioi.aedi_property_reader.convertor_factory;
 import aermicioi.aedi_property_reader.env;
-import aermicioi.aedi_property_reader.generic_convertor_container;
-import aermicioi.aedi_property_reader.generic_convertor_factory;
-import aermicioi.aedi_property_reader.json;
-import aermicioi.aedi_property_reader.test.fixture;
 import aermicioi.aedi_property_reader.xml;
+import aermicioi.aedi_property_reader.json;
+import aermicioi.aedi_property_reader.test.core.fixture;
 import std.exception;
 import std.json;
 import std.process : env = environment;
 import std.xml;
-
-unittest {
-    auto container = new GenericConvertorContainer!(string, ConvertorFactoryString)();
-    auto locator = new MockLocator();
-    container.locator = locator;
-
-	with (container.configure) {
-
-		property!(size_t)("size_t");
-		property!(size_t[])("array");
-	}
-    
-    assert(container.locate!size_t("size_t") == 192);
-    assert(container.locate!(size_t[])("array") == [10, 20, 20]);
-}
 
 unittest {
 	auto c = container(
@@ -104,35 +89,4 @@ unittest {
 	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
 	assert(c.locate!float("float") == 1.0);
 	assert(c.locate!size_t("integer") == 10);
-}
-
-unittest {
-	import std.path : dirName;
-	auto j = json(dirName(__FILE__) ~ "/config.json", false);
-
-	with (j.configure) {
-		property!size_t("integer");
-	}
-
-	assert(j.locate!size_t("integer") == 10);
-
-	assertNotThrown(json("unknown"));
-	assertThrown(json("unkown", false));
-}
-
-unittest {
-	import std.path : dirName;
-	auto x = xml(dirName(__FILE__) ~ "/config.xml", false);
-
-	with (x.configure) {
-		property!double("double");
-	}
-
-	assert(x.locate!double("double") == 1.0);
-
-	assertNotThrown(xml("unknown"));
-	assertThrown(xml("unkown", false));
-
-	assertNotThrown(xml(dirName(__FILE__) ~ "/config_malformed.xml", true));
-	assertThrown(xml(dirName(__FILE__) ~ "/config_malformed.xml", false));
 }

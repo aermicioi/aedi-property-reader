@@ -5,5 +5,16 @@
 	"license": "BSL-1.0",
 	"dependencies" : {
 		"aedi": "~>0.3.0",
-	}
+		"aedi-property-reader:arg": "*",
+		"aedi-property-reader:env": "*",
+		"aedi-property-reader:xml": "*",
+		"aedi-property-reader:json": "*"
+	},
+	"subPackages": [
+		"./core",
+		"./arg",
+		"./env",
+		"./xml",
+		"./json"
+	]
 }
