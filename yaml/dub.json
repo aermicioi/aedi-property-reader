@@ -1,0 +1,15 @@
+{
+	"name": "yaml",
+	"authors": [
+		"Alexandru Ermicioi"
+	],
+	"dependencies": {
+		"dyaml": "~>0.6.3",
+		"aedi-property-reader:core": "~>0.1.0",
+		"aedi": "~>0.3.0"
+	},
+	"targetType": "sourceLibrary",
+	"description": "yaml document loader and factory",
+	"copyright": "Copyright © 2017, Alexandru Ermicioi",
+	"license": "BSL-1.0"
+}

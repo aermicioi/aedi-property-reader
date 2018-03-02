@@ -8,13 +8,17 @@
 		"aedi-property-reader:arg": "*",
 		"aedi-property-reader:env": "*",
 		"aedi-property-reader:xml": "*",
-		"aedi-property-reader:json": "*"
+		"aedi-property-reader:json": "*",
+		"aedi-property-reader:yaml": "*",
+		"aedi-property-reader:sdlang": "*"
 	},
 	"subPackages": [
 		"./core",
 		"./arg",
 		"./env",
 		"./xml",
-		"./json"
+		"./json",
+		"./yaml",
+		"./sdlang"
 	]
 }

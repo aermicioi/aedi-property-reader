@@ -1,0 +1,16 @@
+{
+	"name": "sdlang",
+	"authors": [
+		"Alexandru Ermicioi"
+	],
+	"dependencies": {
+		"aedi-property-reader:core": "~>0.1.0",
+		"aedi": "~>0.3.0",
+		"sdlang-d": "~>0.10.1",
+		"taggedalgebraic": "~>0.10.9"
+	},
+	"targetType": "sourceLibrary",
+	"description": "sdlang document loader and factory",
+	"copyright": "Copyright © 2017, Alexandru Ermicioi",
+	"license": "BSL-1.0"
+}

@@ -8,6 +8,7 @@
 	"license": "BSL-1.0",
 	"targetType": "sourceLibrary",
 	"dependencies": {
-		"aedi": "~>0.3.0"
+		"aedi": "~>0.3.0",
+		"taggedalgebraic": "~>0.10.9"
 	}
 }
