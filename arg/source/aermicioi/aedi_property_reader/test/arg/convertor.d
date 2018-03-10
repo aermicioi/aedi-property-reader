@@ -27,8 +27,53 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.arg.convertor;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import aermicioi.aedi_property_reader.arg.convertor;
+import std.exception;
+
+unittest {
+    enum Colorful {
+        yes,
+        no
+    }
+
+    string[] args = [
+        "command",
+        "--integer=29192",
+        "--double=1.0"	,
+        "--boolean=true",
+        "--enum=yes",
+        "--assoc-array=beta=0.5",
+        "--assoc-array",
+        "theta=0.95",
+        "--array",
+        "first one",
+        "--array=second one",
+    ];
+
+    int i;
+    double d;
+    bool b;
+    Colorful c;
+    string[string] as;
+    string s;
+    string t;
+    string[] sd;
+
+    ["", "--integer=29192"].convert!int(i);
+    ["", "--double=1.0"].convert!double(d);
+    ["", "--boolean=true"].convert!bool(b);
+    ["", "--enum=yes"].convert!Colorful(c);
+    ["", "--assoc-array=test=t", "--assoc-array=pest=p"].convert!(string[string])(as);
+    ["", "--array=second one", "--array=third one"].convert!(string[])(sd);
+
+    assert(i == 29192);
+    assert(d == 1.0);
+    assert(b == true);
+    assert(c == Colorful.yes);
+    import std.stdio;
+    writeln(s);
+    assert(as == ["pest" : "p", "test" : "t"]);
+    assert(sd == ["second one", "third one"]);
+}

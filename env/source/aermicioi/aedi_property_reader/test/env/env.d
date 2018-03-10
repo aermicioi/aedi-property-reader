@@ -27,11 +27,39 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core;
+module aermicioi.aedi_property_reader.env.test.env;
 
-public import aermicioi.aedi_property_reader.core.convertor_configurer;
-public import aermicioi.aedi_property_reader.core.convertor;
-public import aermicioi.aedi_property_reader.core.type_guesser;
-public import aermicioi.aedi_property_reader.core.std_conv;
-public import aermicioi.aedi_property_reader.core.convertor;
-public import aermicioi.aedi : locate;
+import aermicioi.aedi_property_reader.env;
+import aermicioi.aedi_property_reader.core;
+
+unittest {
+    auto c = env();
+
+    c.document = [
+            "string" : "stringed",
+            "array" : "[ \"hello\", \" \", \"world!\"]",
+            "float" : "1.0",
+            "integer" : "10",
+            "guessable-ubyte" : "10",
+            "guessable-float" : "1.0",
+            "guessable-array" : "[ \"hello\", \" \", \"world!\"]",
+            "guessable-string" : "stringed"
+    ];
+
+    with (c.configure) {
+        property!(string)("string"); // Not testing it since factory takes arguments from
+        property!(string[])("array");
+        property!(float)("float");
+        property!(size_t)("integer");
+    }
+
+    assert(c.locate!(string) == "stringed");
+	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
+	assert(c.locate!float("float") == 1.0);
+	assert(c.locate!size_t("integer") == 10);
+
+    assert(c.locate!(string)("guessable-string") == "stringed");
+	assert(c.locate!(string[])("guessable-array") == ["hello", " ", "world!"]);
+	assert(c.locate!float("guessable-float") == 1.0);
+	assert(c.locate!ubyte("guessable-ubyte") == 10);
+}

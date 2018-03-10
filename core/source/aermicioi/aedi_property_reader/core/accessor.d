@@ -1,16 +1,22 @@
 module aermicioi.aedi_property_reader.core.accessor;
 
-import std.traits;
+import std.traits : fullyQualifiedName, isImplicitlyConvertible, EnumMembers;
 import taggedalgebraic;
+import std.array;
+import std.conv;
+import aermicioi.aedi.exception.not_found_exception;
+import std.algorithm;
+import std.range;
+import std.exception : enforce;
 
-interface PropertyAccessor(ComponentType, FieldType = ComponentType) {
+interface PropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) {
 
-    FieldType access(ComponentType component, string property) const;
+    FieldType access(ComponentType component, in KeyType property) const;
 
-    bool has(in ComponentType component, string property) const;
+    bool has(in ComponentType component, in KeyType property) const;
 }
 
-class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType) : PropertyAccessor!(ComponentType, FieldType) {
+class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType) {
 
     private {
 
@@ -32,7 +38,16 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType) : Prop
         Returns:
             typeof(this)
         **/
-        typeof(this) accessors(PropertyAccessor!(ComponentType, FieldType)[] accessors) @safe nothrow pure {
+        typeof(this) accessors(PropertyAccessor!(ComponentType, FieldType, KeyType)[] accessors) @safe nothrow pure {
+            this.accessors_ = accessors;
+
+            return this;
+        }
+
+        /**
+        ditto
+        **/
+        typeof(this) accessors(PropertyAccessor!(ComponentType, FieldType, KeyType)[] accessors...) @safe nothrow pure {
             this.accessors_ = accessors;
 
             return this;
@@ -42,13 +57,13 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType) : Prop
         Get accessors
 
         Returns:
-            PropertyAccessor!(ComponentType, FieldType)
+            PropertyAccessor!(ComponentType, FieldType, KeyType)
         **/
-        inout(PropertyAccessor!(ComponentType, FieldType)[]) accessors() @safe nothrow pure inout {
+        inout(PropertyAccessor!(ComponentType, FieldType, KeyType)[]) accessors() @safe nothrow pure inout {
             return this.accessors_;
         }
 
-        FieldType access(ComponentType component, string property) const {
+        FieldType access(ComponentType component, in KeyType property) const {
 
             foreach (accessor; this.accessors) {
 
@@ -62,7 +77,7 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType) : Prop
             throw new NotFoundException("Could not find element");
         }
 
-        bool has(in ComponentType component, string property) const {
+        bool has(in ComponentType component, in KeyType property) const {
 
             foreach (accessor; this.accessors) {
 
@@ -76,12 +91,14 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType) : Prop
     }
 }
 
-class PropertyPathAccessor(ComponentType, FieldType = ComponentType) : PropertyAccessor!(ComponentType, FieldType)
-    if (isImplicitlyConvertible!(FieldType, ComponentType)) {
+class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType)
+    if (isImplicitlyConvertible!(FieldType, ComponentType) && isInputRange!KeyType) {
 
     private {
         PropertyAccessor!(ComponentType, FieldType) accessor_;
         PropertyAccessor!(ComponentType, FieldType) indexer_;
+
+        ElementType!KeyType propertyAccessor_;
     }
 
     public {
@@ -103,7 +120,7 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType) : PropertyA
         Returns:
             typeof(this)
         **/
-        typeof(this) accessor(PropertyAccessor!(ComponentType, FieldType) accessor) @safe nothrow pure {
+        typeof(this) accessor(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) @safe nothrow pure {
             this.accessor_ = accessor;
 
             return this;
@@ -113,9 +130,9 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType) : PropertyA
         Get accessor
 
         Returns:
-            PropertyAccessor!(ComponentType, FieldType)
+            PropertyAccessor!(ComponentType, FieldType, KeyType)
         **/
-        inout(PropertyAccessor!(ComponentType, FieldType)) accessor() @safe nothrow pure inout {
+        inout(PropertyAccessor!(ComponentType, FieldType, KeyType)) accessor() @safe nothrow pure inout {
             return this.accessor_;
         }
 
@@ -129,7 +146,7 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType) : PropertyA
         Returns:
             typeof(this)
         **/
-        typeof(this) indexer(PropertyAccessor!(ComponentType, FieldType) indexer) @safe nothrow pure {
+        typeof(this) indexer(PropertyAccessor!(ComponentType, FieldType, KeyType) indexer) @safe nothrow pure {
             this.indexer_ = indexer;
 
             return this;
@@ -141,77 +158,75 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType) : PropertyA
         Returns:
             PropertyAccessor!(ComponentType, FieldType)
         **/
-        inout(PropertyAccessor!(ComponentType, FieldType)) indexer() @safe nothrow pure inout {
+        inout(PropertyAccessor!(ComponentType, FieldType, KeyType)) indexer() @safe nothrow pure inout {
             return this.indexer_;
         }
 
-        FieldType access(ComponentType component, string path) const {
+        /**
+        Set propertyAccessor
+
+        Params:
+            propertyAccessor = property splitter used to cut up the property path into multiple points
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) propertyAccessor(ElementType!KeyType propertyAccessor) @safe nothrow pure {
+            this.propertyAccessor_ = propertyAccessor;
+
+            return this;
+        }
+
+        /**
+        Get propertyAccessor
+
+        Returns:
+            ElementType!KeyType
+        **/
+        inout(ElementType!KeyType) propertyAccessor() @safe nothrow pure inout {
+            return this.propertyAccessor_;
+        }
+
+        FieldType access(ComponentType component, in KeyType path) const {
             import std.algorithm;
             import std.range;
 
-            auto identities = path.splitter(".").map!(s => s.splitter("[")).joiner;
+            auto identities = path.splitter(this.propertyAccessor);
 
             ComponentType current = component;
 
             foreach (identity; identities) {
 
-                if (identity.endsWith("]")) {
-                    identity = identity[0 .. $ - 1];
+                if (this.accessor.has(component, identity)) {
 
-                    if (identity.startsWith("\"") && identity.endsWith("\"")) {
-                        identity = identity[1 .. $ - 1];
-                    }
+                    current = this.accessor.access(component, identity);
+                } else if (this.indexer.has(component, identity)) {
 
-                    if (indexer.has(current, identity)) {
-
-                        current = this.indexer.access(current, identity);
-                    } else {
-
-                        throw new Exception("Property " ~ identity ~ " not found in path " ~ path);
-                    }
-                } else if (this.accessor.has(current, identity)) {
-
-                    current = this.accessor.access(current, identity);
+                    current = this.indexer.access(component, identity);
                 } else {
 
-                    throw new Exception("Property " ~ identity ~ " not found in path " ~ path);
+                    throw new NotFoundException(text("Could not find ", identity, " in ", current, " for property path of ", path));
                 }
             }
 
             return current;
         }
 
-        bool has(in ComponentType component, string path) const {
+        bool has(in ComponentType component, in KeyType path) const {
 
-            import std.algorithm;
-            import std.range;
+            auto identities = path.splitter(this.propertyAccessor);
 
-            auto identities = path.splitter(".").map!(s => s.splitter("[")).joiner;
-
-            ComponentType current = component;
+            ComponentType current = cast(ComponentType) component;
 
             foreach (identity; identities) {
+                if (!this.accessor.has(current, identity) || !this.indexer.has(current, identity)) {
+                    return false;
+                }
 
-                if (identity.endsWith("]")) {
-                    identity = identity[0 .. $ - 1];
-
-                    if (identity.startsWith("\"") && identity.endsWith("\"")) {
-                        identity = identity[1 .. $ - 1];
-                    }
-
-                    if (indexer.has(current, identity)) {
-
-                        current = this.indexer.access(current, identity);
-                    } else {
-
-                        return false;
-                    }
-                } else if (this.accessor.has(current, identity)) {
-
+                if (this.accessor.has(current, identity)) {
                     current = this.accessor.access(current, identity);
                 } else {
-
-                    return false;
+                    current = this.indexer.access(current, identity);
                 }
             }
 
@@ -220,7 +235,244 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType) : PropertyA
     }
 }
 
-class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyAccessorType : PropertyAccessor!(X, Z), X, Z, Y) : PropertyAccessor!(Tagged, Tagged) {
+class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType)
+    if (isBidirectionalRange!KeyType) {
+
+    private {
+        alias EType = ElementType!KeyType;
+        EType beggining_;
+        EType ending_;
+
+        PropertyAccessor!(ComponentType, FieldType, KeyType) accessor_;
+        PropertyAccessor!(ComponentType, FieldType, KeyType) indexer_;
+    }
+
+    public {
+
+        this(EType beggining, EType ending, PropertyAccessor!(ComponentType, FieldType, KeyType) accessor, PropertyAccessor!(ComponentType, FieldType, KeyType) indexer) {
+            this.beggining_ = beggining;
+            this.ending_ = ending;
+            this.accessor = accessor;
+            this.indexer = indexer;
+        }
+
+        /**
+        Set beggining
+
+        Params:
+            beggining = element denoting beggining of array syntax in identity, ex. [
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) beggining(EType beggining) @safe nothrow pure {
+            this.beggining_ = beggining;
+
+            return this;
+        }
+
+        /**
+        Get beggining
+
+        Returns:
+            EType
+        **/
+        inout(EType) beggining() @safe nothrow pure inout {
+            return this.beggining_;
+        }
+
+        /**
+        Set ending
+
+        Params:
+            ending = element denoting the end of array indexing, ex. ]
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) ending(EType ending) @safe nothrow pure {
+            this.ending_ = ending;
+
+            return this;
+        }
+
+        /**
+        Get ending
+
+        Returns:
+            EType
+        **/
+        inout(EType) ending() @safe nothrow pure inout {
+            return this.ending_;
+        }
+
+        /**
+        Set accessor
+
+        Params:
+            accessor = accessor used to access property part from indexed property
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) accessor(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) @safe nothrow pure {
+            this.accessor_ = accessor;
+
+            return this;
+        }
+
+        /**
+        Get accessor
+
+        Returns:
+            PropertyAccessor!(ComponentType, FieldType, KeyType)
+        **/
+        inout(PropertyAccessor!(ComponentType, FieldType, KeyType)) accessor() @safe nothrow pure inout {
+            return this.accessor_;
+        }
+
+        /**
+        Set indexer
+
+        Params:
+            indexer = property accessor used to access element based on contents in index part of property
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) indexer(PropertyAccessor!(ComponentType, FieldType, KeyType) indexer) @safe nothrow pure {
+            this.indexer_ = indexer;
+
+            return this;
+        }
+
+        /**
+        Get indexer
+
+        Returns:
+            PropertyAccessor!(ComponentType, FieldType, KeyType)
+        **/
+        inout(PropertyAccessor!(ComponentType, FieldType, KeyType)) indexer() @safe nothrow pure inout {
+            return this.indexer_;
+        }
+
+        FieldType access(ComponentType component, in KeyType path) const {
+
+            auto splitted = path.splitter(this.beggining);
+
+            enforce!NotFoundException(!splitted.empty, text("Malformed indexed property ", path));
+
+            FieldType property = this.accessor.access(component, splitted.front);
+            splitted.popFront;
+
+            enforce!NotFoundException(!splitted.empty, text("Malformed indexed property ", path, ", no index part found"));
+            enforce!NotFoundException(!splitted.front.endsWith(this.ending), text("Malformed indexed property ", path, ", no closing ] found"));
+
+            return this.indexer.access(component, splitted.front.drop(1).dropBack(1));
+        }
+
+        bool has(in ComponentType component, in KeyType path) const {
+
+            auto splitted = path.splitter(this.beggining);
+
+            if (splitted.empty) {
+                return false;
+            }
+
+            FieldType property = this.accessor.access(cast(ComponentType) component, splitted.front);
+            splitted.popFront;
+
+            if (splitted.empty || !splitted.front.endsWith(this.ending)) {
+                return false;
+            }
+
+            return this.indexer.has(property, splitted.front.drop(1).dropBack(1));
+        }
+    }
+}
+
+class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType)
+    if (isBidirectionalRange!KeyType) {
+
+    private {
+        alias EType = ElementType!KeyType;
+        EType tick_;
+
+        PropertyAccessor!(ComponentType, FieldType, KeyType) accessor_;
+    }
+
+    public {
+
+        this(EType tick, PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) {
+            this.tick = tick;
+            this.accessor = accessor;
+        }
+
+        /**
+        Set tick
+
+        Params:
+            tick = ticking element used to encapsulate property
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) tick(EType tick) @safe nothrow pure {
+            this.tick_ = tick;
+
+            return this;
+        }
+
+        /**
+        Get tick
+
+        Returns:
+            EType
+        **/
+        inout(EType) tick() @safe nothrow pure inout {
+            return this.tick_;
+        }
+
+        /**
+        Set accessor
+
+        Params:
+            accessor = accessor used to access property enclosed in ticks
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) accessor(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) @safe nothrow pure {
+            this.accessor_ = accessor;
+
+            return this;
+        }
+
+        /**
+        Get accessor
+
+        Returns:
+            PropertyAccessor!(ComponentType, FieldType, KeyType)
+        **/
+        inout(PropertyAccessor!(ComponentType, FieldType, KeyType)) accessor() @safe nothrow pure inout {
+            return this.accessor_;
+        }
+
+        FieldType access(ComponentType component, in KeyType path) const {
+
+            enforce!NotFoundException(!(path.front == this.tick) || !(path.back == this.tick), text("Malformed ticked property ", path, ", missing a tick"));
+
+            return this.accessor.access(component, path.drop(1).dropBack(1));
+        }
+
+        bool has(in ComponentType component, in KeyType path) const {
+
+            return (!(path.front == this.tick) || !(path.back == this.tick)) && this.accessor.has(component, path.drop(1).dropBack(2));
+        }
+    }
+}
+
+class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyAccessorType : PropertyAccessor!(X, Z, KeyType), X, Z, KeyType = string, Y) : PropertyAccessor!(Tagged, Tagged, KeyType) {
 
     private {
         PropertyAccessorType accessor_;
@@ -258,7 +510,7 @@ class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyA
             }
         }
 
-        Tagged access(Tagged component, string property) const
+        Tagged access(Tagged component, in KeyType property) const
         {
             if (this.has(component, property)) {
                 return Tagged(this.accessor.access(cast(X) component, property));
@@ -269,7 +521,7 @@ class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyA
             throw new NotFoundException(text(component, " does not have ", property));
         }
 
-        bool has(in Tagged component, string property) const {
+        bool has(in Tagged component, in KeyType property) const {
             import std.meta;
             import aermicioi.util.traits;
 
@@ -277,8 +529,7 @@ class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyA
                 static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
                     if (mixin("component.Kind." ~ e ~ " == component.kind")) {
 
-                        import std.stdio;
-                        return this.accessor.has(cast(X) (cast() component), property);
+                        return this.accessor.has(cast(const(X)) component, property);
                     }
 
                     return false;
@@ -288,4 +539,61 @@ class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyA
             assert(false, "TaggedAlgebraic does not have " ~ fullyQualifiedName!X ~ " as member");
         }
     }
+}
+
+class AssociativeArrayAccessor(Key, Type) : PropertyAccessor!(Type[const(Key)], Type, Key) {
+
+    public {
+
+        Type access(Type[const(Key)] component, in Key property) const {
+            auto peek = property in component;
+            enforce!NotFoundException(peek, text("Could not find ", property, " in associative array ", component));
+
+            return *peek;
+        }
+
+        bool has(in Type[const(Key)] component, in Key property) const {
+            return (property in component) !is null;
+        }
+    }
+}
+
+class ArrayAccessor(Type) : PropertyAccessor!(Type[], Type, size_t) {
+
+    public {
+
+        FieldType access(Type[] component, in size_t property) const {
+            enforce!NotFoundException(property >= component.length, "Could not find property ", property, " in array ", component);
+
+            return component[property];
+        }
+
+        bool has(in Type[] component, in size_t property) const {
+            return property >= component.length;
+        }
+    }
+}
+
+auto dsl(ComponentType, FieldType, KeyType)(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor, PropertyAccessor!(ComponentType, FieldType, KeyType) indexer) {
+    return new PropertyPathAccessor!(ComponentType, FieldType, KeyType)(
+        accessor,
+        new AggregatePropertyAccessor!(ComponentType, FieldType, KeyType)(
+            accessor,
+            new ArrayIndexedPropertyAccessor!(ComponentType, FieldType, KeyType)(
+                '[', ']',
+                accessor,
+                new AggregatePropertyAccessor!(ComponentType, FieldType, KeyType)(
+                    new TickedPropertyAccessor!(ComponentType, FieldType, KeyType)(
+                        '\'',
+                        accessor,
+                    ),
+                    new TickedPropertyAccessor!(ComponentType, FieldType, KeyType)(
+                        '"',
+                        accessor,
+                    ),
+                    indexer
+                )
+            )
+        )
+    );
 }

@@ -27,8 +27,26 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.env.accessor;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import aermicioi.aedi;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.env.accessor;
+import std.exception;
+
+unittest {
+    string[string] elems = [
+		"foo": "foofoo",
+		"moo": "moomoo"
+	];
+
+	EnvironmentAccessor accessor = new EnvironmentAccessor;
+
+	assert(accessor.has(elems, "foo"));
+	assert(accessor.has(elems, "moo"));
+	assert(!accessor.has(elems, "coo"));
+
+	assert(accessor.access(elems, "foo"));
+	assert(accessor.access(elems, "moo"));
+	assertThrown!NotFoundException(!accessor.access(elems, "coo"));
+}

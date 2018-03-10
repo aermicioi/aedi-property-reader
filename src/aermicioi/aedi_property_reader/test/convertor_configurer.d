@@ -29,64 +29,64 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.test.convertor_configurer;
 
-import aermicioi.aedi;
-import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi.test.fixture;
-import aermicioi.aedi_property_reader.core.convertor_configurer;
-import aermicioi.aedi_property_reader.core.convertor_container;
-import aermicioi.aedi_property_reader.core.convertor_factory;
-import aermicioi.aedi_property_reader.core.generic_convertor_container;
-import aermicioi.aedi_property_reader.core.convertor_factory_impl;
-import aermicioi.aedi_property_reader.arg;
-import aermicioi.aedi_property_reader.env;
-import aermicioi.aedi_property_reader.xml;
-import aermicioi.aedi_property_reader.json;
-import aermicioi.aedi_property_reader.test.core.fixture;
-import std.exception;
-import std.json;
-import std.process : env = environment;
-import std.xml;
+// import aermicioi.aedi;
+// import aermicioi.aedi.exception.not_found_exception;
+// import aermicioi.aedi.test.fixture;
+// import aermicioi.aedi_property_reader.core.convertor_configurer;
+// import aermicioi.aedi_property_reader.core.convertor_container;
+// import aermicioi.aedi_property_reader.core.convertor_factory;
+// import aermicioi.aedi_property_reader.core.generic_convertor_container;
+// import aermicioi.aedi_property_reader.core.convertor_factory_impl;
+// import aermicioi.aedi_property_reader.arg;
+// import aermicioi.aedi_property_reader.env;
+// import aermicioi.aedi_property_reader.xml;
+// import aermicioi.aedi_property_reader.json;
+// import aermicioi.aedi_property_reader.test.core.fixture;
+// import std.exception;
+// import std.json;
+// import std.process : env = environment;
+// import std.xml;
 
-unittest {
-	auto c = container(
-		argument(),
-		environment(),
-		json(),
-		xml()
-	);
+// unittest {
+// 	auto c = container(
+// 		argument(),
+// 		environment(),
+// 		json(),
+// 		xml()
+// 	);
 
-	foreach (child; c.containers) {
-		assert(child !is null);
-	}
-}
+// 	foreach (child; c.containers) {
+// 		assert(child !is null);
+// 	}
+// }
 
-unittest {
-	auto c = container(
-		argument(
-			new GetoptIdentityLocator([
-				"commandline",
-				"--string=stringed"
-			])
-		),
-		environment(),
-		json(q{{"integer" : 10}}),
-		xml("<root><float>1.0</float></root>")
-	);
+// unittest {
+// 	auto c = container(
+// 		argument(
+// 			new GetoptIdentityLocator([
+// 				"commandline",
+// 				"--string=stringed"
+// 			])
+// 		),
+// 		environment(),
+// 		json(q{{"integer" : 10}}),
+// 		xml("<root><float>1.0</float></root>")
+// 	);
 
-	env["array"] = "[\"hello\", \" \", \"world!\"]";
+// 	env["array"] = "[\"hello\", \" \", \"world!\"]";
 
-	foreach (child; c.containers) {
-		assert(child !is null);
+// 	foreach (child; c.containers) {
+// 		assert(child !is null);
 
-		with (child.configure) {
-			property!(string)("string"); // Not testing it since factory takes arguments from
-			property!(string[])("array");
-			property!(float)("float");
-			property!(size_t)("integer");
-		}
-	}
+// 		with (child.configure) {
+// 			property!(string)("string"); // Not testing it since factory takes arguments from
+// 			property!(string[])("array");
+// 			property!(float)("float");
+// 			property!(size_t)("integer");
+// 		}
+// 	}
 
-	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
-	assert(c.locate!float("float") == 1.0);
-	assert(c.locate!size_t("integer") == 10);
-}
+// 	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
+// 	assert(c.locate!float("float") == 1.0);
+// 	assert(c.locate!size_t("integer") == 10);
+// }

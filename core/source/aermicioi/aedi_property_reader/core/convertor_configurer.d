@@ -31,66 +31,40 @@ module aermicioi.aedi_property_reader.core.convertor_configurer;
 
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
-import aermicioi.aedi_property_reader.core.convertor_factory;
-import aermicioi.aedi_property_reader.core.convertor_container;
-import aermicioi.aedi_property_reader.core.convertor_factory_impl;
-import aermicioi.aedi_property_reader.core.generic_convertor_container;
+import aermicioi.aedi_property_reader.core.convertor;
 import std.json;
 import std.xml;
+import std.meta;
 
-/**
-Configuration context for convertor containers, that provides a nice property configuration interface.
-**/
-struct ConvertorContext(T : Storage!(ConvertorFactory!(FromType, Object), string), FromType) {
+struct ConvertorContext(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType) {
 
-    public {
-        /**
-        Underlying container that is configured
-        **/
-        T container;
+    DocumentContainerType container;
+    alias container this;
 
-        alias container this;
+    ref typeof(this) register(To)(string identity) {
+        container.set(new AdvisedConvertor!(To, FieldType)(), identity);
 
-        /**
-        Register a property into converting container
-
-        Params:
-            path = the path or identity of property
-            ToType = the type of property that is registered
-
-        Returns:
-            ConvertorFactory!(FromType, ToType)
-        **/
-        auto property(Factory : ConvertorFactory!(FromType, ToType), ToType)(string path) {
-
-            auto implementation = new Factory;
-            auto wrapper = new ObjectWrappingConvertorFactory!(Factory!(ToType, FromType))(implementation);
-
-            container.set(wrapper, path);
-
-            return implementation;
-        }
-
-        static if (is(T : GenericConvertorContainer!(FromType, DefaultFactory), alias DefaultFactory)) {
-
-            /**
-            ditto
-            **/
-            auto property(ToType)(string path) {
-                import std.traits;
-
-                return this.property!(DefaultFactory!(ToType, FromType), ToType)(path);
-            }
-        }
+        return this;
     }
+
+    ref typeof(this) register(To)() {
+
+        this.register!(To, To);
+    }
+
+    ref typeof(this) register(Iface, To)() {
+        import std.traits : fullyQualifiedName;
+
+        return this.register!To(fullyQualifiedName!Iface);
+    }
+
+    alias property = register;
 }
 
-/**
-Create a configuration context for container.
+auto configure(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType)(DocumentContainerType container) {
+    return ConvertorContext!(DocumentContainerType, AdvisedConvertor)(container);
+}
 
-Params:
-    container = container that is to be configured using ConvertorContext
-**/
-auto configure(T : Storage!(ConvertorFactory!(FromType, Object), string), FromType)(T container) {
-    return ConvertorContext!(T, FromType)(container);
+auto configure(DocumentContainerType : AdvisedDocumentContainer!(DocumentType, FieldType, AdvisedConvertor), DocumentType, FieldType, alias AdvisedConvertor)(DocumentContainerType container) {
+	return container.configure!(DocumentContainerType, AdvisedConvertor);
 }

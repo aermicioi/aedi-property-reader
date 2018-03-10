@@ -27,8 +27,54 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.sdlang.sdlang;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import aermicioi.aedi.storage.locator;
+import aermicioi.aedi.test.fixture;
+import aermicioi.aedi_property_reader.sdlang;
+import aermicioi.aedi_property_reader.core.convertor_configurer;
+import std.exception;
+
+unittest {
+	auto c = sdlang(q{
+		float 1.0f
+		double 2.0
+		int 10
+		long 20L
+		string "hello"
+		array "ahoj" " " "world!"
+	}, false);
+
+    with (c.configure) {
+        property!(string)("string"); // Not testing it since factory takes arguments from
+        property!(string)("array");
+        property!(float)("float");
+        property!(double)("double");
+        property!(long)("long");
+        property!(int)("int");
+    }
+
+    assert(c.locate!string == "hello");
+	assert(c.locate!string("array") == "ahoj");
+	assert(c.locate!float == 1.0);
+	assert(c.locate!double == 2.0);
+	assert(c.locate!int == 10);
+	assert(c.locate!long == 20);
+}
+
+unittest {
+	import std.path : dirName;
+	auto x = sdlang(dirName(__FILE__) ~ "/config.sdl", false);
+
+	with (x.configure) {
+		property!double("double");
+	}
+
+	assert(x.locate!double("double") == 1.0);
+
+	assertNotThrown(sdlang("unknown loaf-h"));
+	assertThrown(sdlang("unknown loaf-h", false));
+
+	assertNotThrown(sdlang(dirName(__FILE__) ~ "/config_malformed.sdl", true));
+	assertThrown(sdlang(dirName(__FILE__) ~ "/config_malformed.sdl", false));
+}

@@ -27,11 +27,8 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core;
 
-public import aermicioi.aedi_property_reader.core.convertor_configurer;
-public import aermicioi.aedi_property_reader.core.convertor;
-public import aermicioi.aedi_property_reader.core.type_guesser;
-public import aermicioi.aedi_property_reader.core.std_conv;
-public import aermicioi.aedi_property_reader.core.convertor;
-public import aermicioi.aedi : locate;
+module aermicioi.aedi_property_reader.env.accessor;
+
+import aermicioi.aedi_property_reader.core.accessor;
+alias EnvironmentAccessor = AssociativeArrayAccessor!(string, string);

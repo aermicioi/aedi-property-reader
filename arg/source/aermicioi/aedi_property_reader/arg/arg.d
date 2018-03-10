@@ -27,8 +27,49 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.arg.arg;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import aermicioi.aedi_property_reader.arg.accessor;
+import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.arg.arg;
+import std.experimental.allocator;
+
+auto argument() {
+	import core.runtime;
+
+	return Runtime.args.argument;
+}
+
+auto argument(string[] args) {
+	return args.argument(
+		new ArgumentAccessor
+	);
+}
+
+auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor) {
+	return args.argument(
+		accessor,
+		new StdConvTypeGuesser!(const(string)[]),
+	);
+}
+
+auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor, TypeGuesser!(const(string)[]) guesser) {
+	return args.argument(
+		accessor,
+		guesser,
+		theAllocator
+	);
+}
+
+auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor, TypeGuesser!(const(string)[]) guesser, IAllocator allocator) {
+	ArgumentAdvisedDocumentContainer container = new ArgumentAdvisedDocumentContainer(args);
+
+	container.accessor = accessor;
+	container.guesser = guesser;
+	container.allocator = allocator;
+
+	debug pragma(msg, ArgumentAdvisedDocumentContainer);
+
+	return container;
+}

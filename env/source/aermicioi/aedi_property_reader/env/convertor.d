@@ -27,11 +27,21 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core;
+module aermicioi.aedi_property_reader.env.convertor;
 
-public import aermicioi.aedi_property_reader.core.convertor_configurer;
-public import aermicioi.aedi_property_reader.core.convertor;
-public import aermicioi.aedi_property_reader.core.type_guesser;
-public import aermicioi.aedi_property_reader.core.std_conv;
-public import aermicioi.aedi_property_reader.core.convertor;
-public import aermicioi.aedi : locate;
+import aermicioi.aedi_property_reader.core.convertor;
+import std.conv;
+import std.experimental.allocator;
+import std.traits : isSomeString;
+
+void convert(To, From)(in From from, ref To to, IAllocator allocator = theAllocator)
+    if (isSomeString!From) {
+    to = from.to!To;
+}
+
+void destruct(To)(ref To to, IAllocator allocator = theAllocator) {
+    destroy(to);
+    to = To.init;
+}
+
+alias EnvironmentConvertor = AdvisedConvertor!(convert, destruct);

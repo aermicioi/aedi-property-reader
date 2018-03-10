@@ -27,8 +27,40 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.yaml.convertor;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import std.exception;
+import dyaml;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi.exception.invalid_cast_exception;
+import aermicioi.aedi_property_reader.yaml.convertor;
+
+unittest {
+	enum Colorful : string {
+    	affirmative = "aa",
+        negative = "bb"
+    }
+
+    int i;
+    double d;
+    bool b;
+    Colorful c;
+    string[string] as;
+    string s;
+    string t;
+    string[] sd;
+
+    Loader.fromString((cast(char[]) "29192").dup).load.convert!int(i);
+    Loader.fromString((cast(char[]) "1.0").dup).load.convert!double(d);
+    Loader.fromString((cast(char[]) "true").dup).load.convert!bool(b);
+    Loader.fromString((cast(char[]) "affirmative").dup).load.convert!Colorful(c);
+    Loader.fromString((cast(char[]) "test: \"t\"\npest: \"p\"").dup).load.convert!(string[string])(as);
+    Loader.fromString((cast(char[]) "[\"second one\", \"third one\"]").dup).load.convert!(string[])(sd);
+
+    assert(i == 29192);
+    assert(d == 1.0);
+    assert(b == true);
+    assert(c == Colorful.affirmative);
+    assert(as == ["test" : "t", "pest" : "p"]);
+    assert(sd == ["second one", "third one"]);
+}

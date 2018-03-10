@@ -27,8 +27,27 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.core.convertor_configurer;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import aermicioi.aedi;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi.test.fixture;
+import std.exception;
+import std.json;
+import std.process : env = environment;
+import std.xml;
+
+unittest {
+    // auto container = new GenericConvertorContainer!(string, ConvertorFactoryString)();
+    // auto locator = new MockLocator();
+    // container.locator = locator;
+
+	// with (container.configure) {
+
+	// 	property!(size_t)("size_t");
+	// 	property!(size_t[])("array");
+	// }
+
+    // assert(container.locate!size_t("size_t") == 192);
+    // assert(container.locate!(size_t[])("array") == [10, 20, 20]);
+}

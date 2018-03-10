@@ -27,8 +27,35 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.convertor;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import std.exception;
+import sdlang;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi.exception.invalid_cast_exception;
+import aermicioi.aedi_property_reader.sdlang.convertor;
+import aermicioi.aedi_property_reader.sdlang.accessor : SdlangElement;
+
+unittest {
+	Tag root = parseSource(q{
+		valid 2 value=1
+		invalid "string" value="march"
+	});
+
+	int i;
+
+	SdlangElement(root.tags["valid"].front).convert(i);
+	assert(i == 2);
+
+	SdlangElement(root.tags["valid"].front.attributes["value"].front).convert(i);
+	assert(i == 1);
+
+	assertThrown!InvalidCastException(SdlangElement(root.tags["invalid"].front).convert(i));
+
+	try {
+		SdlangElement(root.tags["invalid"].front.attributes["value"].front).convert(i);
+		assert(false);
+	} catch (InvalidCastException e) {
+
+	}
+}

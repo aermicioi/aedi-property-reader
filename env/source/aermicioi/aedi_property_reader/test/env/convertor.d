@@ -27,8 +27,25 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.env.convertor;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import aermicioi.aedi;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.env.convertor;
+import std.exception;
+
+unittest {
+    string[string] elems = [
+		"foo": "foofoo",
+		"moo": "moomoo"
+	];
+
+	int i;
+	int* d;
+
+	convert!int("10", i);
+	assert(i == 10);
+
+	destruct(i);
+	assert(i == int.init);
+}

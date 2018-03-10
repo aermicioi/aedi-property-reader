@@ -27,8 +27,40 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.json.convertor;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import std.process;
+import std.exception;
+import std.json;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.json.convertor;
+
+unittest {
+    enum Colorful {
+        yes,
+        no
+    }
+
+    int i;
+    double d;
+    bool b;
+    Colorful c;
+    string[string] as;
+    string s;
+    string t;
+    string[] sd;
+
+    JSONValue(29192).convert!int(i);
+    JSONValue(1.0).convert!double(d);
+    JSONValue(true).convert!bool(b);
+    JSONValue("yes").convert!Colorful(c);
+    JSONValue(["pest" : "p", "test" : "t"]).convert!(string[string])(as);
+    JSONValue(["second one", "third one"]).convert!(string[])(sd);
+
+    assert(i == 29192);
+    assert(d == 1.0);
+    assert(b == true);
+    assert(c == Colorful.yes);
+    assert(as == ["pest" : "p", "test" : "t"]);
+    assert(sd == ["second one", "third one"]);
+}

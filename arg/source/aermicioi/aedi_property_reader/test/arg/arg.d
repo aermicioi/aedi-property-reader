@@ -27,8 +27,39 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.arg.arg;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import aermicioi.aedi : locate;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi.test.fixture;
+import aermicioi.aedi_property_reader.arg;
+import aermicioi.aedi_property_reader.core;
+import std.exception;
+import std.json;
+import std.process : env = environment;
+import std.xml;
+
+unittest {
+	auto c = argument([
+            "commandline",
+            "--string=stringed",
+            "--array=hello",
+            "--array= ",
+            "--array=world",
+            "--float=1.0",
+            "--integer=10"
+    ]);
+
+	debug pragma(msg, typeof(c));
+    with (c.configure) {
+        property!(string)("string"); // Not testing it since factory takes arguments from
+        property!(string[])("array");
+        property!(float)("float");
+        property!(size_t)("integer");
+    }
+
+    assert(c.locate!(string) == "stringed");
+	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
+	assert(c.locate!float("float") == 1.0);
+	assert(c.locate!size_t("integer") == 10);
+}

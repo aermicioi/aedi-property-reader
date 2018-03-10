@@ -27,8 +27,40 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.xml.convertor;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import std.process;
+import std.exception;
+import std.xml;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.xml.convertor;
+
+unittest {
+    enum Colorful {
+        yes,
+        no
+    }
+
+    int i;
+    double d;
+    bool b;
+    Colorful c;
+    string[string] as;
+    string s;
+    string t;
+    string[] sd;
+
+    new Document("<root>29192</root>").convert!int(i);
+    new Document("<root>1.0</root>").convert!double(d);
+    new Document("<root>true</root>").convert!bool(b);
+    new Document("<root>yes</root>").convert!Colorful(c);
+    new Document("<root><test>t</test><pest>p</pest></root>").convert!(string[string])(as);
+    new Document("<root><v>second one</v><v>third one</v></root>").convert!(string[])(sd);
+
+    assert(i == 29192);
+    assert(d == 1.0);
+    assert(b == true);
+    assert(c == Colorful.yes);
+    assert(as == ["pest" : "p", "test" : "t"]);
+    assert(sd == ["second one", "third one"]);
+}

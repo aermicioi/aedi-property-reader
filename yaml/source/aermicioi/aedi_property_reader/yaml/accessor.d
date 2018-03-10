@@ -7,7 +7,7 @@ import std.exception;
 
 class YamlNodePropertyAccessor : PropertyAccessor!(Node, Node) {
 
-    Node access(Node component, string property) const {
+    Node access(Node component, in string property) const {
 
         if (this.has(component, property)) {
             return component[property];
@@ -16,14 +16,14 @@ class YamlNodePropertyAccessor : PropertyAccessor!(Node, Node) {
         throw new NotFoundException("yaml tag " ~ component.tag ~ " doesn't have child " ~ property);
     }
 
-    bool has(in Node component, string property) const {
+    bool has(in Node component, in string property) const {
         return component.isMapping && component.containsKey(property);
     }
 }
 
 class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
 
-    Node access(Node component, string property) const {
+    Node access(Node component, in string property) const {
 
         if (this.has(component, property)) {
             import std.conv : to;
@@ -34,7 +34,7 @@ class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
         throw new NotFoundException("yaml tag " ~ component.tag ~ " doesn't have child on index " ~ property);
     }
 
-    bool has(in Node component, string property) const {
+    bool has(in Node component, in string property) const {
         import std.string;
         import std.conv;
 

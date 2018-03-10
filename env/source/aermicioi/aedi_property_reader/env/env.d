@@ -27,11 +27,38 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core;
+module aermicioi.aedi_property_reader.env.env;
 
-public import aermicioi.aedi_property_reader.core.convertor_configurer;
-public import aermicioi.aedi_property_reader.core.convertor;
-public import aermicioi.aedi_property_reader.core.type_guesser;
-public import aermicioi.aedi_property_reader.core.std_conv;
-public import aermicioi.aedi_property_reader.core.convertor;
-public import aermicioi.aedi : locate;
+import aermicioi.aedi_property_reader.env.accessor;
+import aermicioi.aedi_property_reader.env.convertor;
+import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.env.type_guesser;
+import aermicioi.aedi_property_reader.core.type_guesser;
+
+alias EnvironmentDocumentContainer = AdvisedDocumentContainer!(string[const(string)], string, EnvironmentConvertor);
+
+auto env() {
+    auto container = env(new EnvironmentTypeGuesser);
+    import std.traits;
+
+    static if (is(EnvironmentTypeGuesser: StdConvTypeGuesser!(S, ToTypes), S, ToTypes...)) {
+        static foreach (To; ToTypes) {
+            container.set(new EnvironmentConvertor!(To, S), fullyQualifiedName!To);
+        }
+    }
+
+    return container;
+}
+
+auto env(TypeGuesser!string guesser) {
+    import std.process : environment;
+    import std.experimental.allocator;
+
+    EnvironmentDocumentContainer container = new EnvironmentDocumentContainer(environment.toAA);
+
+    container.guesser = guesser;
+    container.accessor = new EnvironmentAccessor;
+    container.allocator = theAllocator;
+
+    return container;
+}

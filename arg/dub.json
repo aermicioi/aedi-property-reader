@@ -4,7 +4,9 @@
 		"Alexandru Ermicioi"
 	],
 	"dependencies": {
-		"aedi-property-reader:core": "~>0.1.0",
+		"aedi-property-reader:core": {
+			"path": "../core"
+		},
 		"aedi": "~>0.3.0"
 	},
 	"targetType": "sourceLibrary",

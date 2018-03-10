@@ -27,8 +27,48 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.env;
+module aermicioi.aedi_property_reader.test.json.json;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
-public import aermicioi.aedi_property_reader.env.env;
+import aermicioi.aedi.storage.locator;
+import aermicioi.aedi.test.fixture;
+import aermicioi.aedi_property_reader.json;
+import aermicioi.aedi_property_reader.core.convertor_configurer;
+import std.json;
+import std.exception;
+
+unittest {
+	auto c = json(q{
+		{
+			"string": "hello",
+			"array": ["hello", " ", "world!"],
+			"float": 1.0,
+			"integer": 10
+		}
+	});
+
+    with (c.configure) {
+        property!(string)("string"); // Not testing it since factory takes arguments from
+        property!(string[])("array");
+        property!(float)("float");
+        property!(size_t)("integer");
+    }
+
+    assert(c.locate!(string)("string") == "hello");
+	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
+	assert(c.locate!float("float") == 1.0);
+	assert(c.locate!size_t("integer") == 10);
+}
+
+unittest {
+	import std.path : dirName;
+	auto j = json(dirName(__FILE__) ~ "/config.json", false);
+
+	with (j.configure) {
+		property!size_t("integer");
+	}
+
+	assert(j.locate!size_t("integer") == 10);
+
+	assertNotThrown(json("unknown"));
+	assertThrown(json("unkown", false));
+}

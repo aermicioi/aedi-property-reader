@@ -31,47 +31,47 @@ module aermicioi.aedi_property_reader.test.xml_container;
 
 import std.xml;
 import std.exception;
-import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi_property_reader.xml.xml_container;
-import aermicioi.aedi_property_reader.xml.accessor;
-import aermicioi.aedi_property_reader.core.accessor;
-unittest {
-    XmlLocator locator = new XmlLocator(new PropertyPathAccessor!XmlElement(
-        new AggregatePropertyAccessor!XmlElement(
-            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlAttributePropertyAccessor)(new XmlAttributePropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementPropertyAccessor)(new XmlElementPropertyAccessor)
-        ),
-        new AggregatePropertyAccessor!XmlElement(
-            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementPropertyAccessor)(new XmlElementPropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementIndexAccessor)(new XmlElementIndexAccessor)
-        )
-    ));
-    locator.xml = XmlElement(new Document("
-            <root>
-                <string>some text</string>
-                <integer>10</integer>
-                <double>1.0</double>
-                <array>
-                    <value>1</value>
-                    <value>1</value>
-                    <value>1</value>
-					<valued>
-						<field>with string</field>
-					</valued>
-                </array>
-            </root>
-    "));
+// import aermicioi.aedi.exception.not_found_exception;
+// import aermicioi.aedi_property_reader.xml.xml_container;
+// import aermicioi.aedi_property_reader.xml.accessor;
+// import aermicioi.aedi_property_reader.core.accessor;
+// unittest {
+//     XmlLocator locator = new XmlLocator(new PropertyPathAccessor!XmlElement(
+//         new AggregatePropertyAccessor!XmlElement(
+//             new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlAttributePropertyAccessor)(new XmlAttributePropertyAccessor),
+//             new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementPropertyAccessor)(new XmlElementPropertyAccessor)
+//         ),
+//         new AggregatePropertyAccessor!XmlElement(
+//             new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementPropertyAccessor)(new XmlElementPropertyAccessor),
+//             new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementIndexAccessor)(new XmlElementIndexAccessor)
+//         )
+//     ));
+//     locator.xml = XmlElement(new Document("
+//             <root>
+//                 <string>some text</string>
+//                 <integer>10</integer>
+//                 <double>1.0</double>
+//                 <array>
+//                     <value>1</value>
+//                     <value>1</value>
+//                     <value>1</value>
+// 					<valued>
+// 						<field>with string</field>
+// 					</valued>
+//                 </array>
+//             </root>
+//     "));
 
-    assert(locator.has("string"));
-    assert(locator.get("string").text == "some text");
-    assert(!locator.has("unkown"));
-    assertThrown!NotFoundException(locator.get("unkown"));
+//     assert(locator.has("string"));
+//     assert(locator.get("string").text == "some text");
+//     assert(!locator.has("unkown"));
+//     assertThrown!NotFoundException(locator.get("unkown"));
 
-	assert(locator.has("array[3].field"));
-	assert(locator.has("array[\"valued\"].field"));
-	assert(!locator.has("array[4].field"));
+// 	assert(locator.has("array[3].field"));
+// 	assert(locator.has("array[\"valued\"].field"));
+// 	assert(!locator.has("array[4].field"));
 
-	assert(locator.get("array[3].field").text == "with string");
-	assert(locator.get("array[\"valued\"].field").text == "with string");
-	assertThrown!NotFoundException(locator.get("array[4].field"));
-}
+// 	assert(locator.get("array[3].field").text == "with string");
+// 	assert(locator.get("array[\"valued\"].field").text == "with string");
+// 	assertThrown!NotFoundException(locator.get("array[4].field"));
+// }

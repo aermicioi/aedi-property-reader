@@ -17,7 +17,7 @@ alias XmlElement = TaggedAlgebraic!XmlElementUnion;
 
 class XmlElementPropertyAccessor : PropertyAccessor!Element {
 
-    Element access(Element component, string property) const {
+    Element access(Element component, in string property) const {
 
         if (this.has(component, property)) {
             return component.elements.find!(e => e.tag.name == property).front;
@@ -33,9 +33,9 @@ class XmlElementPropertyAccessor : PropertyAccessor!Element {
     }
 }
 
-class XmlElementIndexAccessor : PropertyAccessor!(Element, Element) {
+class XmlElementIndexAccessor : PropertyAccessor!Element {
 
-    Element access(Element component, string property) const {
+    Element access(Element component, in string property) const {
 
         if (this.has(component, property)) {
             import std.conv : to;
@@ -56,7 +56,7 @@ class XmlElementIndexAccessor : PropertyAccessor!(Element, Element) {
 }
 
 class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
-    string access(Element component, string property) const {
+    string access(Element component, in string property) const {
 
         if (this.has(component, property)) {
             return component.tag.attr[property];
@@ -65,7 +65,7 @@ class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
         throw new NotFoundException("Xml tag " ~ component.toString ~ " doesn't have attribute " ~ property);
     }
 
-    bool has(in Element component, string property) const {
+    bool has(in Element component, in string property) const {
         enforce!Exception(component !is null, "Cannot access " ~ property ~ " of null component");
 
         return (property in component.tag.attr) !is null;

@@ -42,6 +42,7 @@ alias StringToScalarConvTypeGuesser = StringStdConvTypeGuesser!(
     long,
     float,
     double,
+    char,
     bool[],
     ubyte[],
     ushort[],
@@ -53,4 +54,5 @@ alias StringToScalarConvTypeGuesser = StringStdConvTypeGuesser!(
     long[],
     float[],
     double[],
+    string[]
 );

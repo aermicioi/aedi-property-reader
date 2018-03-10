@@ -30,7 +30,6 @@ Authors:
 module aermicioi.aedi_property_reader.test.core.fixture;
 
 import aermicioi.aedi;
-import aermicioi.aedi_property_reader.core.convertor_factory;
 import std.conv;
 
 class MockLocator : Locator!(string, string) {
@@ -61,7 +60,7 @@ class MockLocator : Locator!(string, string) {
             return *reference;
         }
 
-        bool has(in string identity) inout {
+        bool has(string identity) inout {
             return (identity in dummy) !is null;
         }
     }

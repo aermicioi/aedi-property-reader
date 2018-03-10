@@ -1,7 +1,6 @@
 module aermicioi.aedi_property_reader.sdlang.type_guesser;
 
 import aermicioi.aedi_property_reader.core.type_guesser;
-import aermicioi.aedi_property_reader.core.convertor_factory_impl;
 import aermicioi.aedi_property_reader.sdlang.accessor;
 import sdlang.ast;
 
