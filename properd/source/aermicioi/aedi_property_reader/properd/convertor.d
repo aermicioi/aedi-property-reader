@@ -27,41 +27,30 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.test.yaml_container;
+module aermicioi.aedi_property_reader.properd.convertor;
 
-import std.xml;
+import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.properd.accessor;
+import aermicioi.aedi.factory;
+import aermicioi.aedi.storage.locator;
+import aermicioi.aedi.storage.wrapper;
+import aermicioi.aedi.storage.decorator;
+import aermicioi.aedi.exception;
+import std.traits;
+import std.experimental.allocator;
+import properd;
+import std.conv;
+import std.range;
 import std.exception;
-import aermicioi.aedi.exception.not_found_exception;
-// import aermicioi.aedi_property_reader.xml.xml_container;
 
-// unittest {
-//     XmlLocator locator = new XmlLocator;
-//     locator.xml = new Document("
-//             <root>
-//                 <string>some text</string>
-//                 <integer>10</integer>
-//                 <double>1.0</double>
-//                 <array>
-//                     <value>1</value>
-//                     <value>1</value>
-//                     <value>1</value>
-// 					<valued>
-// 						<field>with string</field>
-// 					</valued>
-//                 </array>
-//             </root>
-//     ");
+alias ProperdConvertor = AdvisedConvertor!(convert, destruct);
 
-//     assert(locator.has("string"));
-//     assert(locator.get("string").text == "some text");
-//     assert(!locator.has("unkown"));
-//     assertThrown!NotFoundException(locator.get("unkown"));
+void convert(To, From : string)(in From node, ref To to, IAllocator allocator = theAllocator) {
 
-// 	assert(locator.has("array[3].field"));
-// 	assert(locator.has("array[\"valued\"].field"));
-// 	assert(!locator.has("array[4].field"));
+	to = node.to!To;
+}
+void destruct(To)(ref To to, IAllocator allocator = theAllocator) {
+	destroy(to);
 
-// 	assert(locator.get("array[3].field").text == "with string");
-// 	assert(locator.get("array[\"valued\"].field").text == "with string");
-// 	assertThrown!NotFoundException(locator.get("array[4].field"));
-// }
+	to = To.init;
+}

@@ -27,16 +27,16 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.test.yaml.convertor_configurer;
+module aermicioi.aedi_property_reader.test.properd.properd;
 
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.test.fixture;
-import aermicioi.aedi_property_reader.yaml;
+import aermicioi.aedi_property_reader.properd;
 import aermicioi.aedi_property_reader.core.convertor_configurer;
 import std.exception;
 
 unittest {
-	auto c = yaml("float: 1.0\ndouble: 2.0\nint: 10\nlong: 20\nstring: \"hello\"\narray: [\"ahoj\", \" \", \"world!\"]".dup, false);
+	auto c = properd("float= 1.0\ndouble= 2.0\nint= 10\nlong= 20\nstring=hello\narray= [\"ahoj\", \" \", \"world!\"]", false);
 
     with (c.configure) {
         property!(string)("string"); // Not testing it since factory takes arguments from
@@ -55,7 +55,7 @@ unittest {
 
 unittest {
 	import std.path : dirName;
-	auto x = yaml(dirName(__FILE__) ~ "/config.yaml", false);
+	auto x = properd(dirName(__FILE__) ~ "/config.properties", false);
 
 	with (x.configure) {
 		property!double("double");
@@ -63,9 +63,9 @@ unittest {
 
 	assert(x.locate!double("double") == 1.0);
 
-	assertNotThrown(yaml("	unknown loaf-h"));
-	assertThrown(yaml("	unknown loaf-h", false));
+	assertNotThrown(properd("	unknown loaf-h"));
+	assertThrown(properd("	unknown loaf-h", false));
 
-	assertNotThrown(yaml(dirName(__FILE__) ~ "/config_malformed.yaml", true));
-	assertThrown(yaml(dirName(__FILE__) ~ "/config_malformed.yaml", false));
+	assertNotThrown(properd(dirName(__FILE__) ~ "/config_malformed.properties", true));
+	assertThrown(properd(dirName(__FILE__) ~ "/config_malformed.properties", false));
 }

@@ -1,0 +1,15 @@
+{
+	"name": "properd",
+	"authors": [
+		"Alexandru Ermicioi"
+	],
+	"dependencies": {
+		"proper-d": "~>0.0.2",
+		"aedi-property-reader:core": "~>0.1.0",
+		"aedi": "~>0.3.0"
+	},
+	"targetType": "sourceLibrary",
+	"description": "ini document loader and factory based on properd library",
+	"copyright": "Copyright © 2017, Alexandru Ermicioi",
+	"license": "BSL-1.0"
+}
