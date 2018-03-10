@@ -27,7 +27,7 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.test.core.convertor_configurer;
+module aermicioi.aedi_property_reader.test.core.core;
 
 import aermicioi.aedi;
 import aermicioi.aedi.exception.not_found_exception;

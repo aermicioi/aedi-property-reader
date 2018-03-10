@@ -30,10 +30,14 @@ Authors:
 module aermicioi.aedi_property_reader.arg.arg;
 
 import aermicioi.aedi_property_reader.arg.accessor;
+import aermicioi.aedi_property_reader.arg.convertor;
 import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.arg.arg;
 import std.experimental.allocator;
+
+alias ArgumentAdvisedDocumentContainer = AdvisedDocumentContainer!(const(string)[], const(string)[], ArgumentAdvisedConvertor);
 
 auto argument() {
 	import core.runtime;
@@ -68,8 +72,6 @@ auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor, TypeGu
 	container.accessor = accessor;
 	container.guesser = guesser;
 	container.allocator = allocator;
-
-	debug pragma(msg, ArgumentAdvisedDocumentContainer);
 
 	return container;
 }

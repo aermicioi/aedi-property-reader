@@ -32,7 +32,7 @@ module aermicioi.aedi_property_reader.test.sdlang.sdlang;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.test.fixture;
 import aermicioi.aedi_property_reader.sdlang;
-import aermicioi.aedi_property_reader.core.convertor_configurer;
+import aermicioi.aedi_property_reader.core.core;
 import std.exception;
 
 unittest {

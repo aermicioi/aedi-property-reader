@@ -48,7 +48,8 @@ unittest {
         "first one",
         "--array=second one",
         "-d",
-        "-mfzl"
+        "-mfzl",
+        "second one"
     ];
 
     ArgumentAccessor accessor = new ArgumentAccessor;
@@ -68,18 +69,18 @@ unittest {
     assert(accessor.has(args, "0"));
     assert(accessor.has(args, "1"));
 
-    assert(accessor.access(args, "integer") == ["--integer=29192"]);
-    assert(accessor.access(args, "double") == ["--double=1.0"]);
-    assert(accessor.access(args, "boolean") == ["--boolean=true"]);
-    assert(accessor.access(args, "enum") == ["--enum=yes"]);
-    assert(accessor.access(args, "assoc-array") == ["--assoc-array=beta=0.5", "--assoc-array"]);
-    assert(accessor.access(args, "theta") == ["theta=0.95"]);
-    assert(accessor.access(args, "array") == ["--array", "--array=second one"]);
-    assert(accessor.access(args, "d") == ["-d"]);
-    assert(accessor.access(args, "m") == ["-mfzl"]);
-    assert(accessor.access(args, "f") == ["-mfzl"]);
-    assert(accessor.access(args, "z") == ["-mfzl"]);
-    assert(accessor.access(args, "l") == ["-mfzl"]);
-    assert(accessor.access(args, "0") == ["command"]);
-    assert(accessor.access(args, "1") == ["first one"]);
+    assert(accessor.access(args, "integer") == ["command", "--integer=29192"]);
+    assert(accessor.access(args, "double") == ["command", "--double=1.0"]);
+    assert(accessor.access(args, "boolean") == ["command", "--boolean=true"]);
+    assert(accessor.access(args, "enum") == ["command", "--enum=yes"]);
+    assert(accessor.access(args, "assoc-array") == ["command", "--assoc-array=beta=0.5", "--assoc-array"]);
+    assert(accessor.access(args, "theta") == ["command", "theta=0.95"]);
+    assert(accessor.access(args, "array") == ["command", "--array", "--array=second one"]);
+    assert(accessor.access(args, "d") == ["command", "-d"]);
+    assert(accessor.access(args, "m") == ["command", "-mfzl"]);
+    assert(accessor.access(args, "f") == ["command", "-mfzl"]);
+    assert(accessor.access(args, "z") == ["command", "-mfzl"]);
+    assert(accessor.access(args, "l") == ["command", "-mfzl"]);
+    assert(accessor.access(args, "0") == ["command", "first one"]);
+    assert(accessor.access(args, "1") == ["command", "second one"]);
 }

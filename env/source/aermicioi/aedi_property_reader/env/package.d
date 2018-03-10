@@ -29,6 +29,4 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.env;
 
-public import aermicioi.aedi_property_reader.env.convertor;
-public import aermicioi.aedi_property_reader.env.accessor;
 public import aermicioi.aedi_property_reader.env.env;

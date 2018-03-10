@@ -32,7 +32,7 @@ module aermicioi.aedi_property_reader.test.convertor_configurer;
 // import aermicioi.aedi;
 // import aermicioi.aedi.exception.not_found_exception;
 // import aermicioi.aedi.test.fixture;
-// import aermicioi.aedi_property_reader.core.convertor_configurer;
+// import aermicioi.aedi_property_reader.core.core;
 // import aermicioi.aedi_property_reader.core.convertor_container;
 // import aermicioi.aedi_property_reader.core.convertor_factory;
 // import aermicioi.aedi_property_reader.core.generic_convertor_container;

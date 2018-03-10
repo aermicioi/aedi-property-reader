@@ -36,6 +36,7 @@ import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.yaml.accessor;
 import aermicioi.aedi_property_reader.yaml.convertor;
+import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.yaml.type_guesser;
 import dyaml;
 import std.experimental.logger;

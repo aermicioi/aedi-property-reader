@@ -29,7 +29,4 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.properd;
 
-public import aermicioi.aedi_property_reader.properd.accessor;
-public import aermicioi.aedi_property_reader.properd.convertor;
 public import aermicioi.aedi_property_reader.properd.properd;
-public import aermicioi.aedi_property_reader.properd.type_guesser;

@@ -85,4 +85,3 @@ void destruct(To)(ref To to, IAllocator allocator = theAllocator) {
 }
 
 alias ArgumentAdvisedConvertor = AdvisedConvertor!(convert, destruct);
-alias ArgumentAdvisedDocumentContainer = AdvisedDocumentContainer!(const(string)[], ArgumentAdvisedConvertor);

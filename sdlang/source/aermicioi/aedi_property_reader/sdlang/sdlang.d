@@ -36,6 +36,7 @@ import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.sdlang.convertor;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.sdlang.type_guesser;
 import sdlanguage = sdlang;
 import std.experimental.logger;

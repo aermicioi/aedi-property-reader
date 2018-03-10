@@ -29,8 +29,9 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.core;
 
-public import aermicioi.aedi_property_reader.core.convertor_configurer;
+public import aermicioi.aedi_property_reader.core.core;
 public import aermicioi.aedi_property_reader.core.convertor;
+public import aermicioi.aedi_property_reader.core.document;
 public import aermicioi.aedi_property_reader.core.type_guesser;
 public import aermicioi.aedi_property_reader.core.std_conv;
 public import aermicioi.aedi_property_reader.core.convertor;

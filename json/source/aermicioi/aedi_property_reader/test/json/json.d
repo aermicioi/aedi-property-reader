@@ -32,7 +32,7 @@ module aermicioi.aedi_property_reader.test.json.json;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.test.fixture;
 import aermicioi.aedi_property_reader.json;
-import aermicioi.aedi_property_reader.core.convertor_configurer;
+import aermicioi.aedi_property_reader.core.core;
 import std.json;
 import std.exception;
 

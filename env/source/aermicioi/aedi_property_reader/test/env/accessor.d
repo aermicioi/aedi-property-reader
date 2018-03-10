@@ -31,7 +31,7 @@ module aermicioi.aedi_property_reader.test.env.accessor;
 
 import aermicioi.aedi;
 import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi_property_reader.env.accessor;
+import aermicioi.aedi_property_reader.core.accessor;
 import std.exception;
 
 unittest {
@@ -40,7 +40,7 @@ unittest {
 		"moo": "moomoo"
 	];
 
-	EnvironmentAccessor accessor = new EnvironmentAccessor;
+	AssociativeArrayAccessor!string accessor = new AssociativeArrayAccessor!string;
 
 	assert(accessor.has(elems, "foo"));
 	assert(accessor.has(elems, "moo"));

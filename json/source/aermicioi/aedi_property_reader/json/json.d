@@ -36,6 +36,7 @@ import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.json.convertor;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.json.type_guesser;
 import std.json;
 import std.experimental.allocator;

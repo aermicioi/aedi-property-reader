@@ -31,4 +31,4 @@ module aermicioi.aedi_property_reader.arg;
 
 public import aermicioi.aedi_property_reader.arg.accessor;
 public import aermicioi.aedi_property_reader.arg.arg;
-public import aermicioi.aedi_property_reader.arg.convertor_configurer;
+public import aermicioi.aedi_property_reader.arg.convertor;

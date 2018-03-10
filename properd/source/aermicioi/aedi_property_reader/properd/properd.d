@@ -33,15 +33,14 @@ import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.std_conv;
+import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.type_guesser;
-import aermicioi.aedi_property_reader.properd.accessor;
-import aermicioi.aedi_property_reader.properd.convertor;
-import aermicioi.aedi_property_reader.properd.type_guesser;
 import lproperd = properd;
 import std.experimental.logger;
 import std.experimental.allocator;
 
-alias ProperdDocumentContainer = AdvisedDocumentContainer!(string[const(string)], string, ProperdConvertor);
+alias ProperdDocumentContainer = AdvisedDocumentContainer!(string[const(string)], string, StdConvAdvisedConvertor);
 
 /**
 Create a convertor container with data source being properd document.
@@ -77,13 +76,13 @@ ditto
 **/
 auto properd(string[const(string)] value, IAllocator allocator = theAllocator) {
     import std.meta : AliasSeq;
-    auto container = value.properd(accessor, new ProperdTypeGuesser, allocator);
+    auto container = value.properd(accessor, new StringToScalarConvTypeGuesser, allocator);
     import std.datetime;
     import std.traits;
 
-    static if (is(EnvironmentTypeGuesser: StdConvTypeGuesser!(S, ToTypes), S, ToTypes...)) {
+    static if (is(StringToScalarConvTypeGuesser: StdConvTypeGuesser!(S, ToTypes), S, ToTypes...)) {
         static foreach (To; ToTypes) {
-            container.set(new EnvironmentConvertor!(To, S), fullyQualifiedName!To);
+            container.set(new StdConvAdvisedConvertor!(To, S), fullyQualifiedName!To);
         }
     }
 
@@ -132,7 +131,6 @@ auto properd(string pathOrData, bool returnEmpty = true) {
 
 private auto accessor() {
     import aermicioi.aedi_property_reader.core.accessor;
-    import aermicioi.aedi_property_reader.properd.accessor : ProperdPropertyAccessor;
 
-    return new ProperdPropertyAccessor();
+    return new AssociativeArrayAccessor!string;
 }

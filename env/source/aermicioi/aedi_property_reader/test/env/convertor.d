@@ -25,13 +25,13 @@ License:
 	DEALINGS IN THE SOFTWARE.
 
 Authors:
-	aermicioi
+	Alexandru Ermicioi
 **/
 module aermicioi.aedi_property_reader.test.env.convertor;
 
 import aermicioi.aedi;
 import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi_property_reader.env.convertor;
+import aermicioi.aedi_property_reader.core.std_conv;
 import std.exception;
 
 unittest {

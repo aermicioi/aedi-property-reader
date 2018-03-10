@@ -29,21 +29,21 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.env.env;
 
-import aermicioi.aedi_property_reader.env.accessor;
-import aermicioi.aedi_property_reader.env.convertor;
 import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.env.type_guesser;
+import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.core.document;
+import aermicioi.aedi_property_reader.core.std_conv;
 
-alias EnvironmentDocumentContainer = AdvisedDocumentContainer!(string[const(string)], string, EnvironmentConvertor);
+alias EnvironmentDocumentContainer = AdvisedDocumentContainer!(string[const(string)], string, StdConvAdvisedConvertor);
 
 auto env() {
-    auto container = env(new EnvironmentTypeGuesser);
+    auto container = env(new StringToScalarConvTypeGuesser);
     import std.traits;
 
-    static if (is(EnvironmentTypeGuesser: StdConvTypeGuesser!(S, ToTypes), S, ToTypes...)) {
+    static if (is(StringToScalarConvTypeGuesser: StdConvTypeGuesser!(S, ToTypes), S, ToTypes...)) {
         static foreach (To; ToTypes) {
-            container.set(new EnvironmentConvertor!(To, S), fullyQualifiedName!To);
+            container.set(new StdConvAdvisedConvertor!(To, S), fullyQualifiedName!To);
         }
     }
 
@@ -57,7 +57,7 @@ auto env(TypeGuesser!string guesser) {
     EnvironmentDocumentContainer container = new EnvironmentDocumentContainer(environment.toAA);
 
     container.guesser = guesser;
-    container.accessor = new EnvironmentAccessor;
+    container.accessor = new AssociativeArrayAccessor!string;
     container.allocator = theAllocator;
 
     return container;

@@ -4,10 +4,7 @@
 		"Alexandru Ermicioi"
 	],
 	"dependencies": {
-		"aedi-property-reader:core": {
-			"path": "../core"
-		},
-		"aedi": "~>0.3.0"
+		"aedi-property-reader:core" : "*"
 	},
 	"targetType": "sourceLibrary",
 	"description": "Command line argument locator and factory.",

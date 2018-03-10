@@ -5,8 +5,7 @@
 	],
 	"dependencies": {
 		"dyaml": "~>0.6.3",
-		"aedi-property-reader:core": "~>0.1.0",
-		"aedi": "~>0.3.0"
+		"aedi-property-reader:core": "*"
 	},
 	"targetType": "sourceLibrary",
 	"description": "yaml document loader and factory",

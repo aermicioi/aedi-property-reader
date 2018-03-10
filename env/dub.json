@@ -8,7 +8,6 @@
 	"license": "BSL-1.0",
 	"targetType": "sourceLibrary",
 	"dependencies": {
-		"aedi" : "~>0.3.0",
-		"aedi-property-reader:core" : "~>0.1.0"
+		"aedi-property-reader:core": "*"
 	}
 }

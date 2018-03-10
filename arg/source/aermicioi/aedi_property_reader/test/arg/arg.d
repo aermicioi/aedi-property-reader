@@ -45,12 +45,11 @@ unittest {
             "--string=stringed",
             "--array=hello",
             "--array= ",
-            "--array=world",
+            "--array=world!",
             "--float=1.0",
             "--integer=10"
     ]);
 
-	debug pragma(msg, typeof(c));
     with (c.configure) {
         property!(string)("string"); // Not testing it since factory takes arguments from
         property!(string[])("array");

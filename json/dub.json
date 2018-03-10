@@ -4,8 +4,7 @@
 		"Alexandru Ermicioi"
 	],
 	"dependencies": {
-		"aedi": "~>0.3.0",
-		"aedi-property-reader:core": "~>0.1.0"
+		"aedi-property-reader:core": "*"
 	},
 	"targetType": "sourceLibrary",
 	"description": "Json document locator and factory",

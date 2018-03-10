@@ -27,30 +27,45 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.properd.convertor;
+module aermicioi.aedi_property_reader.core.core;
 
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.properd.accessor;
-import aermicioi.aedi.factory;
+import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
-import aermicioi.aedi.storage.wrapper;
-import aermicioi.aedi.storage.decorator;
-import aermicioi.aedi.exception;
-import std.traits;
-import std.experimental.allocator;
-import properd;
-import std.conv;
-import std.range;
-import std.exception;
+import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.document;
+import std.json;
+import std.xml;
+import std.meta;
 
-alias ProperdConvertor = AdvisedConvertor!(convert, destruct);
+struct ConvertorContext(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType) {
 
-void convert(To, From : string)(in From node, ref To to, IAllocator allocator = theAllocator) {
+    DocumentContainerType container;
+    alias container this;
 
-	to = node.to!To;
+    ref typeof(this) register(To)(string identity) {
+        container.set(new AdvisedConvertor!(To, FieldType)(), identity);
+
+        return this;
+    }
+
+    ref typeof(this) register(To)() {
+
+        this.register!(To, To);
+    }
+
+    ref typeof(this) register(Iface, To)() {
+        import std.traits : fullyQualifiedName;
+
+        return this.register!To(fullyQualifiedName!Iface);
+    }
+
+    alias property = register;
 }
-void destruct(To)(ref To to, IAllocator allocator = theAllocator) {
-	destroy(to);
 
-	to = To.init;
+auto configure(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType)(DocumentContainerType container) {
+    return ConvertorContext!(DocumentContainerType, AdvisedConvertor)(container);
+}
+
+auto configure(DocumentContainerType : AdvisedDocumentContainer!(DocumentType, FieldType, AdvisedConvertor), DocumentType, FieldType, alias AdvisedConvertor)(DocumentContainerType container) {
+	return container.configure!(DocumentContainerType, AdvisedConvertor);
 }

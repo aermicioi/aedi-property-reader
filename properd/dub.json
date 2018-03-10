@@ -5,8 +5,7 @@
 	],
 	"dependencies": {
 		"proper-d": "~>0.0.2",
-		"aedi-property-reader:core": "~>0.1.0",
-		"aedi": "~>0.3.0"
+		"aedi-property-reader:core": "*"
 	},
 	"targetType": "sourceLibrary",
 	"description": "ini document loader and factory based on properd library",
