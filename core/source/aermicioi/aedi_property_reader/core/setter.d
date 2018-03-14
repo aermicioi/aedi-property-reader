@@ -29,14 +29,68 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.core.setter;
 
+import aermicioi.aedi : NotFoundException;
+import aermicioi.aedi_property_reader.core.exception;
+import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.util.traits : isPropertyGetter, isPropertySetter, isPublic;
+import std.conv;
+import std.traits;
+import std.meta;
+
 interface Setter(CompositeType, FieldType = CompositeType, KeyType = string) {
 
-    void set(CompositeType composite, FieldType value, KeyType property);
+    void set(CompositeType composite, FieldType value, KeyType property) const;
 }
 
-class AssociativeArraySetter(Type, Key = Type) : Setter!(Type[Key], Type, Key) {
+class AssociativeArraySetter(Type : Z[W], Key = Type, Z, W) : Setter!(Type[Key], Type, Key) {
 
-    void set(Type[Key] composite, Type field, KeyType key) {
+    void set(Type[Key] composite, Type field, KeyType key) const {
         composite[key] = field;
+    }
+}
+
+class ArraySetter(Type : Z[], Z) : Setter!(Type[], Type, size_t) {
+
+    void set(Type[] composite, Type field, size_t key) const {
+        enforce!InvalidArgumentException(key < composite.length, text(
+            "Cannot assign ",
+            field,
+            " to ",
+            component,
+            " index ",
+            key,
+            " out of bounds ",
+            component.length
+        ));
+
+        composite[key] = field;
+    }
+}
+
+class CompositeSetter(ComponentType) : Setter!(ComponentType, Object, string)
+    if (isAggregateType!ComponentType) {
+
+    string[] set(ComponentType component, Object field, string property) const {
+        static foreach (member; __traits(allMembers, ComponentType)) {
+            static if (isPublic!(ComponentType, member)) {
+                alias m = Alias!(__traits(getMember, component, member));
+                static if (isField!(ComponentType, member) || (isSomeFunction!m && isPropertySetter!m)) {
+
+                    if (member == property) {
+
+                        alias FieldType = Parameters!m[0];
+                        enforce!InvalidArgumentException(field.identify is typeid(FieldType), text(
+                            "Cannot set value of type ", field.identify,
+                            " to property ", member,
+                            " of type ", typeid(FieldType)
+                        ));
+
+                        __traits(getMember, component, member) = field.unwrap!FieldType;
+                    }
+                }
+            }
+        }
+
+        throw new NotFoundException(text("Component of type ", typeid(ComponentType), " does not have ", property, " property"));
     }
 }

@@ -29,8 +29,85 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.core.inspector;
 
+import std.traits;
+import std.meta;
+import aermicioi.util.traits : isPropertyGetter, isPublic;
+
 interface Inspector(ComponentType, KeyType = string) {
 
-    bool has(ComponentType component, KeyType property) const;
+    TypeInfo typeOf(ComponentType component, in KeyType property) const;
+
+    bool has(ComponentType component, in KeyType property) const;
+
     KeyType[] properties(ComponentType component) const;
+}
+
+class AssociativeArrayInspector(ComponentType : Z[KeyType], KeyType = string, Z) : Inspector!(ComponentType, KeyType) {
+
+    TypeInfo typeOf(ComponentType component, in KeyType property) const {
+        return typeid(Z);
+    }
+
+    bool has(ComponentType component, in KeyType property) const {
+        return (property in component) !is null;
+    }
+
+    KeyType[] properties(ComponentType component) const {
+        import std.array;
+
+        return component.byKey.array;
+    }
+}
+
+class ArrayInspector(ComponentType : Z[], Z) : Inspector!(ComponentType, size_t) {
+
+    TypeInfo typeOf(ComponentType component, in size_t property) const {
+        return typeid(Z);
+    }
+
+    bool has(ComponentType component, in size_t property) const {
+        return component.length > property;
+    }
+
+    size_t[] properties(ComponentType component) const {
+        import std.array;
+        import std.range;
+
+        return iota(component.length).array;
+    }
+}
+
+class CompositeInspector(ComponentType) : Inspector!(ComponentType, size_t)
+    if (isAggregateType!ComponentType) {
+
+    TypeInfo typeOf(ComponentType component, in string property) const {
+        static foreach (member; __traits(allMembers, ComponentType)) {
+            static if (isPublic!(ComponentType, member)) {
+                alias m = Alias!(__traits(getMember, component, member));
+                static if (isField!(ComponentType, member) || (isSomeFunction!m && isPropertyGetter!m)) {
+                    if (member == property) {
+                        return typeid(typeof(__traits(getMember, component, member)));
+                    }
+                }
+            }
+        }
+    }
+
+    bool has(ComponentType component, in string property) const {
+        import std.algorithm : canFind;
+        return this.properties(component).canFind(property);
+    }
+
+    string[] properties(ComponentType component) const {
+        string[] props;
+
+        static foreach (member; __traits(allMembers, ComponentType)) {
+            static if (isPublic!(ComponentType, member)) {
+                alias m = Alias!(__traits(getMember, component, member));
+                static if (isField!(ComponentType, member) || (isSomeFunction!m && isPropertyGetter!m)) {
+                    props ~= member;
+                }
+            }
+        }
+    }
 }
