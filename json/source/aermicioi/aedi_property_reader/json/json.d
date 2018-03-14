@@ -54,7 +54,7 @@ Params:
 Returns:
     JsonConvertorContainer
 **/
-auto json(JSONValue value, PropertyAccessor!JSONValue accessor, TypeGuesser!JSONValue guesser, IAllocator allocator = theAllocator) {
+auto json(JSONValue value, PropertyAccessor!JSONValue accessor, TypeGuesser!JSONValue guesser, RCIAllocator allocator = theAllocator) {
 
     JsonDocumentContainer container = new JsonDocumentContainer(value);
     container.guesser = guesser;
@@ -67,7 +67,7 @@ auto json(JSONValue value, PropertyAccessor!JSONValue accessor, TypeGuesser!JSON
 /**
 ditto
 **/
-auto json(JSONValue value, TypeGuesser!JSONValue guesser, IAllocator allocator = theAllocator) {
+auto json(JSONValue value, TypeGuesser!JSONValue guesser, RCIAllocator allocator = theAllocator) {
 
     return value.json(accessor, guesser, allocator);
 }
@@ -75,7 +75,7 @@ auto json(JSONValue value, TypeGuesser!JSONValue guesser, IAllocator allocator =
 /**
 ditto
 **/
-auto json(JSONValue value, IAllocator allocator = theAllocator) {
+auto json(JSONValue value, RCIAllocator allocator = theAllocator) {
 
     return value.json(accessor, new JsonTypeGuesser, allocator);
 }
@@ -83,7 +83,7 @@ auto json(JSONValue value, IAllocator allocator = theAllocator) {
 /**
 ditto
 **/
-auto json(IAllocator allocator = theAllocator) {
+auto json(RCIAllocator allocator = theAllocator) {
 
     return JSONValue().json(allocator);
 }

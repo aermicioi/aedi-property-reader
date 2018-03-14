@@ -55,7 +55,7 @@ Params:
 Returns:
     JsonConvertorContainer
 **/
-auto xml(XmlElement value, PropertyAccessor!XmlElement accessor, TypeGuesser!XmlElement guesser, IAllocator allocator = theAllocator) {
+auto xml(XmlElement value, PropertyAccessor!XmlElement accessor, TypeGuesser!XmlElement guesser, RCIAllocator allocator = theAllocator) {
 
     XmlDocumentContainer container = new XmlDocumentContainer(value);
     container.guesser = guesser;
@@ -68,7 +68,7 @@ auto xml(XmlElement value, PropertyAccessor!XmlElement accessor, TypeGuesser!Xml
 /**
 ditto
 **/
-auto xml(XmlElement value, TypeGuesser!XmlElement guesser, IAllocator allocator = theAllocator) {
+auto xml(XmlElement value, TypeGuesser!XmlElement guesser, RCIAllocator allocator = theAllocator) {
 
     return value.xml(accessor, guesser, allocator);
 }
@@ -76,7 +76,7 @@ auto xml(XmlElement value, TypeGuesser!XmlElement guesser, IAllocator allocator 
 /**
 ditto
 **/
-auto xml(XmlElement value, IAllocator allocator = theAllocator) {
+auto xml(XmlElement value, RCIAllocator allocator = theAllocator) {
 
     auto container = value.xml(accessor, new XmlTypeGuesser(new StringToScalarConvTypeGuesser), allocator);
 
@@ -92,7 +92,7 @@ auto xml(XmlElement value, IAllocator allocator = theAllocator) {
 /**
 ditto
 **/
-auto xml(IAllocator allocator = theAllocator) {
+auto xml(RCIAllocator allocator = theAllocator) {
 
     return XmlElement("").xml(allocator);
 }

@@ -39,7 +39,7 @@ import std.range;
 import std.experimental.allocator;
 import aermicioi.aedi_property_reader.core.convertor;
 
-void convert(To, From : const(string)[])(in From from, ref To to, IAllocator allocator = theAllocator)
+void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
     if (isScalarType!To) {
     string[] args = cast(string[]) from;
 
@@ -50,7 +50,7 @@ void convert(To, From : const(string)[])(in From from, ref To to, IAllocator all
     }
 }
 
-void convert(To, From : const(string)[])(in From from, ref To to, IAllocator allocator = theAllocator)
+void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
     if (isSomeString!To) {
     string[] args = cast(string[]) from;
 
@@ -61,7 +61,7 @@ void convert(To, From : const(string)[])(in From from, ref To to, IAllocator all
     }
 }
 
-void convert(To, From : const(string)[])(in From from, ref To to, IAllocator allocator = theAllocator)
+void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
     if (!isSomeString!To && isArray!To) {
     string[] args = cast(string[]) from;
 
@@ -70,7 +70,7 @@ void convert(To, From : const(string)[])(in From from, ref To to, IAllocator all
     getopt(args, identity, &to);
 }
 
-void convert(To, From : const(string)[])(in From from, ref To to, IAllocator allocator = theAllocator)
+void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
     if (isAssociativeArray!To) {
     string[] args = cast(string[]) from;
 
@@ -79,7 +79,7 @@ void convert(To, From : const(string)[])(in From from, ref To to, IAllocator all
     getopt(args, identity, &to);
 }
 
-void destruct(To)(ref To to, IAllocator allocator = theAllocator) {
+void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     destroy(to);
     to = To.init;
 }

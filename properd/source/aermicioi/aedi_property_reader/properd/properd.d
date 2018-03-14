@@ -40,7 +40,7 @@ import lproperd = properd;
 import std.experimental.logger;
 import std.experimental.allocator;
 
-alias ProperdDocumentContainer = AdvisedDocumentContainer!(string[const(string)], string, StdConvAdvisedConvertor);
+alias ProperdDocumentContainer = AdvisedDocumentContainer!(string[string], string, StdConvAdvisedConvertor);
 
 /**
 Create a convertor container with data source being properd document.
@@ -53,7 +53,7 @@ Params:
 Returns:
     JsonConvertorContainer
 **/
-auto properd(string[const(string)] value, PropertyAccessor!(string[const(string)], string) accessor, TypeGuesser!string guesser, IAllocator allocator = theAllocator) {
+auto properd(string[string] value, PropertyAccessor!(string[string], string) accessor, TypeGuesser!string guesser, RCIAllocator allocator = theAllocator) {
 
     ProperdDocumentContainer container = new ProperdDocumentContainer(value);
     container.guesser = guesser;
@@ -66,7 +66,7 @@ auto properd(string[const(string)] value, PropertyAccessor!(string[const(string)
 /**
 ditto
 **/
-auto properd(string[const(string)] value, TypeGuesser!string guesser, IAllocator allocator = theAllocator) {
+auto properd(string[string] value, TypeGuesser!string guesser, RCIAllocator allocator = theAllocator) {
 
     return value.properd(accessor, guesser, allocator);
 }
@@ -74,7 +74,7 @@ auto properd(string[const(string)] value, TypeGuesser!string guesser, IAllocator
 /**
 ditto
 **/
-auto properd(string[const(string)] value, IAllocator allocator = theAllocator) {
+auto properd(string[string] value, RCIAllocator allocator = theAllocator) {
     import std.meta : AliasSeq;
     auto container = value.properd(accessor, new StringToScalarConvTypeGuesser, allocator);
     import std.datetime;
@@ -92,9 +92,9 @@ auto properd(string[const(string)] value, IAllocator allocator = theAllocator) {
 /**
 ditto
 **/
-auto properd(IAllocator allocator = theAllocator) {
+auto properd(RCIAllocator allocator = theAllocator) {
 
-    return (cast(string[const(string)]) null).properd(allocator);
+    return (cast(string[string]) null).properd(allocator);
 }
 
 /**

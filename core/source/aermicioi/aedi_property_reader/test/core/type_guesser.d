@@ -27,45 +27,20 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.type_guesser;
+module aermicioi.aedi_property_reader.core.test.type_guesser;
 
-interface TypeGuesser(SerializedType) {
+import aermicioi.aedi_property_reader.core.type_guesser;
 
-    public {
+unittest {
+    auto guesser = new StringToScalarConvTypeGuesser;
 
-        TypeInfo guess(SerializedType serialized);
-    }
+    assert(guesser.guess("true") is typeid(bool));
+    assert(guesser.guess("20") is typeid(long));
+    assert(guesser.guess("20.0") is typeid(double));
+    assert(guesser.guess("a") is typeid(char));
+    assert(guesser.guess("[true]") is typeid(bool[]));
+    assert(guesser.guess("[20]") is typeid(long[]));
+    assert(guesser.guess("[20.0]") is typeid(double[]));
+    assert(guesser.guess("[\"20\"]") is typeid(string[]));
+    assert(guesser.guess("a string") is typeid(string));
 }
-
-class StdConvTypeGuesser(SerializedType, ConvertableTypes...) : TypeGuesser!SerializedType {
-
-    public {
-
-        TypeInfo guess(SerializedType serialized) {
-            import std.conv;
-
-            foreach (ConvertableType; ConvertableTypes) {
-                try {
-                    cast(void) serialized.to!ConvertableType;
-                    return typeid(ConvertableType);
-                } catch (ConvException ex) {
-
-                }
-            }
-
-            return typeid(SerializedType);
-        }
-    }
-}
-
-alias StringStdConvTypeGuesser(ConvertableTypes...) = StdConvTypeGuesser!(string, ConvertableTypes);
-alias StringToScalarConvTypeGuesser = StringStdConvTypeGuesser!(
-    bool,
-    long,
-    double,
-    char,
-    bool[],
-    long[],
-    double[],
-    string[]
-);

@@ -27,45 +27,16 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.type_guesser;
+module aermicioi.aedi_property_reader.core.setter;
 
-interface TypeGuesser(SerializedType) {
+interface Setter(CompositeType, FieldType = CompositeType, KeyType = string) {
 
-    public {
-
-        TypeInfo guess(SerializedType serialized);
-    }
+    void set(CompositeType composite, FieldType value, KeyType property);
 }
 
-class StdConvTypeGuesser(SerializedType, ConvertableTypes...) : TypeGuesser!SerializedType {
+class AssociativeArraySetter(Type, Key = Type) : Setter!(Type[Key], Type, Key) {
 
-    public {
-
-        TypeInfo guess(SerializedType serialized) {
-            import std.conv;
-
-            foreach (ConvertableType; ConvertableTypes) {
-                try {
-                    cast(void) serialized.to!ConvertableType;
-                    return typeid(ConvertableType);
-                } catch (ConvException ex) {
-
-                }
-            }
-
-            return typeid(SerializedType);
-        }
+    void set(Type[Key] composite, Type field, KeyType key) {
+        composite[key] = field;
     }
 }
-
-alias StringStdConvTypeGuesser(ConvertableTypes...) = StdConvTypeGuesser!(string, ConvertableTypes);
-alias StringToScalarConvTypeGuesser = StringStdConvTypeGuesser!(
-    bool,
-    long,
-    double,
-    char,
-    bool[],
-    long[],
-    double[],
-    string[]
-);

@@ -35,7 +35,7 @@ import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.std_conv;
 
-alias EnvironmentDocumentContainer = AdvisedDocumentContainer!(string[const(string)], string, StdConvAdvisedConvertor);
+alias EnvironmentDocumentContainer = AdvisedDocumentContainer!(string[string], string, StdConvAdvisedConvertor);
 
 auto env() {
     auto container = env(new StringToScalarConvTypeGuesser);

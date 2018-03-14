@@ -27,45 +27,36 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.type_guesser;
+module aermicioi.aedi_property_reader.core.test.document;
 
-interface TypeGuesser(SerializedType) {
+import aermicioi.aedi : locate, NotFoundException;
+import aermicioi.aedi_property_reader.core.document : DocumentContainer;
+import aermicioi.aedi_property_reader.core.type_guesser : StringToScalarConvTypeGuesser;
+import aermicioi.aedi_property_reader.core.accessor : AssociativeArrayAccessor;
+import aermicioi.aedi_property_reader.core.convertor : CallbackConvertor;
+import aermicioi.aedi_property_reader.core.std_conv : StdConvAdvisedConvertor;
+import std.experimental.allocator;
+import std.exception;
 
-    public {
+unittest {
 
-        TypeInfo guess(SerializedType serialized);
-    }
+    DocumentContainer!(string[string], string) document = new DocumentContainer!(string[string], string)([
+        "foo": "foofoo",
+        "moo": "10"
+    ]);
+
+    document.guesser = new StringToScalarConvTypeGuesser;
+    document.accessor = new AssociativeArrayAccessor!string;
+    document.allocator = theAllocator;
+
+    document.set(new StdConvAdvisedConvertor!(long, string), "long");
+    document.set(new StdConvAdvisedConvertor!(string, string), "string");
+
+    assert(document.has("foo"));
+    assert(!document.has("coo"));
+
+    assert(document.locate!long("moo") == 10);
+    assert(document.locate!string("foo") == "foofoo");
+
+    assertThrown!NotFoundException(document.locate!int("coo"));
 }
-
-class StdConvTypeGuesser(SerializedType, ConvertableTypes...) : TypeGuesser!SerializedType {
-
-    public {
-
-        TypeInfo guess(SerializedType serialized) {
-            import std.conv;
-
-            foreach (ConvertableType; ConvertableTypes) {
-                try {
-                    cast(void) serialized.to!ConvertableType;
-                    return typeid(ConvertableType);
-                } catch (ConvException ex) {
-
-                }
-            }
-
-            return typeid(SerializedType);
-        }
-    }
-}
-
-alias StringStdConvTypeGuesser(ConvertableTypes...) = StdConvTypeGuesser!(string, ConvertableTypes);
-alias StringToScalarConvTypeGuesser = StringStdConvTypeGuesser!(
-    bool,
-    long,
-    double,
-    char,
-    bool[],
-    long[],
-    double[],
-    string[]
-);

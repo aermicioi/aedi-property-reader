@@ -55,7 +55,7 @@ Params:
 Returns:
     JsonConvertorContainer
 **/
-auto yaml(Node value, PropertyAccessor!Node accessor, TypeGuesser!Node guesser, IAllocator allocator = theAllocator) {
+auto yaml(Node value, PropertyAccessor!Node accessor, TypeGuesser!Node guesser, RCIAllocator allocator = theAllocator) {
 
     YamlDocumentContainer container = new YamlDocumentContainer(value);
     container.guesser = guesser;
@@ -68,7 +68,7 @@ auto yaml(Node value, PropertyAccessor!Node accessor, TypeGuesser!Node guesser, 
 /**
 ditto
 **/
-auto yaml(Node value, TypeGuesser!Node guesser, IAllocator allocator = theAllocator) {
+auto yaml(Node value, TypeGuesser!Node guesser, RCIAllocator allocator = theAllocator) {
 
     return value.yaml(accessor, guesser, allocator);
 }
@@ -76,7 +76,7 @@ auto yaml(Node value, TypeGuesser!Node guesser, IAllocator allocator = theAlloca
 /**
 ditto
 **/
-auto yaml(Node value, IAllocator allocator = theAllocator) {
+auto yaml(Node value, RCIAllocator allocator = theAllocator) {
     import std.meta : AliasSeq;
     auto container = value.yaml(accessor, new YamlTypeGuesser, allocator);
     import std.datetime;
@@ -99,7 +99,7 @@ auto yaml(Node value, IAllocator allocator = theAllocator) {
 /**
 ditto
 **/
-auto yaml(IAllocator allocator = theAllocator) {
+auto yaml(RCIAllocator allocator = theAllocator) {
 
     return Node("").yaml(allocator);
 }

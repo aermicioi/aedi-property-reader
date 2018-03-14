@@ -27,45 +27,18 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.type_guesser;
+module aermicioi.aedi_property_reader.core.composite_convertor;
 
-interface TypeGuesser(SerializedType) {
+import aermicioi.aedi_property_reader.core.convertor;
+import std.experimental.allocator;
 
-    public {
+class CompositeConvertor(From, To) : Convertor {
 
-        TypeInfo guess(SerializedType serialized);
+    private {
+        Convertor[] convertors;
+    }
+
+    void convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) {
+
     }
 }
-
-class StdConvTypeGuesser(SerializedType, ConvertableTypes...) : TypeGuesser!SerializedType {
-
-    public {
-
-        TypeInfo guess(SerializedType serialized) {
-            import std.conv;
-
-            foreach (ConvertableType; ConvertableTypes) {
-                try {
-                    cast(void) serialized.to!ConvertableType;
-                    return typeid(ConvertableType);
-                } catch (ConvException ex) {
-
-                }
-            }
-
-            return typeid(SerializedType);
-        }
-    }
-}
-
-alias StringStdConvTypeGuesser(ConvertableTypes...) = StdConvTypeGuesser!(string, ConvertableTypes);
-alias StringToScalarConvTypeGuesser = StringStdConvTypeGuesser!(
-    bool,
-    long,
-    double,
-    char,
-    bool[],
-    long[],
-    double[],
-    string[]
-);

@@ -45,7 +45,7 @@ import std.exception;
 
 alias YamlConvertor = AdvisedConvertor!(convert, destruct);
 
-void convert(To, From : Node)(in From node, ref To to, IAllocator allocator = theAllocator)
+void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (!is(To == enum)) {
 
 	enforce!InvalidCastException(node.convertsTo!To, text("Could not convert yaml ", dumper(node), " to ", typeid(To)));
@@ -53,7 +53,7 @@ void convert(To, From : Node)(in From node, ref To to, IAllocator allocator = th
 	to = (cast() node).as!To;
 }
 
-void convert(To : Z[], From : Node, Z)(in From node, ref To to, IAllocator allocator = theAllocator)
+void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (isSomeString!To && !is(To == enum)) {
 
 	enforce!InvalidCastException(node.isString, text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a string"));
@@ -61,7 +61,7 @@ void convert(To : Z[], From : Node, Z)(in From node, ref To to, IAllocator alloc
 	to = cast(string) (cast() node).as!(string);
 }
 
-void convert(To : Z[], From : Node, Z)(in From node, ref To to, IAllocator allocator = theAllocator)
+void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (!isSomeString!To && !is(To == enum)) {
 
 	enforce!InvalidCastException(node.isSequence, text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a sequence"));
@@ -74,7 +74,7 @@ void convert(To : Z[], From : Node, Z)(in From node, ref To to, IAllocator alloc
 	}
 }
 
-void convert(To : Z[K], From : Node, Z, K)(in From node, ref To to, IAllocator allocator = theAllocator) if (!is(To == enum)) {
+void convert(To : Z[K], From : Node, Z, K)(in From node, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
 
 	enforce(node.isMapping, text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a map"));
 
@@ -91,7 +91,7 @@ void convert(To : Z[K], From : Node, Z, K)(in From node, ref To to, IAllocator a
 	}
 }
 
-void convert(To, From : Node)(in From node, ref To to, IAllocator allocator = theAllocator)
+void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (is(To == enum)) {
 
 	string temp;
@@ -100,13 +100,13 @@ void convert(To, From : Node)(in From node, ref To to, IAllocator allocator = th
 	temp.destruct(allocator);
 }
 
-void destruct(To)(ref To to, IAllocator allocator = theAllocator) {
+void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
 	destroy(to);
 
 	to = To.init;
 }
 
-void destruct(To: Z[], Z)(ref To to, IAllocator allocator = theAllocator)
+void destruct(To: Z[], Z)(ref To to, RCIAllocator allocator = theAllocator)
 	if (!isSomeString!To) {
 	allocator.dispose(to);
 

@@ -44,11 +44,12 @@ import std.array;
 import std.experimental.logger;
 
 
-class DocumentContainer(DocumentType, FieldType = DocumentType) : Container, Storage!(Convertor, string) {
+class DocumentContainer(DocumentType, FieldType = DocumentType) : Container, Storage!(Convertor, string), AllocatorAware!() {
+
+    mixin AllocatorAwareMixin!(typeof(this));
 
     private {
         Convertor[string] convertors;
-        IAllocator allocator_;
         PropertyAccessor!(DocumentType, FieldType) accessor_;
         TypeGuesser!FieldType guesser_;
 
@@ -62,30 +63,6 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) : Container, Sto
         }
 
         @property {
-            /**
-            Set allocator
-
-            Params:
-                allocator = allocator used to allocate memory for converted components.
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) allocator(IAllocator allocator) @safe nothrow pure {
-                this.allocator_ = allocator;
-
-                return this;
-            }
-
-            /**
-            Get allocator
-
-            Returns:
-                IAllocator
-            **/
-            inout(IAllocator) allocator() @safe nothrow pure inout {
-                return this.allocator_;
-            }
 
             /**
             Set guesser
@@ -313,6 +290,16 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) : Container, Sto
 }
 
 class AdvisedDocumentContainer(DocumentType, FieldType, alias AdvisedConvertor) : DocumentContainer!(DocumentType, FieldType) {
+
+    public {
+
+        this(DocumentType document) {
+            super(document);
+        }
+    }
+}
+
+class AdvisedComponentContainer(DocumentType, Object, alias AdvisedConvertor = NoOpConvertor) : DocumentContainer!(DocumentType, Object) {
 
     public {
 

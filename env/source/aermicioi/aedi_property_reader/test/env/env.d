@@ -40,8 +40,8 @@ unittest {
             "array" : "[ \"hello\", \" \", \"world!\"]",
             "float" : "1.0",
             "integer" : "10",
-            "guessable-ubyte" : "10",
-            "guessable-float" : "1.0",
+            "guessable-long" : "10",
+            "guessable-double" : "1.0",
             "guessable-array" : "[ \"hello\", \" \", \"world!\"]",
             "guessable-string" : "stringed"
     ];
@@ -60,6 +60,6 @@ unittest {
 
     assert(c.locate!(string)("guessable-string") == "stringed");
 	assert(c.locate!(string[])("guessable-array") == ["hello", " ", "world!"]);
-	assert(c.locate!float("guessable-float") == 1.0);
-	assert(c.locate!ubyte("guessable-ubyte") == 10);
+	assert(c.locate!double("guessable-double") == 1.0);
+	assert(c.locate!long("guessable-long") == 10);
 }

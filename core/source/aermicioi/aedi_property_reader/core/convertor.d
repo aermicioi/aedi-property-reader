@@ -42,11 +42,11 @@ import std.algorithm;
 import std.array;
 import std.experimental.logger;
 
-alias FunctionalConvertor(To, From) = void function(in From, ref To, IAllocator allocator = theAllocator);
-alias DelegateConvertor(To, From) = void delegate(in From, ref To, IAllocator allocator = theAllocator);
+alias FunctionalConvertor(To, From) = void function(in From, ref To, RCIAllocator allocator = theAllocator);
+alias DelegateConvertor(To, From) = void delegate(in From, ref To, RCIAllocator allocator = theAllocator);
 
 template isConvertor(alias T) {
-    static if (is(typeof(&T) : void function(in Y, ref X, IAllocator allocator = theAllocator), Y, X) || is(typeof(&T) : void delegate(in Y, ref X, IAllocator allocator = theAllocator), Y, X)) {
+    static if (is(typeof(&T) : void function(in Y, ref X, RCIAllocator allocator = theAllocator), Y, X) || is(typeof(&T) : void delegate(in Y, ref X, RCIAllocator allocator = theAllocator), Y, X)) {
         enum bool Yes = true;
 
         alias To = X;
@@ -75,11 +75,11 @@ template maybeConvertor(alias T, To, From) {
     }
 }
 
-alias FunctionalDestructor(To) = void function (ref To, IAllocator = theAllocator);
-alias DelegateDestructor(To) = void delegate (ref To, IAllocator = theAllocator);
+alias FunctionalDestructor(To) = void function (ref To, RCIAllocator = theAllocator);
+alias DelegateDestructor(To) = void delegate (ref To, RCIAllocator = theAllocator);
 
 template isDestructor(alias T) {
-    static if (is(typeof(&T) : void function (ref X, IAllocator = theAllocator), X) || is(typeof(&T) : void delegate (ref X, IAllocator = theAllocator), X)) {
+    static if (is(typeof(&T) : void function (ref X, RCIAllocator = theAllocator), X) || is(typeof(&T) : void delegate (ref X, RCIAllocator = theAllocator), X)) {
         enum bool Yes = true;
 
         alias To = X;
@@ -118,8 +118,8 @@ interface Convertor {
     bool convertsTo(TypeInfo to) const;
     bool convertsTo(in Object to) const;
 
-    Object convert(in Object from, TypeInfo to, IAllocator allocator = theAllocator);
-    void destruct(ref Object converted, IAllocator allocator = theAllocator);
+    Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator);
+    void destruct(ref Object converted, RCIAllocator allocator = theAllocator);
 }
 
 class CallbackConvertor(alias convertor, alias destructor) : Convertor
@@ -158,30 +158,18 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
         }
 
         bool convertsFrom(in Object from) const {
-            static if (is(From : Object)) {
-
-                return this.convertsFrom(from.classinfo);
-            } else {
-
-                return this.convertsFrom((cast(Placeholder) from).type);
-            }
+            return this.convertsFrom(from.identify);
         }
 
         bool convertsTo(TypeInfo to) const {
             return typeid(Info.To) is to;
         }
 
-        bool convertsTo(in Object To) const {
-            static if (is(To : Object)) {
-
-                return this.convertsTo(to.classinfo);
-            } else {
-
-                return this.convertsTo((cast(Placeholder) to).type);
-            }
+        bool convertsTo(in Object to) const {
+            return this.convertsTo(to.identify);
         }
 
-        Object convert(in Object from, TypeInfo to, IAllocator allocator = theAllocator)
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
         {
             enforce!ConvertorException(this.convertsTo(to), text(to, " is not supported by convertor expected ", typeid(Info.To)));
             enforce!ConvertorException(this.convertsFrom(from), text(this.unwrap(from), " is not supported by convertor expected ", typeid(Info.From)));
@@ -219,7 +207,7 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
             return placeholder;
         }
 
-        void destruct(ref Object converted, IAllocator allocator = theAllocator) {
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
             static if (is(Info.To : Object)) {
 
                 destructor(converted, allocator);
@@ -320,7 +308,7 @@ class AggregateConvertor : Convertor {
             return this.convertors.canFind!(c => c.convertsTo(to));
         }
 
-        Object convert(in Object from, TypeInfo to, IAllocator allocator = theAllocator)
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
         {
             auto convertors = this.convertors.find!(c => c.convertsFrom(from) && c.convertsTo(to));
 
@@ -331,7 +319,7 @@ class AggregateConvertor : Convertor {
             throw new ConvertorException(text("Could not convert ", typeid(from), " to type ", to));
         }
 
-        void destruct(ref Object converted, IAllocator allocator = theAllocator) {
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
             auto convertors = this.convertors.find!(c => c.convertsFrom(from) && c.convertsTo(to));
 
             if (convertors.empty) {
@@ -343,7 +331,60 @@ class AggregateConvertor : Convertor {
     }
 }
 
-To convert(To, From)(Convertor convertor, From from, IAllocator allocator = theAllocator) {
+class NoOpConvertor : Convertor {
+    import std.algorithm;
+
+    public {
+        @property {
+            /**
+            Get from
+
+            Returns:
+                TypeInfo
+            **/
+            TypeInfo from() @safe nothrow pure const {
+                return typeid(Object);
+            }
+
+            /**
+            Get to
+
+            Returns:
+                TypeInfo
+            **/
+            TypeInfo to() @safe nothrow pure const {
+                return typeid(Object);
+            }
+        }
+
+        bool convertsFrom(TypeInfo from) const {
+            return this.from is from;
+        }
+
+        bool convertsFrom(in Object from) const {
+            return this.convertsTo(typeid(from));
+        }
+
+        bool convertsTo(TypeInfo to) const {
+            return this.to is from;
+        }
+
+        bool convertsTo(in Object to) const {
+            return this.convertsTo(typeid(to));
+        }
+
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
+        {
+            return cast() from;
+        }
+
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
+
+        }
+    }
+}
+
+To convert(To, From)(Convertor convertor, From from, RCIAllocator allocator = theAllocator) {
     import std.typecons : scoped;
     static if (is(From : Object)) {
 
@@ -382,6 +423,42 @@ class PlaceholderImpl(T) : WrapperImpl!T, Placeholder {
     TypeInfo type() const {
         return typeid(T);
     }
+}
+
+auto placeholder(T)(auto ref T value, RCIAllocator allocator = theAllocator) {
+    static if (is(T : Object)) {
+        return value;
+    } else {
+        return allocator.make!(PlaceholderImpl!T)(value);
+    }
+}
+
+auto unwrap(T)(inout(Object) object) {
+    static if (is(T : Object)) {
+
+        return cast(T) object;
+    } else {
+
+        auto wrapper = (cast(Wrapper!T) object);
+
+        assert(wrapper !is null, text("Cannot unwrap an object that does not implement ", typeid(Wrapper!T)));
+
+        return wrapper.value;
+    }
+}
+
+TypeInfo identify(in Object object) {
+    if (object is null) {
+        return typeid(null);
+    }
+
+    Placeholder p = cast(Placeholder) object;
+
+    if (p !is null) {
+        return p.type;
+    }
+
+    return object.classinfo;
 }
 
 template AdvisedConvertor(alias convertor, alias destructor) {

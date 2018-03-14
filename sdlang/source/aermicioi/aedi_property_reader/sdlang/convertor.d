@@ -39,7 +39,7 @@ import std.experimental.allocator;
 
 alias SdlangConvertor = AdvisedConvertor!(convert, destruct);
 
-void convert(To, From : Tag)(in From from, ref To to, IAllocator allocator = theAllocator) if (!is(To == enum)) {
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
 	try {
 		to = (cast() from).expectValue!To;
 
@@ -49,7 +49,7 @@ void convert(To, From : Tag)(in From from, ref To to, IAllocator allocator = the
 	}
 }
 
-void convert(To, From : Attribute)(in From from, ref To to, IAllocator allocator = theAllocator) if (!is(To == enum)) {
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
 	import std.variant : VariantException;
 
 	try {
@@ -61,21 +61,21 @@ void convert(To, From : Attribute)(in From from, ref To to, IAllocator allocator
 	}
 }
 
-void convert(To, From : Tag)(in From from, ref To to, IAllocator allocator = theAllocator) if (is(To == enum)) {
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (is(To == enum)) {
 	string temp;
     from.convert!string(temp, allocator);
     value = temp.to!To;
 	temp.destruct(allocator);
 }
 
-void convert(To, From : Attribute)(in From from, ref To to, IAllocator allocator = theAllocator) if (is(To == enum)) {
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (is(To == enum)) {
 	string temp;
     from.convert!string(temp, allocator);
     value = temp.to!To;
 	temp.destruct(allocator);
 }
 
-void convert(To, From : SdlangElement)(in From from, ref To to, IAllocator allocator = theAllocator) {
+void convert(To, From : SdlangElement)(in From from, ref To to, RCIAllocator allocator = theAllocator) {
 
 	final switch (from.kind) {
 		case SdlangElement.Kind.tag: {
@@ -90,7 +90,7 @@ void convert(To, From : SdlangElement)(in From from, ref To to, IAllocator alloc
 	}
 }
 
-void destruct(To)(ref To to, IAllocator allocator = theAllocator) {
+void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
 
 	destroy(to);
 	to = To.init;

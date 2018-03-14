@@ -33,11 +33,11 @@ import std.conv : to;
 import std.experimental.allocator;
 import aermicioi.aedi_property_reader.core.convertor;
 
-void convert(To, From)(From from, ref To to, IAllocator allocator = theAllocator) {
+void convert(To, From)(From from, ref To to, RCIAllocator allocator = theAllocator) {
     to = from.to!To;
 }
 
-void destruct(To)(ref To to, IAllocator allocator = theAllocator) {
+void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     destroy(to);
     to = To.init;
 }

@@ -5,18 +5,15 @@
 [![Code cov](https://img.shields.io/codecov/c/github/aermicioi/aedi-property-reader.svg)]()
 [![Dub version](https://img.shields.io/dub/v/aedi-property-reader.svg)](https://code.dlang.org/packages/aedi-property-reader)
 
-Aedi property reader is a config reader, with ability to read from
-xml, json, environment, and command line.
-
-It allows to define a set of default parameters, and extend or override them
-from environment, command line or any other configuration file.
+Aedi property reader is a library for loading config properties from various sources,
+like xml, json, yaml, or sdlang.
 
 ## Features
 
-- Simple - Get started fast.
-- Powerful - For multi-deployment configurations.
+- Simple - Init container, define properties, use it.
+- Powerful - Hierarchical organization of multiple files.
 - Flexible - Supports multiple config formats and sources.
-- Predictable - Well tested foundation for library and app developers.
+- Smart - Uses document syntax to guess D types for properties.
 
 ## Installation
 
@@ -39,10 +36,13 @@ dependency "aedi-property-reader" version="~master"
 Aedi property reader provides an unified interface for reading config properties out of
 a multitude of sources. It is able to read configuration out of following sources:
 
-- Command line 
-- Environment 
-- Xml document 
-- Json document 
+- command line
+- environment
+- xml
+- json
+- sdlang
+- yaml
+- java like property files
 
 To use aedi property reader to load configuration following steps are required:
 
@@ -61,14 +61,14 @@ import aermicioi.aedi;
 import aermicioi.aedi_property_reader;
 
 void properties(T : ConvertorContainer!(FromType, ToType), FromType, ToType)(T container) {
-		with (container.configure) { // Create a configuration context for config container
-			property!string("protocol"); // Define `protocol` property of type `string`
-			property!string("host");
-			property!string("resource");
-			property!ushort("port");
-			property!(string[string])("arguments"); // Define `arguments` property of type `string[string]`
-			property!(size_t[])("nope-an-array");
-		}
+	with (container.configure) { // Create a configuration context for config container
+		register!string("protocol"); // Define `protocol` property of type `string`
+		register!string("host");
+		register!string("resource");
+		register!ushort("port");
+		register!(string[string])("arguments"); // Define `arguments` property of type `string[string]`
+		register!(size_t[])("nope-an-array");
+	}
 }
 
 auto load() {
@@ -84,10 +84,10 @@ void main()
 
 	writeln("Dumping network connection information:");
 	writeln("Protocol: ", cont.locate!string("protocol")); // Write property found in configuration
-	writeln("Host: ", cont.locate!string("host")); 
+	writeln("Host: ", cont.locate!string("host"));
 	writeln("Port: ", cont.locate!ushort("port"));
 	writeln("Arguments: ", cont.locate!(string[string])("arguments")); // Write property found in configuration
-	writeln("nope-an-array: ", cont.locate!(size_t[])("nope-an-array")); 
+	writeln("nope-an-array: ", cont.locate!(size_t[])("nope-an-array"));
 }
 ```
 

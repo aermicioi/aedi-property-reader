@@ -27,45 +27,39 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.type_guesser;
+module aermicioi.aedi_property_reader.core.test.convertor;
 
-interface TypeGuesser(SerializedType) {
+import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.exception;
+import std.conv;
+import std.experimental.allocator;
+import std.exception;
 
-    public {
-
-        TypeInfo guess(SerializedType serialized);
-    }
+void convert(in string from, ref size_t to, RCIAllocator allocator = theAllocator) {
+    to = from.to!size_t;
 }
 
-class StdConvTypeGuesser(SerializedType, ConvertableTypes...) : TypeGuesser!SerializedType {
-
-    public {
-
-        TypeInfo guess(SerializedType serialized) {
-            import std.conv;
-
-            foreach (ConvertableType; ConvertableTypes) {
-                try {
-                    cast(void) serialized.to!ConvertableType;
-                    return typeid(ConvertableType);
-                } catch (ConvException ex) {
-
-                }
-            }
-
-            return typeid(SerializedType);
-        }
-    }
+void destruct(ref size_t to, RCIAllocator allocator = theAllocator) {
+    destroy(to);
+    to = size_t.init;
 }
 
-alias StringStdConvTypeGuesser(ConvertableTypes...) = StdConvTypeGuesser!(string, ConvertableTypes);
-alias StringToScalarConvTypeGuesser = StringStdConvTypeGuesser!(
-    bool,
-    long,
-    double,
-    char,
-    bool[],
-    long[],
-    double[],
-    string[]
-);
+unittest {
+    auto convertor = new CallbackConvertor!(convert, destruct);
+    size_t v = 10;
+    string sv = "20";
+
+    assert(convertor.from is typeid(string));
+    assert(convertor.to is typeid(size_t));
+
+    assert(convertor.convertsFrom(typeid(string)));
+    assert(convertor.convertsTo(typeid(size_t)));
+
+    assert(convertor.convertsFrom(sv.placeholder));
+    assert(convertor.convertsTo(v.placeholder));
+
+    assert(convertor.convert(sv.placeholder, typeid(size_t)).unwrap!size_t == 20);
+    assertThrown!ConvertorException(convertor.convert(sv.placeholder, typeid(string)));
+    assertThrown!ConvertorException(convertor.convert(v.placeholder, typeid(size_t)));
+
+}

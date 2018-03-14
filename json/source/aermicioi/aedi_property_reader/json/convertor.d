@@ -53,7 +53,7 @@ Throws:
 Returns:
     value
 **/
-void convert(To, From : JSONValue)(in From json, ref To value, IAllocator allocator = theAllocator)
+void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (isFloatingPoint!To && !is(To == enum)) {
 
     if (json.type != JSON_TYPE.FLOAT) {
@@ -66,7 +66,7 @@ void convert(To, From : JSONValue)(in From json, ref To value, IAllocator alloca
 /**
 ditto
 **/
-void convert(To, From : JSONValue)(in From json, ref To value, IAllocator allocator = theAllocator)
+void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (is(To : bool) && !is(To == enum)) {
 
     if (json.type == JSON_TYPE.TRUE) {
@@ -85,7 +85,7 @@ void convert(To, From : JSONValue)(in From json, ref To value, IAllocator alloca
 /**
 ditto
 **/
-void convert(To, From : JSONValue)(in From json, ref To value, IAllocator allocator = theAllocator)
+void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (isUnsigned!To && isIntegral!To && !is(To == enum)) {
 
     if ((json.type == JSON_TYPE.INTEGER) && (json.integer >= 0)) {
@@ -103,7 +103,7 @@ void convert(To, From : JSONValue)(in From json, ref To value, IAllocator alloca
 /**
 ditto
 **/
-void convert(To, From : JSONValue)(in From json, ref To value, IAllocator allocator = theAllocator)
+void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (!isUnsigned!To && isIntegral!To && !is(To == enum)) {
 
     if (json.type != JSON_TYPE.INTEGER) {
@@ -116,7 +116,7 @@ void convert(To, From : JSONValue)(in From json, ref To value, IAllocator alloca
 /**
 ditto
 **/
-void convert(To, From : JSONValue)(in From json, ref To value, IAllocator allocator = theAllocator)
+void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (isSomeString!To && !is(To == enum)) {
 
     if (json.type != JSON_TYPE.STRING) {
@@ -129,7 +129,7 @@ void convert(To, From : JSONValue)(in From json, ref To value, IAllocator alloca
 /**
 ditto
 **/
-void convert(To : Z[], From : JSONValue, Z)(in From json, ref To value, IAllocator allocator = theAllocator)
+void convert(To : Z[], From : JSONValue, Z)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (!isSomeString!To && !is(To == enum)) {
 
     if (json.type != JSON_TYPE.ARRAY) {
@@ -146,7 +146,7 @@ void convert(To : Z[], From : JSONValue, Z)(in From json, ref To value, IAllocat
 /**
 ditto
 **/
-void convert(To : Z[string], From : JSONValue, Z)(in From json, ref To value, IAllocator allocator = theAllocator) if (!is(To == enum)) {
+void convert(To : Z[string], From : JSONValue, Z)(in From json, ref To value, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
 
     if (json.type != JSON_TYPE.OBJECT) {
         throw new InvalidCastException("Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To);
@@ -165,7 +165,7 @@ void convert(To : Z[string], From : JSONValue, Z)(in From json, ref To value, IA
 /**
 ditto
 **/
-void convert(To, From : JSONValue)(in From json, ref To value, IAllocator allocator = theAllocator) if (is(To == enum)) {
+void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator) if (is(To == enum)) {
 
     string temp;
     json.convert!string(temp, allocator);
@@ -173,12 +173,12 @@ void convert(To, From : JSONValue)(in From json, ref To value, IAllocator alloca
 	temp.destruct(allocator);
 }
 
-void destruct(To)(ref To to, IAllocator allocator = theAllocator) {
+void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     destroy(to);
     to = to.init;
 }
 
-void destruct(To : Z[], Z)(ref To to, IAllocator allocator = theAllocator)
+void destruct(To : Z[], Z)(ref To to, RCIAllocator allocator = theAllocator)
     if (!isSomeString!To) {
     allocator.dispose(to);
     to = To.init;

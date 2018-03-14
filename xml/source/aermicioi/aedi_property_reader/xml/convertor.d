@@ -53,7 +53,7 @@ Tohrows:
 Returns:
     value
 **/
-void convert(To, From : Element)(in From from, ref To value, IAllocator allocator = theAllocator)
+void convert(To, From : Element)(in From from, ref To value, RCIAllocator allocator = theAllocator)
     if (isNumeric!To && !is(To == enum)) {
 
     try {
@@ -70,7 +70,7 @@ void convert(To, From : Element)(in From from, ref To value, IAllocator allocato
     }
 }
 
-void convert(To, From : Element)(in From from, ref To value, IAllocator allocator = theAllocator)
+void convert(To, From : Element)(in From from, ref To value, RCIAllocator allocator = theAllocator)
     if (is(To : bool) && !is(To == enum)) {
     import std.string : strip;
 
@@ -91,7 +91,7 @@ void convert(To, From : Element)(in From from, ref To value, IAllocator allocato
 /**
 ditto
 **/
-void convert(To, From : Element)(in From from, ref To value, IAllocator allocator = theAllocator)
+void convert(To, From : Element)(in From from, ref To value, RCIAllocator allocator = theAllocator)
     if (isSomeString!To && !is(To == enum)) {
 
     try {
@@ -111,7 +111,7 @@ void convert(To, From : Element)(in From from, ref To value, IAllocator allocato
 /**
 ditto
 **/
-void convert(To : Z[], From : Element, Z)(in From from, ref To value, IAllocator allocator = theAllocator)
+void convert(To : Z[], From : Element, Z)(in From from, ref To value, RCIAllocator allocator = theAllocator)
     if (!isSomeString!To && !is(To == enum)) {
 
     value = allocator.makeArray!Z(from.elements.length);
@@ -124,7 +124,7 @@ void convert(To : Z[], From : Element, Z)(in From from, ref To value, IAllocator
 /**
 ditto
 **/
-void convert(To : Z[string], From : Element, Z)(in From from, ref To value, IAllocator allocator = theAllocator) if (!is(To == enum)){
+void convert(To : Z[string], From : Element, Z)(in From from, ref To value, RCIAllocator allocator = theAllocator) if (!is(To == enum)){
 
     foreach (ref el; from.elements) {
 
@@ -137,7 +137,7 @@ void convert(To : Z[string], From : Element, Z)(in From from, ref To value, IAll
 /**
 ditto
 **/
-void convert(To, From : Element)(in From from, ref To value, IAllocator allocator = theAllocator) if (is(To == enum)){
+void convert(To, From : Element)(in From from, ref To value, RCIAllocator allocator = theAllocator) if (is(To == enum)){
 
     string temp;
     from.convert!string(temp, allocator);
@@ -145,12 +145,12 @@ void convert(To, From : Element)(in From from, ref To value, IAllocator allocato
 	temp.destruct(allocator);
 }
 
-void convert(To, From : string)(in From from, ref To value, IAllocator allocator = theAllocator) {
+void convert(To, From : string)(in From from, ref To value, RCIAllocator allocator = theAllocator) {
 
     value = from.to!To;
 }
 
-void convert(To, From : XmlElement)(in From from, ref To value, IAllocator allocator = theAllocator) {
+void convert(To, From : XmlElement)(in From from, ref To value, RCIAllocator allocator = theAllocator) {
 
     final switch(from.kind) {
         case XmlElement.Kind.element: {
@@ -164,12 +164,12 @@ void convert(To, From : XmlElement)(in From from, ref To value, IAllocator alloc
     }
 }
 
-void destruct(To)(ref To to, IAllocator allocator = theAllocator) {
+void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     destroy(to);
     to = To.init;
 }
 
-void destruct(To : Z[], Z)(ref To to, IAllocator allocator = theAllocator)
+void destruct(To : Z[], Z)(ref To to, RCIAllocator allocator = theAllocator)
     if (!isSomeString!To) {
     allocator.dispose(to);
     to = To.init;

@@ -55,7 +55,7 @@ Params:
 Returns:
     JsonConvertorContainer
 **/
-auto sdlang(SdlangElement value, PropertyAccessor!SdlangElement accessor, TypeGuesser!SdlangElement guesser, IAllocator allocator = theAllocator) {
+auto sdlang(SdlangElement value, PropertyAccessor!SdlangElement accessor, TypeGuesser!SdlangElement guesser, RCIAllocator allocator = theAllocator) {
 
     SdlangDocumentContainer container = new SdlangDocumentContainer(value);
     container.guesser = guesser;
@@ -68,7 +68,7 @@ auto sdlang(SdlangElement value, PropertyAccessor!SdlangElement accessor, TypeGu
 /**
 ditto
 **/
-auto sdlang(SdlangElement value, TypeGuesser!SdlangElement guesser, IAllocator allocator = theAllocator) {
+auto sdlang(SdlangElement value, TypeGuesser!SdlangElement guesser, RCIAllocator allocator = theAllocator) {
 
     return value.sdlang(accessor, guesser, allocator);
 }
@@ -76,7 +76,7 @@ auto sdlang(SdlangElement value, TypeGuesser!SdlangElement guesser, IAllocator a
 /**
 ditto
 **/
-auto sdlang(SdlangElement value, IAllocator allocator = theAllocator) {
+auto sdlang(SdlangElement value, RCIAllocator allocator = theAllocator) {
 
     auto container = value.sdlang(accessor, new SdlangTypeGuesser(), allocator);
     import std.traits : fullyQualifiedName;
@@ -102,7 +102,7 @@ auto sdlang(SdlangElement value, IAllocator allocator = theAllocator) {
 /**
 ditto
 **/
-auto sdlang(IAllocator allocator = theAllocator) {
+auto sdlang(RCIAllocator allocator = theAllocator) {
     import sdlang.ast;
 
     return SdlangElement(new Tag()).sdlang(allocator);

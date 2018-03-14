@@ -66,7 +66,7 @@ auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor, TypeGu
 	);
 }
 
-auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor, TypeGuesser!(const(string)[]) guesser, IAllocator allocator) {
+auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor, TypeGuesser!(const(string)[]) guesser, RCIAllocator allocator) {
 	ArgumentAdvisedDocumentContainer container = new ArgumentAdvisedDocumentContainer(args);
 
 	container.accessor = accessor;
