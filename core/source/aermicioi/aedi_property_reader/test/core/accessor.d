@@ -182,6 +182,25 @@ unittest {
 }
 
 unittest {
+	import aermicioi.aedi_property_reader.core.convertor;
+    string[string] elems = [
+		"foo": "foofoo",
+		"moo": "moomoo"
+	];
+
+
+	auto accessor = new WrappingAccessor!(string[string], string)(new AssociativeArrayAccessor!string);
+
+	assert(accessor.has(elems, "foo"));
+	assert(accessor.has(elems, "moo"));
+	assert(!accessor.has(elems, "coo"));
+
+	assert(accessor.access(elems, "foo").identify is typeid(string));
+	assert(typeid(accessor.access(elems, "foo")) is typeid(PlaceholderImpl!string));
+	assert(accessor.access(elems, "foo").unwrap!string == "foofoo");
+}
+
+unittest {
 	class Placeholder {
 		Placeholder p;
 		int v = 10;

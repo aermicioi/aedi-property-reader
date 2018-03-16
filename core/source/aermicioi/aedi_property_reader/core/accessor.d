@@ -244,7 +244,7 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
     }
 }
 
-auto PropertyPathAccessor(T : PropertyAccessor!(ComponentType, FieldType, KeyType), ComponentType, FieldType, KeyType)
+auto propertyPathAccessor(T : PropertyAccessor!(ComponentType, FieldType, KeyType), ComponentType, FieldType, KeyType)
     (ElementType!KeyType separator, T accessor) {
     return new PropertyPathAccessor!(ComponentType, FieldType, KeyType)(separator, accessor);
 }
@@ -594,7 +594,7 @@ auto taggedAccessor(Tagged, T : PropertyAccessor!(Composite, Field, Key), Compos
     return new TaggedElementPropertyAccessorWrapper!(Tagged, T)(accessor);
 }
 
-class AssociativeArrayAccessor(Key, Type = Key) : PropertyAccessor!(Type[Key], Type, Key) {
+class AssociativeArrayAccessor(Type, Key = Type) : PropertyAccessor!(Type[Key], Type, Key) {
 
     public {
 
@@ -782,6 +782,61 @@ class UnwrappingAccessor(ComponentType, FieldType = ComponentType, KeyType = str
     }
 }
 
+class WrappingAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : AllocatingPropertyAccessor!(ComponentType, Object, KeyType) {
+    import aermicioi.aedi_property_reader.core.convertor : identify, unwrap;
+    import std.experimental.allocator;
+
+    mixin AllocatorAwareMixin!(typeof(this));
+
+    private {
+        PropertyAccessor!(ComponentType, FieldType, KeyType) accessor_;
+    }
+
+    public {
+        this(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) {
+            this.allocator = theAllocator;
+            this.accessor = accessor;
+        }
+
+        /**
+        Set accessor
+
+        Params:
+            accessor = underlying accessor working on unwrapped element
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) accessor(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) @safe nothrow pure {
+            this.accessor_ = accessor;
+
+            return this;
+        }
+
+        /**
+        Get accessor
+
+        Returns:
+            PropertyAccessor!(ComponentType, FieldType, KeyType)
+        **/
+        inout(PropertyAccessor!(ComponentType, FieldType, KeyType)) accessor() @safe nothrow pure inout {
+            return this.accessor_;
+        }
+
+        Object access(ComponentType component, in KeyType path) const {
+            import aermicioi.aedi_property_reader.core.convertor : placeholder;
+            enforce!NotFoundException(this.has(component, path), text("Could not find property ", path));
+
+            return this.accessor.access(component, path).placeholder(cast() this.allocator);
+        }
+
+        bool has(in ComponentType component, in KeyType path) const {
+
+            return this.accessor.has(component, path);
+        }
+    }
+}
+
 class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string) {
     import std.traits;
     import std.meta;
@@ -802,8 +857,12 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
 
                 static if (isPublic!(component, member)) {
                     if (member == property) {
-                        alias m = Alias!(__traits(getMember, component, member));
-                        static if (isField!(Type, member) || (isSomeFunction!m && isPropertyGetter!m)) {
+                        static if (
+                            isField!(Type, member) ||
+                            (
+                                isSomeFunction!(__traits(getMember, component, member)) &&
+                                anySatisfy!(isPropertyGetter, __traits(getOverloads, component, member)))
+                            ) {
 
                             return (__traits(getMember, component, member)).placeholder(cast() this.allocator);
                         }
@@ -820,8 +879,12 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
 
                 static if (isPublic!(component, member)) {
                     if (member == property) {
-                        alias m = Alias!(__traits(getMember, component, member));
-                        static if (isField!(Type, member) || (isSomeFunction!m && isPropertyGetter!m)) {
+                        static if (
+                            isField!(Type, member) ||
+                            (
+                                isSomeFunction!(__traits(getMember, component, member)) &&
+                                anySatisfy!(isPropertyGetter, __traits(getOverloads, component, member)))
+                            ) {
 
                             return true;
                         }

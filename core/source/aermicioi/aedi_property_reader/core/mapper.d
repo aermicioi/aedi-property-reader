@@ -35,61 +35,234 @@ import aermicioi.aedi_property_reader.core.inspector;
 import aermicioi.aedi_property_reader.core.setter;
 import aermicioi.aedi_property_reader.core.accessor;
 import std.experimental.allocator;
+import std.experimental.logger;
 import std.exception;
 import std.algorithm;
 import std.conv;
 
 interface Mapper(From, To) {
 
-    void map(in From from, ref To to, RCIAllocator allocator = theAllocator) const;
+    void map(From from, ref To to, RCIAllocator allocator = theAllocator) const;
 }
 
 class CompositeMapper(From, To) {
 
     private {
-        bool strict;
-        bool conversion;
+        bool conversion_;
 
-        Convertor[] convertors;
+        Convertor[] convertors_;
 
-        Setter!(To, Object) setter;
-        PropertyAccessor!(From, Object) accessor;
-        Inspector!From fromInspector;
-        Inspector!To toInspector;
+        Setter!(To, Object) setter_;
+        PropertyAccessor!(From, Object) accessor_;
+        Inspector!From fromInspector_;
+        Inspector!To toInspector_;
     }
 
-    void map(in From from, ref To to, RCIAllocator allocator = theAllocator) {
+    public {
 
-        foreach (property; this.fromInspector.properties) {
-            if (this.toInspector.has(property)) {
+        @property {
+            /**
+            Set convertors
 
-                Object value = this.accessor.access(from, property);
-                if (this.fromInspector.typeOf(component, property) != this.toInspector.typeOf(component, property)) {
-                    if (this.conversion) {
-                        auto compatible = convertors.filter!(c =>
-                            c.convertsFrom!(this.fromInspector.typeOf(from, property)) &&
-                            c.convertsTo!(this.toInspector.typeOf(to, property))
-                        );
+            Params:
+                convertors = a list of optional convertors used to convert from one format to another one
 
-                        enforce!ConvertorException(!compatible.empty, text(
-                            "Could not find convertor to convert ", property, " from ", this.fromInspector.typeOf(from, property),
-                            " to ", this.toInspector.typeOf(to, property)
-                        ));
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) convertors(Convertor[] convertors) @safe nothrow pure {
+                this.convertors_ = convertors;
 
-                        value = compatible.front.convert(value, this.toInspector.typeOf(to, property), allocator);
-                    } else {
-                        throw new InvalidArgumentException(text(
-                            "Invalid assignment ", property, " has type of ", this.fromInspector.typeOf(from, property),
-                            " in from component while in to component it has ", this.toInspector.typeOf(to, property)
-                        ));
+                return this;
+            }
+
+            /**
+            Get convertors
+
+            Returns:
+                Convertor[]
+            **/
+            inout(Convertor[]) convertors() @safe nothrow pure inout {
+                return this.convertors_;
+            }
+
+            /**
+            Set conversion
+
+            Params:
+                conversion = wether to convert or not values using convertors.
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) conversion(bool conversion) @safe nothrow pure {
+                this.conversion_ = conversion;
+
+                return this;
+            }
+
+            /**
+            Get conversion
+
+            Returns:
+                bool
+            **/
+            inout(bool) conversion() @safe nothrow pure inout {
+                return this.conversion_;
+            }
+
+            /**
+            Set setter
+
+            Params:
+                setter = setter used to pass values to component.
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) setter(Setter!(To, Object) setter) @safe nothrow pure {
+                this.setter_ = setter;
+
+                return this;
+            }
+
+            /**
+            Get setter
+
+            Returns:
+                Setter!(To, Object)
+            **/
+            inout(Setter!(To, Object)) setter() @safe nothrow pure inout {
+                return this.setter_;
+            }
+
+            /**
+            Set accessor
+
+            Params:
+                accessor = property accessor used to extract values from mapped component
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) accessor(PropertyAccessor!(From, Object) accessor) @safe nothrow pure {
+                this.accessor_ = accessor;
+
+                return this;
+            }
+
+            /**
+            Get accessor
+
+            Returns:
+                PropertyAccessor!(From, Object)
+            **/
+            inout(PropertyAccessor!(From, Object)) accessor() @safe nothrow pure inout {
+                return this.accessor_;
+            }
+
+            /**
+            Set fromInspector
+
+            Params:
+                fromInspector = inspector providing information about mapped component
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) fromInspector(Inspector!From fromInspector) @safe nothrow pure {
+                this.fromInspector_ = fromInspector;
+
+                return this;
+            }
+
+            /**
+            Get fromInspector
+
+            Returns:
+                Inspector!From
+            **/
+            inout(Inspector!From) fromInspector() @safe nothrow pure inout {
+                return this.fromInspector_;
+            }
+
+            /**
+            Set toInspector
+
+            Params:
+                toInspector = inspector used to provide information about component that will store mapped data
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) toInspector(Inspector!To toInspector) @safe nothrow pure {
+                this.toInspector_ = toInspector;
+
+                return this;
+            }
+
+            /**
+            Get toInspector
+
+            Returns:
+                Inspector!To
+            **/
+            inout(Inspector!To) toInspector() @safe nothrow pure inout {
+                return this.toInspector_;
+            }
+        }
+
+        void map(From from, ref To to, RCIAllocator allocator = theAllocator) {
+
+            trace("Mapping ", this.fromInspector.properties(from), " of ", typeid(from), " to ", typeid(to));
+            foreach (property; this.fromInspector.properties(from)) {
+
+                trace("Migrating ", property, " property ");
+                if (this.toInspector.has(to, property)) {
+
+                    Object value = this.accessor.access(from, property);
+                    if (this.fromInspector.typeOf(from, property) != this.toInspector.typeOf(to, property)) {
+                        if (this.conversion) {
+                            trace(
+                                property,
+                                " type differs in original component and destination component, ",
+                                this.fromInspector.typeOf(from, property), " and ",
+                                this.toInspector.typeOf(to, property)
+                            );
+
+                            auto compatible = convertors.filter!(c =>
+                                c.convertsFrom(this.fromInspector.typeOf(from, property)) &&
+                                c.convertsTo(this.toInspector.typeOf(to, property))
+                            );
+
+                            enforce!ConvertorException(!compatible.empty, text(
+                                "Could not find convertor to convert ", property, " from ", this.fromInspector.typeOf(from, property),
+                                " to ", this.toInspector.typeOf(to, property)
+                            ));
+
+                            trace("Found convertor for ", property, " from ", compatible.front.from, " to ", compatible.front.to);
+
+                            value = compatible.front.convert(value, this.toInspector.typeOf(to, property), allocator);
+                        } else {
+
+                            throw new InvalidArgumentException(text(
+                                "Invalid assignment ", property, " has type of ", this.fromInspector.typeOf(from, property),
+                                " in from component while in to component it has ", this.toInspector.typeOf(to, property)
+                            ));
+                        }
                     }
-                }
 
-                this.setter.set(
-                    to,
-                    this.accessor.access(from, property),
-                    property
-                );
+                    this.setter.set(
+                        to,
+                        value,
+                        property
+                    );
+
+                    trace("Migrated ", property, " from ", typeid(from), " to ", typeid(to));
+                } else {
+
+                    error(typeid(to), " element does not have ", property);
+                }
             }
         }
     }

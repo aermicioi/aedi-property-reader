@@ -31,7 +31,10 @@ module aermicioi.aedi_property_reader.core.inspector;
 
 import std.traits;
 import std.meta;
-import aermicioi.util.traits : isPropertyGetter, isPublic;
+import std.exception;
+import std.conv;
+import aermicioi.util.traits : isPropertyGetter, isPropertySetter, isPublic, isField;
+import aermicioi.aedi : NotFoundException;
 
 interface Inspector(ComponentType, KeyType = string) {
 
@@ -42,34 +45,38 @@ interface Inspector(ComponentType, KeyType = string) {
     KeyType[] properties(ComponentType component) const;
 }
 
-class AssociativeArrayInspector(ComponentType : Z[KeyType], KeyType = string, Z) : Inspector!(ComponentType, KeyType) {
+class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspector!(ComponentType[KeyType], KeyType) {
 
-    TypeInfo typeOf(ComponentType component, in KeyType property) const {
-        return typeid(Z);
+    TypeInfo typeOf(ComponentType[KeyType] component, in KeyType property) const {
+        enforce!NotFoundException(this.has(component, property), text("No ", property, " property for ", component, " found"));
+
+        return typeid(ComponentType);
     }
 
-    bool has(ComponentType component, in KeyType property) const {
+    bool has(ComponentType[KeyType] component, in KeyType property) const {
         return (property in component) !is null;
     }
 
-    KeyType[] properties(ComponentType component) const {
+    KeyType[] properties(ComponentType[KeyType] component) const {
         import std.array;
 
         return component.byKey.array;
     }
 }
 
-class ArrayInspector(ComponentType : Z[], Z) : Inspector!(ComponentType, size_t) {
+class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t) {
 
-    TypeInfo typeOf(ComponentType component, in size_t property) const {
-        return typeid(Z);
+    TypeInfo typeOf(ComponentType[] component, in size_t property) const {
+        enforce!NotFoundException(this.has(component, property), text("No ", property, " property for ", component, " found"));
+
+        return typeid(ComponentType);
     }
 
-    bool has(ComponentType component, in size_t property) const {
+    bool has(ComponentType[] component, in size_t property) const {
         return component.length > property;
     }
 
-    size_t[] properties(ComponentType component) const {
+    size_t[] properties(ComponentType[] component) const {
         import std.array;
         import std.range;
 
@@ -77,20 +84,28 @@ class ArrayInspector(ComponentType : Z[], Z) : Inspector!(ComponentType, size_t)
     }
 }
 
-class CompositeInspector(ComponentType) : Inspector!(ComponentType, size_t)
+class CompositeInspector(ComponentType) : Inspector!(ComponentType, string)
     if (isAggregateType!ComponentType) {
 
     TypeInfo typeOf(ComponentType component, in string property) const {
+        enforce!NotFoundException(this.has(component, property), text("No ", property, " property for ", component, " found"));
+
         static foreach (member; __traits(allMembers, ComponentType)) {
-            static if (isPublic!(ComponentType, member)) {
+            static if (isPublic!(ComponentType, member)) {{
                 alias m = Alias!(__traits(getMember, component, member));
-                static if (isField!(ComponentType, member) || (isSomeFunction!m && isPropertyGetter!m)) {
-                    if (member == property) {
+                if (member == property) {
+                    static if (
+                        isField!(ComponentType, member) ||
+                        (isSomeFunction!m && anySatisfy!(isPropertyGetter, __traits(getOverloads, component, member)))
+                    ) {
+
                         return typeid(typeof(__traits(getMember, component, member)));
                     }
                 }
-            }
+            }}
         }
+
+        return typeid(void);
     }
 
     bool has(ComponentType component, in string property) const {
@@ -102,12 +117,19 @@ class CompositeInspector(ComponentType) : Inspector!(ComponentType, size_t)
         string[] props;
 
         static foreach (member; __traits(allMembers, ComponentType)) {
-            static if (isPublic!(ComponentType, member)) {
-                alias m = Alias!(__traits(getMember, component, member));
-                static if (isField!(ComponentType, member) || (isSomeFunction!m && isPropertyGetter!m)) {
+            static if (isPublic!(ComponentType, member)) {{
+                static if (
+                    isField!(ComponentType, member) ||
+                    (isSomeFunction!(__traits(getMember, component, member)) && (
+                        anySatisfy!(isPropertyGetter, __traits(getOverloads, component, member)) ||
+                        anySatisfy!(isPropertySetter, __traits(getOverloads, component, member))
+
+                    ))) {
                     props ~= member;
                 }
-            }
+            }}
         }
+
+        return props;
     }
 }
