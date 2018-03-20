@@ -35,10 +35,13 @@ import std.exception;
 import std.conv;
 import aermicioi.util.traits : isPropertyGetter, isPropertySetter, isPublic, isField;
 import aermicioi.aedi : NotFoundException;
+import aermicioi.aedi_property_reader.core.convertor : unwrap, identify;
 
 interface Inspector(ComponentType, KeyType = string) {
 
     TypeInfo typeOf(ComponentType component, in KeyType property) const;
+
+    TypeInfo typeOf(ComponentType component) const;
 
     bool has(ComponentType component, in KeyType property) const;
 
@@ -51,6 +54,10 @@ class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspec
         enforce!NotFoundException(this.has(component, property), text("No ", property, " property for ", component, " found"));
 
         return typeid(ComponentType);
+    }
+
+    TypeInfo typeOf(ComponentType[KeyType] component) const {
+        return typeid(ComponentType[KeyType]);
     }
 
     bool has(ComponentType[KeyType] component, in KeyType property) const {
@@ -70,6 +77,10 @@ class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t) {
         enforce!NotFoundException(this.has(component, property), text("No ", property, " property for ", component, " found"));
 
         return typeid(ComponentType);
+    }
+
+    TypeInfo typeOf(ComponentType[] component) const {
+        return typeid(ComponentType[]);
     }
 
     bool has(ComponentType[] component, in size_t property) const {
@@ -108,6 +119,10 @@ class CompositeInspector(ComponentType) : Inspector!(ComponentType, string)
         return typeid(void);
     }
 
+    TypeInfo typeOf(ComponentType component) const {
+        return typeid(ComponentType);
+    }
+
     bool has(ComponentType component, in string property) const {
         import std.algorithm : canFind;
         return this.properties(component).canFind(property);
@@ -131,5 +146,70 @@ class CompositeInspector(ComponentType) : Inspector!(ComponentType, string)
         }
 
         return props;
+    }
+}
+
+class RuntimeInspector(Type, KeyType = string) : Inspector!(Object, KeyType) {
+    private {
+        Inspector!(Type, KeyType) inspector_;
+    }
+
+    public {
+        this(Inspector!(Type, KeyType) inspector) {
+            this.inspector = inspector;
+        }
+
+        @property {
+            /**
+            Set inspector
+
+            Params:
+                inspector = underlying inspector used to extract data
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) inspector(Inspector!(Type, KeyType) inspector) @safe nothrow pure {
+                this.inspector_ = inspector;
+
+                return this;
+            }
+
+            /**
+            Get inspector
+
+            Returns:
+                Inspector!Type
+            **/
+            inout(Inspector!(Type, KeyType)) inspector() @safe nothrow pure inout {
+                return this.inspector_;
+            }
+        }
+
+        TypeInfo typeOf(Object wrapped, in KeyType property) const {
+            if (wrapped.identify is typeid(Type)) {
+
+                return this.inspector.typeOf(wrapped.unwrap!Type, property);
+            }
+
+            return wrapped.classinfo;
+        }
+
+        TypeInfo typeOf(Object component) const {
+            if (component.identify is typeid(Type)) {
+
+                return this.inspector.typeOf(component.unwrap!Type);
+            }
+
+            return component.classinfo;
+        }
+
+        bool has(Object wrapped, in KeyType property) const {
+            return this.inspector.has(wrapped.unwrap!Type, property);
+        }
+
+        KeyType[] properties(Object wrapped) const {
+            return this.inspector.properties(wrapped.unwrap!Type);
+        }
     }
 }

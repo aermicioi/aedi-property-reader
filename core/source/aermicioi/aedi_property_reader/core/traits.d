@@ -45,21 +45,21 @@ template isPropertyGetter(alias func) {
     }
 }
 
-template isPropertySetter(alias Type, string member) {
+template isPropertyPropertySetter(alias Type, string member) {
     static foreach (overload; __traits(getOverloads, Type, member)) {
-        static if (!is(found) && isPropertySetter!overload) {
+        static if (!is(found) && isPropertyPropertySetter!overload) {
             enum found = true;
-            enum isPropertySetter = found;
+            enum isPropertyPropertySetter = found;
         }
     }
 
-    static if (!is(found) && isPropertySetter!overload) {
-        enum isPropertySetter = false;
+    static if (!is(found) && isPropertyPropertySetter!overload) {
+        enum isPropertyPropertySetter = false;
     }
 
 }
 
-enum isPropertySetter(alias func) = (variadicFunctionStyle!func == Variadic.no) && (arity!func == 1) && (functionAttributes!func & FunctionAttribute.property);
+enum isPropertyPropertySetter(alias func) = (variadicFunctionStyle!func == Variadic.no) && (arity!func == 1) && (functionAttributes!func & FunctionAttribute.property);
 
 
 template match(alias predicate, Types...) {

@@ -60,6 +60,14 @@ class XmlElementPropertyAccessor : PropertyAccessor!Element {
 
         return component.elements.canFind!(e => e.tag.name == property);
     }
+
+    TypeInfo componentType(Element component) const {
+        return typeid(Element);
+    }
+
+    TypeInfo fieldType(Element component, in string property) const {
+        return typeid(Element);
+    }
 }
 
 class XmlElementIndexAccessor : PropertyAccessor!Element {
@@ -82,6 +90,14 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
 
         return property.isNumeric && (component.elements.length > property.to!size_t);
     }
+
+    TypeInfo componentType(Element component) const {
+        return typeid(Element);
+    }
+
+    TypeInfo fieldType(Element component, in string property) const {
+        return typeid(Element);
+    }
 }
 
 class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
@@ -98,5 +114,13 @@ class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
         enforce!Exception(component !is null, "Cannot access " ~ property ~ " of null component");
 
         return (property in component.tag.attr) !is null;
+    }
+
+    TypeInfo componentType(Element component) const {
+        return typeid(Element);
+    }
+
+    TypeInfo fieldType(Element component, in string property) const {
+        return typeid(string);
     }
 }

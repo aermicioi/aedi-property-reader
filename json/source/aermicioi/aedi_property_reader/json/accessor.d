@@ -50,6 +50,14 @@ class JsonPropertyAccessor : PropertyAccessor!JSONValue {
 
         return (component.type == JSON_TYPE.OBJECT) && ((property in component.object) !is null);
     }
+
+    TypeInfo componentType(JSONValue component) const {
+        return typeid(JSONValue);
+    }
+
+    TypeInfo fieldType(JSONValue component, in string property) const {
+        return typeid(JSONValue);
+    }
 }
 
 class JsonIndexAccessor : PropertyAccessor!JSONValue {
@@ -70,5 +78,13 @@ class JsonIndexAccessor : PropertyAccessor!JSONValue {
         import std.conv : to;
 
         return (component.type == JSON_TYPE.ARRAY) && property.isNumeric && (component.array.length > property.to!size_t);
+    }
+
+    TypeInfo componentType(JSONValue component) const {
+        return typeid(JSONValue);
+    }
+
+    TypeInfo fieldType(JSONValue component, in string property) const {
+        return typeid(JSONValue);
     }
 }

@@ -48,6 +48,13 @@ class YamlNodePropertyAccessor : PropertyAccessor!(Node, Node) {
     bool has(in Node component, in string property) const {
         return component.isMapping && component.containsKey(property);
     }
+
+    TypeInfo componentType(Node component) const {
+        return typeid(Node);
+    }
+    TypeInfo fieldType(Node component, in string property) const {
+        return typeid(Node);
+    }
 }
 
 class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
@@ -68,5 +75,13 @@ class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
         import std.conv;
 
         return property.isNumeric && component.isSequence && (property.to!size_t < component.length);
+    }
+
+    TypeInfo componentType(Node component) const {
+        return typeid(Node);
+    }
+
+    TypeInfo fieldType(Node component, in string property) const {
+        return typeid(Node);
     }
 }

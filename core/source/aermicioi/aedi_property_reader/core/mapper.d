@@ -40,22 +40,105 @@ import std.exception;
 import std.algorithm;
 import std.conv;
 
-interface Mapper(From, To) {
+interface Mapper(From, To = From) {
 
-    void map(From from, ref To to, RCIAllocator allocator = theAllocator) const;
+    void map(From from, ref To to, RCIAllocator allocator = theAllocator);
 }
 
-class CompositeMapper(From, To) {
+interface MutableMapper(From, To = From, FieldType = From) : Mapper!(From, To) {
+
+    @property {
+        /**
+        Set accessor
+
+        Params:
+            accessor = accesor used to access a field from component
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) accessor(PropertyAccessor!(From, FieldType) accessor) @safe nothrow pure;
+
+        /**
+        Get accessor
+
+        Returns:
+            PropertyAccessor!(From, FieldType)
+        **/
+        inout(PropertyAccessor!(From, FieldType)) accessor() @safe nothrow pure inout;
+
+
+        /**
+        Set setter
+
+        Params:
+            setter = setter used to set a field to component
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) setter(PropertySetter!(To, FieldType) setter) @safe nothrow pure;
+
+        /**
+        Get setter
+
+        Returns:
+            PropertySetter!(To, FieldType)
+        **/
+        inout(PropertySetter!(To, FieldType)) setter() @safe nothrow pure inout;
+
+        /**
+        Set fromInspector
+
+        Params:
+            fromInspector = inspector used to get runtime info about component from which to map fields
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) fromInspector(Inspector!From fromInspector) @safe nothrow pure;
+
+        /**
+        Get fromInspector
+
+        Returns:
+            Inspector!From
+        **/
+        inout(Inspector!From) fromInspector() @safe nothrow pure inout;
+
+        /**
+        Set toInspector
+
+        Params:
+            toInspector = inspector used to provide runtime info about component which will store mapped components
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) toInspector(Inspector!To toInspector) @safe nothrow pure;
+
+        /**
+        Get toInspector
+
+        Returns:
+            Inspector!To
+        **/
+        inout(Inspector!To) toInspector() @safe nothrow pure inout;
+    }
+}
+
+class CompositeMapper(From, To) : Mapper!(From, To) {
 
     private {
+        import std.typecons : Rebindable;
         bool conversion_;
 
         Convertor[] convertors_;
 
-        Setter!(To, Object) setter_;
-        PropertyAccessor!(From, Object) accessor_;
-        Inspector!From fromInspector_;
-        Inspector!To toInspector_;
+        Rebindable!(const PropertySetter!(To, Object)) setter_;
+        Rebindable!(const PropertyAccessor!(From, Object)) accessor_;
+        Rebindable!(const Inspector!From) fromInspector_;
+        Rebindable!(const Inspector!To) toInspector_;
     }
 
     public {
@@ -120,7 +203,7 @@ class CompositeMapper(From, To) {
             Returns:
                 typeof(this)
             **/
-            typeof(this) setter(Setter!(To, Object) setter) @safe nothrow pure {
+            typeof(this) setter(in PropertySetter!(To, Object) setter) @safe nothrow pure {
                 this.setter_ = setter;
 
                 return this;
@@ -130,10 +213,10 @@ class CompositeMapper(From, To) {
             Get setter
 
             Returns:
-                Setter!(To, Object)
+                PropertySetter!(To, Object)
             **/
-            inout(Setter!(To, Object)) setter() @safe nothrow pure inout {
-                return this.setter_;
+            inout(const PropertySetter!(To, Object)) setter() @safe nothrow pure inout {
+                return this.setter_.get;
             }
 
             /**
@@ -145,7 +228,7 @@ class CompositeMapper(From, To) {
             Returns:
                 typeof(this)
             **/
-            typeof(this) accessor(PropertyAccessor!(From, Object) accessor) @safe nothrow pure {
+            typeof(this) accessor(in PropertyAccessor!(From, Object) accessor) @safe nothrow pure {
                 this.accessor_ = accessor;
 
                 return this;
@@ -157,8 +240,8 @@ class CompositeMapper(From, To) {
             Returns:
                 PropertyAccessor!(From, Object)
             **/
-            inout(PropertyAccessor!(From, Object)) accessor() @safe nothrow pure inout {
-                return this.accessor_;
+            inout(const PropertyAccessor!(From, Object)) accessor() @safe nothrow pure inout {
+                return this.accessor_.get;
             }
 
             /**
@@ -170,7 +253,7 @@ class CompositeMapper(From, To) {
             Returns:
                 typeof(this)
             **/
-            typeof(this) fromInspector(Inspector!From fromInspector) @safe nothrow pure {
+            typeof(this) fromInspector(in Inspector!From fromInspector) @safe nothrow pure {
                 this.fromInspector_ = fromInspector;
 
                 return this;
@@ -182,8 +265,8 @@ class CompositeMapper(From, To) {
             Returns:
                 Inspector!From
             **/
-            inout(Inspector!From) fromInspector() @safe nothrow pure inout {
-                return this.fromInspector_;
+            inout(const Inspector!From) fromInspector() @safe nothrow pure inout {
+                return this.fromInspector_.get;
             }
 
             /**
@@ -195,7 +278,7 @@ class CompositeMapper(From, To) {
             Returns:
                 typeof(this)
             **/
-            typeof(this) toInspector(Inspector!To toInspector) @safe nothrow pure {
+            typeof(this) toInspector(in Inspector!To toInspector) @safe nothrow pure {
                 this.toInspector_ = toInspector;
 
                 return this;
@@ -207,8 +290,8 @@ class CompositeMapper(From, To) {
             Returns:
                 Inspector!To
             **/
-            inout(Inspector!To) toInspector() @safe nothrow pure inout {
-                return this.toInspector_;
+            inout(const Inspector!To) toInspector() @safe nothrow pure inout {
+                return this.toInspector_.get;
             }
         }
 
@@ -348,5 +431,186 @@ class CompositeConvertor(From, To) : Convertor {
             allocator.dispose(converted);
             converted = Object.init;
         }
+    }
+}
+
+class RuntimeMapper : Mapper!(Object, Object) {
+
+    private {
+        PropertyAccessor!Object[] accessors_;
+        PropertySetter!Object[] setters_;
+        Inspector!Object[] inspectors_;
+        Mapper!Object delegate (
+            in PropertyAccessor!Object,
+            in PropertySetter!Object,
+            in Inspector!Object,
+            in Inspector!Object
+        ) factory_;
+
+        void delegate(Mapper!Object) destructor_;
+    }
+
+    public {
+        @property {
+            /**
+            Set factory
+
+            Params:
+                factory = factory used to create a mapper
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) factory(Mapper!Object delegate (
+                    in PropertyAccessor!Object,
+                    in PropertySetter!Object,
+                    in Inspector!Object,
+                    in Inspector!Object
+                ) factory) @safe nothrow pure {
+                this.factory_ = factory;
+
+                return this;
+            }
+
+            /**
+            Get factory
+
+            Returns:
+                MutableMapper!Object delegate ()
+            **/
+            inout(Mapper!Object delegate (
+                in PropertyAccessor!Object,
+                in PropertySetter!Object,
+                in Inspector!Object,
+                in Inspector!Object
+            )) factory() @safe nothrow pure inout {
+                return this.factory_;
+            }
+
+            /**
+            Set destructor
+
+            Params:
+                destructor = destructor used to destroy created mapper
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) destructor(void delegate(Mapper!Object) destructor) @safe nothrow pure {
+                this.destructor_ = destructor;
+
+                return this;
+            }
+
+            /**
+            Get destructor
+
+            Returns:
+                void delegate(MutableMapper!Object)
+            **/
+            inout(void delegate(Mapper!Object)) destructor() @safe nothrow pure inout {
+                return this.destructor_;
+            }
+
+            /**
+            Set accessors
+
+            Params:
+                accessors = list of runtime accessors used to access data
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) accessors(PropertyAccessor!Object[] accessors) @safe nothrow pure {
+                this.accessors_ = accessors;
+
+                return this;
+            }
+
+            /**
+            Get accessors
+
+            Returns:
+                PropertyAccessor!Object[]
+            **/
+            inout(PropertyAccessor!Object[]) accessors() @safe nothrow pure inout {
+                return this.accessors_;
+            }
+
+            /**
+            Set setters
+
+            Params:
+                setters = list of runtime setters used to map from one to another
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) setters(PropertySetter!Object[] setters) @safe nothrow pure {
+                this.setters_ = setters;
+
+                return this;
+            }
+
+            /**
+            Get setters
+
+            Returns:
+                PropertySetter!Object[]
+            **/
+            inout(PropertySetter!Object[]) setters() @safe nothrow pure inout {
+                return this.setters_;
+            }
+
+            /**
+            Set inspectors
+
+            Params:
+                inspectors = list of runtime inspectors used to inspect various components
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) inspectors(Inspector!Object[] inspectors) @safe nothrow pure {
+                this.inspectors_ = inspectors;
+
+                return this;
+            }
+
+            /**
+            Get inspectors
+
+            Returns:
+                Inspector!Object[]
+            **/
+            inout(Inspector!Object[]) inspectors() @safe nothrow pure inout {
+                return this.inspectors_;
+            }
+
+        }
+
+        void map(Object from, ref Object to, RCIAllocator allocator = theAllocator) const {
+            auto accessors = this.accessors.filter!(accessor => accessor.componentType(from) is from.identify);
+            auto setters = this.setters.filter!(setter => setter.componentType(to) is to.identify);
+            auto fromInspectors = this.inspectors.filter!(inspector => inspector.typeOf(from) is from.identify);
+            auto toInspectors = this.inspectors.filter!(inspector => inspector.typeOf(to) is to.identify);
+
+            enforce!InvalidArgumentException(!accessors.empty, text("No field accessor for ", from.identify, " has been provided, cannot map to ", to.identify));
+            enforce!InvalidArgumentException(!setters.empty, text("No field setter for ", to.identify, " has been provided, cannot map from ", from.identify));
+            enforce!InvalidArgumentException(!fromInspectors.empty, text("No inspector for ", from.identify, " has been provided, cannot map to ", to.identify));
+            enforce!InvalidArgumentException(!toInspectors.empty, text("No inspector for ", to.identify, " has been provided, cannot map from ", to.identify));
+
+            auto mapper = this.factory()(
+                accessors.front,
+                setters.front,
+                fromInspectors.front,
+                toInspectors.front
+            );
+
+            mapper.map(from, to, allocator);
+
+            this.destructor()(mapper);
+        }
+
     }
 }

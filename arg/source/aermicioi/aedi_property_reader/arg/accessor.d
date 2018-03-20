@@ -141,4 +141,11 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
 
         return !Filter(component, property).empty;
     }
+
+    TypeInfo componentType(const(string)[] component) const {
+        return typeid(const(string)[]);
+    }
+    TypeInfo fieldType(const(string)[] component, in string property) const {
+        return typeid(const(string)[]);
+    }
 }

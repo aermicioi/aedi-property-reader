@@ -49,6 +49,9 @@ interface PropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = s
     FieldType access(ComponentType component, in KeyType property) const;
 
     bool has(in ComponentType component, in KeyType property) const;
+
+    TypeInfo componentType(ComponentType component) const;
+    TypeInfo fieldType(ComponentType component, in KeyType property) const;
 }
 
 interface AllocatingPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
@@ -128,6 +131,14 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
             }
 
             return false;
+        }
+
+        TypeInfo componentType(ComponentType component) const {
+            return typeid(ComponentType);
+        }
+
+        TypeInfo fieldType(ComponentType component, in KeyType property) const {
+            return typeid(FieldType);
         }
     }
 }
@@ -240,6 +251,14 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
             }
 
             return true;
+        }
+
+        TypeInfo componentType(ComponentType component) const {
+            return this.accessor.componentType(component);
+        }
+
+        TypeInfo fieldType(ComponentType component, in KeyType property) const {
+            return this.accessor.fieldType(component, property);
         }
     }
 }
@@ -425,6 +444,14 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
 
             return true;
         }
+
+        TypeInfo componentType(ComponentType component) const {
+            return typeid(ComponentType);
+        }
+
+        TypeInfo fieldType(ComponentType component, in KeyType property) const {
+            return typeid(FieldType);
+        }
     }
 }
 
@@ -511,6 +538,14 @@ class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType =
             return this.valid(path) && this.accessor.has(component, path.strip(this.tick));
         }
 
+        TypeInfo componentType(ComponentType component) const {
+            return this.accessor.componentType(component);
+        }
+
+        TypeInfo fieldType(ComponentType component, in KeyType property) const {
+            return this.accessor.fieldType(component, property);
+        }
+
         private bool valid(in KeyType path) const {
             return (path.front == this.tick) && (path.back == this.tick);
         }
@@ -587,6 +622,38 @@ class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyA
 
             assert(false, "TaggedAlgebraic does not have " ~ fullyQualifiedName!X ~ " as member");
         }
+
+        TypeInfo componentType(Tagged component) const {
+            import std.meta;
+            import aermicioi.util.traits;
+
+            static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
+                static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
+                    if (mixin("component.Kind." ~ e ~ " == component.kind")) {
+
+                        return this.accessor.componentType(cast(X) component);
+                    }
+                }
+            }
+
+            assert(false, "Got stored a value that is not in tagged algebraic");
+        }
+
+        TypeInfo fieldType(Tagged component, in KeyType property) const {
+            import std.meta;
+            import aermicioi.util.traits;
+
+            static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
+                static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
+                    if (mixin("component.Kind." ~ e ~ " == component.kind")) {
+
+                        return this.accessor.fieldType(cast(X) component, property);
+                    }
+                }
+            }
+
+            assert(false, "Got stored a value that is not in tagged algebraic");
+        }
     }
 }
 
@@ -608,6 +675,14 @@ class AssociativeArrayAccessor(Type, Key = Type) : PropertyAccessor!(Type[Key], 
         bool has(in Type[Key] component, in Key property) const {
             return (property in component) !is null;
         }
+
+        TypeInfo componentType(Type[Key] component) const {
+            return typeid(Type[Key]);
+        }
+
+        TypeInfo fieldType(Type[Key] component, in Key property) const {
+            return typeid(Type);
+        }
     }
 }
 
@@ -623,6 +698,14 @@ class ArrayAccessor(Type) : PropertyAccessor!(Type[], Type, size_t) {
 
         bool has(in Type[] component, in size_t property) const {
             return property < component.length;
+        }
+
+        TypeInfo componentType(Type[] component) const {
+            return typeid(Type[]);
+        }
+
+        TypeInfo fieldType(Type[] component, in size_t property) const {
+            return typeid(Type);
         }
     }
 }
@@ -730,10 +813,18 @@ class VariantAccessor(
 
             return false;
         }
+
+        TypeInfo componentType(ComponentType component) const {
+            return typeid(ComponentType);
+        }
+
+        TypeInfo fieldType(ComponentType component, in KeyType property) const {
+            return typeid(FieldType);
+        }
     }
 }
 
-class UnwrappingAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(Object, FieldType, KeyType) {
+class RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(Object, FieldType, KeyType) {
     import aermicioi.aedi_property_reader.core.convertor : identify, unwrap;
     private {
         PropertyAccessor!(ComponentType, FieldType, KeyType) accessor_;
@@ -779,10 +870,25 @@ class UnwrappingAccessor(ComponentType, FieldType = ComponentType, KeyType = str
 
             return (component !is null) && component.unwrap!ComponentType && this.accessor.has(component.unwrap!ComponentType, path);
         }
+
+        TypeInfo componentType(Object component) const {
+            TypeInfo type = component.identify;
+
+            if (type is typeid(ComponentType)) {
+
+                return this.accessor.componentType(component.unwrap!ComponentType);
+            }
+
+            return type;
+        }
+
+        TypeInfo fieldType(Object component, in KeyType property) const {
+            return this.accessor.fieldType(component.unwrap!ComponentType, property);
+        }
     }
 }
 
-class WrappingAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : AllocatingPropertyAccessor!(ComponentType, Object, KeyType) {
+class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : AllocatingPropertyAccessor!(ComponentType, Object, KeyType) {
     import aermicioi.aedi_property_reader.core.convertor : identify, unwrap;
     import std.experimental.allocator;
 
@@ -833,6 +939,14 @@ class WrappingAccessor(ComponentType, FieldType = ComponentType, KeyType = strin
         bool has(in ComponentType component, in KeyType path) const {
 
             return this.accessor.has(component, path);
+        }
+
+        TypeInfo componentType(ComponentType component) const {
+            return this.accessor.componentType(component);
+        }
+
+        TypeInfo fieldType(ComponentType component, in KeyType property) const {
+            return this.accessor.fieldType(component, property);
         }
     }
 }
@@ -893,6 +1007,31 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
             }
 
             return false;
+        }
+
+        TypeInfo componentType(Type component) const {
+            return typeid(Type);
+        }
+
+        TypeInfo fieldType(Type component, in string property) const {
+            foreach (string member; __traits(allMembers, Type)) {
+
+                static if (isPublic!(component, member)) {
+                    if (member == property) {
+                        static if (
+                            isField!(Type, member) ||
+                            (
+                                isSomeFunction!(__traits(getMember, component, member)) &&
+                                anySatisfy!(isPropertyGetter, __traits(getOverloads, component, member)))
+                            ) {
+
+                            return typeid(typeof(__traits(getMember, component, member)));
+                        }
+                    }
+                }
+            }
+
+            throw new NotFoundException(text(typeid(Type), " does not have ", property, " property"));
         }
     }
 }

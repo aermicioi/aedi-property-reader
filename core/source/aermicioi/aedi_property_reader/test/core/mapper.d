@@ -76,9 +76,6 @@ unittest {
 
     mapper.map(from, to);
 
-    import std.stdio;
-    writeln(to);
-
     assert(from == to);
 }
 
@@ -95,7 +92,7 @@ unittest {
     auto mapper = new CompositeMapper!(string[string], Placeholder);
     mapper.conversion = false;
     mapper.setter = new CompositeSetter!Placeholder;
-    mapper.accessor = new WrappingAccessor!(string[string], string)(new AssociativeArrayAccessor!(string, string));
+    mapper.accessor = new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string, string));
     mapper.fromInspector = new AssociativeArrayInspector!string;
     mapper.toInspector = new CompositeInspector!Placeholder;
 
@@ -111,11 +108,108 @@ unittest {
     ];
     mapper.map(from, to);
 
-    import std.stdio;
-    writeln(to);
-
     assert(to.i == from["i"].to!int);
     assert(to.p == from["p"]);
     assert(to.f == from["f"].to!double);
     assert(to.m == from["m"].to!long);
+}
+
+unittest {
+    auto from = cast(Object) [
+        "i": "10",
+        "p": "sample string",
+        "f": "1.0",
+        "m": "20"
+    ].placeholder;
+
+    auto to = cast(Object) Placeholder().placeholder;
+
+    auto mapper = new CompositeMapper!(Object, Object);
+    mapper.conversion = false;
+    mapper.setter = new RuntimeCompositeSetter!(Placeholder, Object)(new CompositeSetter!Placeholder);
+    mapper.accessor = new RuntimeCompositeAccessor!(string[string], Object)(new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string, string)));
+    mapper.fromInspector = new RuntimeInspector!(string[string])(new AssociativeArrayInspector!string);
+    mapper.toInspector = new RuntimeInspector!Placeholder(new CompositeInspector!Placeholder);
+
+    assertThrown!InvalidArgumentException(mapper.map(from, to));
+    mapper.conversion = true;
+    assertThrown!ConvertorException(mapper.map(from, to));
+
+    mapper.convertors = cast(Convertor[]) [
+        new StdConvAdvisedConvertor!(int, string)(),
+        new StdConvAdvisedConvertor!(string, string)(),
+        new StdConvAdvisedConvertor!(double, string)(),
+        new StdConvAdvisedConvertor!(long, string)(),
+    ];
+    mapper.map(from, to);
+
+    assert(to.unwrap!Placeholder.i == from.unwrap!(string[string])["i"].to!int);
+    assert(to.unwrap!Placeholder.p == from.unwrap!(string[string])["p"]);
+    assert(to.unwrap!Placeholder.f == from.unwrap!(string[string])["f"].to!double);
+    assert(to.unwrap!Placeholder.m == from.unwrap!(string[string])["m"].to!long);
+}
+
+unittest {
+    auto from = cast(Object) [
+        "i": "10",
+        "p": "sample string",
+        "f": "1.0",
+        "m": "20"
+    ].placeholder;
+
+    auto to = cast(Object) Placeholder().placeholder;
+
+    auto mapper = new RuntimeMapper;
+    mapper.factory = (
+        in PropertyAccessor!Object accessor,
+        in PropertySetter!Object setter,
+        in Inspector!Object from,
+        in Inspector!Object to
+    ) =>
+        (new CompositeMapper!(Object, Object))
+            .conversion(true)
+            .convertors(cast(Convertor[]) [
+                new StdConvAdvisedConvertor!(int, string)(),
+                new StdConvAdvisedConvertor!(string, string)(),
+                new StdConvAdvisedConvertor!(double, string)(),
+                new StdConvAdvisedConvertor!(long, string)(),
+            ])
+            .accessor(accessor)
+            .setter(setter)
+            .fromInspector(from)
+            .toInspector(to);
+    mapper.destructor = (Mapper!Object m) => destroy(m);
+
+    mapper.setters = cast(PropertySetter!Object[]) [
+        new RuntimeCompositeSetter!(Placeholder, Object)(new CompositeSetter!Placeholder),
+        new RuntimeCompositeSetter!(string[string], Object)(new RuntimeFieldSetter!(string[string], string)(new AssociativeArraySetter!string))
+    ];
+
+    mapper.accessors = cast(PropertyAccessor!Object[]) [
+        new RuntimeCompositeAccessor!(string[string], Object)(new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string, string))),
+        new RuntimeCompositeAccessor!(Placeholder, Object)(new CompositeAccessor!Placeholder)
+    ];
+
+    mapper.inspectors = cast(Inspector!Object[]) [
+        new RuntimeInspector!(string[string])(new AssociativeArrayInspector!string),
+        new RuntimeInspector!Placeholder(new CompositeInspector!Placeholder)
+    ];
+
+    mapper.map(from, to);
+
+    assert(to.unwrap!Placeholder.i == from.unwrap!(string[string])["i"].to!int);
+    assert(to.unwrap!Placeholder.p == from.unwrap!(string[string])["p"]);
+    assert(to.unwrap!Placeholder.f == from.unwrap!(string[string])["f"].to!double);
+    assert(to.unwrap!Placeholder.m == from.unwrap!(string[string])["m"].to!long);
+
+    auto cfrom = cast(Object) [
+        "a": "a"
+    ].placeholder;
+
+    mapper.map(to, cfrom);
+
+    assert(to.unwrap!Placeholder.i == cfrom.unwrap!(string[string])["i"].to!int);
+    assert(to.unwrap!Placeholder.p == cfrom.unwrap!(string[string])["p"]);
+    assert(to.unwrap!Placeholder.f == cfrom.unwrap!(string[string])["f"].to!double);
+    assert(to.unwrap!Placeholder.m == cfrom.unwrap!(string[string])["m"].to!long);
 }

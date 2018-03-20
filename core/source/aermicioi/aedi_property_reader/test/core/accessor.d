@@ -170,7 +170,7 @@ unittest {
 
 	Placeholder p = new Placeholder(new Placeholder(null, 20), 30);
 
-	auto accessor = new UnwrappingAccessor!(Placeholder, Object)(new CompositeAccessor!Placeholder);
+	auto accessor = new RuntimeCompositeAccessor!(Placeholder, Object)(new CompositeAccessor!Placeholder);
 
 	assert(accessor.has(cast(Object) p, "p"));
 	assert(accessor.has(cast(Object) p, "v"));
@@ -189,7 +189,7 @@ unittest {
 	];
 
 
-	auto accessor = new WrappingAccessor!(string[string], string)(new AssociativeArrayAccessor!string);
+	auto accessor = new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!string);
 
 	assert(accessor.has(elems, "foo"));
 	assert(accessor.has(elems, "moo"));
@@ -215,7 +215,7 @@ unittest {
 
 	auto accessor = new PropertyPathAccessor!(Object)(
 		'.',
-		new UnwrappingAccessor!(Placeholder, Object)(
+		new RuntimeCompositeAccessor!(Placeholder, Object)(
 			new CompositeAccessor!Placeholder
 		)
 	);
@@ -245,10 +245,10 @@ unittest {
 	auto accessor = new ArrayIndexedPropertyAccessor!(Object)(
 		'[',
 		']',
-		new UnwrappingAccessor!(Placeholder, Object)(
+		new RuntimeCompositeAccessor!(Placeholder, Object)(
 			new CompositeAccessor!Placeholder
 		),
-		new UnwrappingAccessor!(Placeholder, Object)(
+		new RuntimeCompositeAccessor!(Placeholder, Object)(
 			new CompositeAccessor!Placeholder
 		)
 	);
@@ -278,10 +278,10 @@ unittest {
 	Placeholder p = new Placeholder(new Placeholder(new Placeholder(new Placeholder(null, 0), 10), 20), 30);
 
 	auto accessor = dsl(
-		new UnwrappingAccessor!(Placeholder, Object)(
+		new RuntimeCompositeAccessor!(Placeholder, Object)(
 			new CompositeAccessor!Placeholder
 		),
-		new UnwrappingAccessor!(Placeholder, Object)(
+		new RuntimeCompositeAccessor!(Placeholder, Object)(
 			new CompositeAccessor!Placeholder
 		)
 	);

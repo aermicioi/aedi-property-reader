@@ -39,19 +39,25 @@ import std.traits;
 import std.meta;
 import std.exception;
 
-interface Setter(CompositeType, FieldType = CompositeType, KeyType = string) {
+interface PropertySetter(CompositeType, FieldType = CompositeType, KeyType = string) {
 
     void set(ref CompositeType composite, FieldType value, KeyType property) const;
+
+    TypeInfo componentType(ref CompositeType composite) const;
 }
 
-class AssociativeArraySetter(Type, KeyType = Type) : Setter!(Type[KeyType], Type, KeyType) {
+class AssociativeArraySetter(Type, KeyType = Type) : PropertySetter!(Type[KeyType], Type, KeyType) {
 
     void set(ref Type[KeyType] composite, Type field, KeyType key) const {
         composite[key] = field;
     }
+
+    TypeInfo componentType(ref Type[KeyType] composite) const {
+        return typeid(Type[KeyType]);
+    }
 }
 
-class ArraySetter(Type) : Setter!(Type[], Type, size_t) {
+class ArraySetter(Type) : PropertySetter!(Type[], Type, size_t) {
 
     void set(ref Type[] composite, Type field, size_t key) const {
         enforce!InvalidArgumentException(key < composite.length, text(
@@ -67,9 +73,13 @@ class ArraySetter(Type) : Setter!(Type[], Type, size_t) {
 
         composite[key] = field;
     }
+
+    TypeInfo componentType(ref Type[] composite) const {
+        return typeid(Type[]);
+    }
 }
 
-class CompositeSetter(ComponentType) : Setter!(ComponentType, Object, string)
+class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, string)
     if (isAggregateType!ComponentType) {
 
     void set(T)(ref ComponentType component, T field, string property) const {
@@ -100,9 +110,9 @@ class CompositeSetter(ComponentType) : Setter!(ComponentType, Object, string)
                         __traits(getMember, component, member) = field.unwrap!FieldType;
                         return;
                     } else static if (
-                        isSomeFunction!m && anySatisfy!(isPropertySetter, __traits(getOverloads, ComponentType, member))
+                        isSomeFunction!m && anySatisfy!(isPropertyPropertySetter, __traits(getOverloads, ComponentType, member))
                     ) {
-                        alias FieldType = Parameters!(match!(isPropertySetter, __traits(getOverloads, ComponentType, member)))[0];
+                        alias FieldType = Parameters!(match!(isPropertyPropertySetter, __traits(getOverloads, ComponentType, member)))[0];
 
                         enforce!InvalidArgumentException(field.identify is typeid(FieldType), text(
                             "Cannot set value of type ", field.identify,
@@ -118,5 +128,104 @@ class CompositeSetter(ComponentType) : Setter!(ComponentType, Object, string)
         }}
 
         throw new NotFoundException(text("Component of type ", typeid(ComponentType), " does not have ", property, " property"));
+    }
+
+    TypeInfo componentType(ref ComponentType composite) const {
+        return typeid(ComponentType);
+    }
+}
+
+class RuntimeCompositeSetter(Type, FieldType = Type, KeyType = string) : PropertySetter!(Object, FieldType, KeyType) {
+    private {
+        PropertySetter!(Type, FieldType, KeyType) setter_;
+    }
+
+    public {
+        this(PropertySetter!(Type, FieldType, KeyType) setter) {
+            this.setter = setter;
+        }
+
+        @property {
+            /**
+            Set setter
+
+            Params:
+                setter = underlying setter used to set data
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) setter(PropertySetter!(Type, FieldType, KeyType) setter) @safe nothrow pure {
+                this.setter_ = setter;
+
+                return this;
+            }
+
+            /**
+            Get setter
+
+            Returns:
+                PropertySetter!(Type, FieldType, KeyType)
+            **/
+            inout(PropertySetter!(Type, FieldType, KeyType)) setter() @safe nothrow pure inout {
+                return this.setter_;
+            }
+        }
+
+        void set(ref Object composite, FieldType field, KeyType key) const {
+            auto placeholder = composite.unwrap!Type;
+            this.setter.set(placeholder, field, key);
+        }
+
+        TypeInfo componentType(ref Object composite) const {
+            return composite.identify;
+        }
+    }
+}
+
+class RuntimeFieldSetter(Type, FieldType = Type, KeyType = string) : PropertySetter!(Type, Object, KeyType) {
+    private {
+        PropertySetter!(Type, FieldType, KeyType) setter_;
+    }
+
+    public {
+        this(PropertySetter!(Type, FieldType, KeyType) setter) {
+            this.setter = setter;
+        }
+
+        @property {
+            /**
+            Set setter
+
+            Params:
+                setter = underlying setter used to set data
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) setter(PropertySetter!(Type, FieldType, KeyType) setter) @safe nothrow pure {
+                this.setter_ = setter;
+
+                return this;
+            }
+
+            /**
+            Get setter
+
+            Returns:
+                PropertySetter!(Type, FieldType, KeyType)
+            **/
+            inout(PropertySetter!(Type, FieldType, KeyType)) setter() @safe nothrow pure inout {
+                return this.setter_;
+            }
+        }
+
+        void set(ref Type composite, Object field, KeyType key) const {
+            this.setter.set(composite, field.unwrap!FieldType, key);
+        }
+
+        TypeInfo componentType(ref Type composite) const {
+            return typeid(Type);
+        }
     }
 }

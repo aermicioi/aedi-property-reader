@@ -99,8 +99,6 @@ unittest {
     assert(inspector.has(p, "moo"));
     assert(inspector.has(p, "getter"));
     assert(inspector.has(p, "loo"));
-    import std.stdio;
-    writeln(inspector.has(p, "boo"));
     assert(!inspector.has(p, "boo"));
 
     assert(inspector.typeOf(p, "getter_") is typeid(int));

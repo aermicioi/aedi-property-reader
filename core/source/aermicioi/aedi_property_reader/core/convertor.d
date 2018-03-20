@@ -45,8 +45,11 @@ import std.experimental.logger;
 alias FunctionalConvertor(To, From) = void function(in From, ref To, RCIAllocator allocator = theAllocator);
 alias DelegateConvertor(To, From) = void delegate(in From, ref To, RCIAllocator allocator = theAllocator);
 
+alias RuntimeFunctionalConvertor(To, From) = void function(in From, ref To, Convertor convertor, RCIAllocator allocator = theAllocator);
+alias RuntimeDelegateConvertor(To, From) = void delegate(in From, ref To, Convertor convertor, RCIAllocator allocator = theAllocator);
+
 template isConvertor(alias T) {
-    static if (is(typeof(&T) : void function(in Y, ref X, RCIAllocator allocator = theAllocator), Y, X) || is(typeof(&T) : void delegate(in Y, ref X, RCIAllocator allocator = theAllocator), Y, X)) {
+    static if (is(typeof(&T) : void function(in Y, ref X, RCIAllocator), Y, X) || is(typeof(&T) : void delegate(in Y, ref X, RCIAllocator), Y, X)) {
         enum bool Yes = true;
 
         alias To = X;
@@ -70,6 +73,36 @@ template maybeConvertor(alias T, To, From) {
         enum Yes = true;
         alias Convertor = T!(To, From);
         alias Info = isConvertor!Convertor;
+    } else {
+        enum Yes = false;
+    }
+}
+
+template isRuntimeConvertor(alias T) {
+    static if (is(typeof(&T) : void function(in Y, ref X, Convertor, RCIAllocator), Y, X) || is(typeof(&T) : void delegate(in Y, ref X, Convertor, RCIAllocator), Y, X)) {
+        enum bool Yes = true;
+
+        alias To = X;
+        alias From = Y;
+    } else {
+
+        enum bool Yes = false;
+    }
+}
+
+template isRuntimeConvertor(alias T, To, From) {
+    static if (isRuntimeConvertor!T.Yes && is(isConvertor!T.To == To) && is(isRuntimeConvertor!T.From == From)) {
+        alias isRuntimeConvertor = isRuntimeConvertor!T;
+    } else {
+        enum Yes = false;
+    }
+}
+
+template maybeRuntimeConvertor(alias T, To, From) {
+    static if (isRuntimeConvertor!(T!(To, From)).Yes) {
+        enum Yes = true;
+        alias Convertor = T!(To, From);
+        alias Info = isRuntimeConvertor!Convertor;
     } else {
         enum Yes = false;
     }
@@ -102,6 +135,38 @@ template maybeDestructor(alias T, To) {
         enum Yes = true;
         alias Destructor = T!(To);
         alias Info = isDestructor!Destructor;
+    } else {
+        enum Yes = false;
+    }
+}
+
+alias RuntimeFunctionalDestructor(To) = void function (ref To, Convertor, RCIAllocator = theAllocator);
+alias RuntimeDelegateDestructor(To) = void delegate (ref To, Convertor, RCIAllocator = theAllocator);
+
+template isRuntimeDestructor(alias T) {
+    static if (is(typeof(&T) : void function (ref X, Convertor, RCIAllocator), X) || is(typeof(&T) : void delegate (ref X, Convertor, RCIAllocator), X)) {
+        enum bool Yes = true;
+
+        alias To = X;
+    } else {
+
+        enum bool Yes = false;
+    }
+}
+
+template isRuntimeDestructor(T, To) {
+    static if (isRuntimeDestructor!T.Yes && is(isRuntimeDestructor!T.To == To)) {
+        alias isRuntimeDestructor = isRuntimeDestructor!T;
+    } else {
+        enum Yes = false;
+    }
+}
+
+template maybeRuntimeDestructor(alias T, To) {
+    static if (isRuntimeDestructor!(T!To).Yes) {
+        enum Yes = true;
+        alias Destructor = T!(To);
+        alias Info = isRuntimeDestructor!Destructor;
     } else {
         enum Yes = false;
     }
@@ -172,7 +237,7 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
         {
             enforce!ConvertorException(this.convertsTo(to), text(to, " is not supported by convertor expected ", typeid(Info.To)));
-            enforce!ConvertorException(this.convertsFrom(from), text(this.unwrap(from), " is not supported by convertor expected ", typeid(Info.From)));
+            enforce!ConvertorException(this.convertsFrom(from), text(from.identify, " is not supported by convertor expected ", typeid(Info.From)));
 
             Info.From naked;
 
@@ -187,7 +252,7 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
                 auto wrapper = (cast(Wrapper!(Info.From)) from);
 
                 if (wrapper is null) {
-                    throw new ConvertorException(text("Cannot convert ", this.unwrap(from), " only supported ", this.from));
+                    throw new ConvertorException(text("Cannot convert ", from.identify, " only supported ", this.from));
                 }
 
                 naked = wrapper.value;
@@ -219,12 +284,130 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
             }
         }
     }
+}
 
-    private TypeInfo unwrap(in Object obj) const {
-        static if (is(From : obj)) {
-            return obj;
-        } else {
-            return (cast(Placeholder) obj).type;
+class RuntimeConvertor(alias convertor, alias destructor)
+    if (isRuntimeConvertor!convertor && isRuntimeDestructor!destructor) {
+
+    private {
+        alias Info = isRuntimeConvertor!convertor;
+
+        Convertor convertor_;
+    }
+
+    public {
+
+        @property {
+            /**
+            Set convertor
+
+            Params:
+                convertor = convertor passed to runtime converting callback for optionall use in converting complex components.
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) convertor(Convertor convertor) @safe nothrow pure {
+                this.convertor_ = convertor;
+
+                return this;
+            }
+
+            /**
+            Get convertor
+
+            Returns:
+                Convertor
+            **/
+            inout(Convertor) convertor() @safe nothrow pure inout {
+                return this.convertor_;
+            }
+
+            /**
+            Get from
+
+            Returns:
+                TypeInfo
+            **/
+            TypeInfo from() @safe nothrow pure const {
+                return typeid(Info.From);
+            }
+
+            /**
+            Get to
+
+            Returns:
+                TypeInfo
+            **/
+            TypeInfo to() @safe nothrow pure const {
+                return typeid(Info.To);
+            }
+        }
+
+        bool convertsFrom(TypeInfo from) const {
+            return typeid(Info.From) is from;
+        }
+
+        bool convertsFrom(in Object from) const {
+            return this.convertsFrom(from.identify);
+        }
+
+        bool convertsTo(TypeInfo to) const {
+            return typeid(Info.To) is to;
+        }
+
+        bool convertsTo(in Object to) const {
+            return this.convertsTo(to.identify);
+        }
+
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
+        {
+            enforce!ConvertorException(this.convertsTo(to), text(to, " is not supported by convertor expected ", typeid(Info.To)));
+            enforce!ConvertorException(this.convertsFrom(from), text(this.unwrap(from), " is not supported by convertor expected ", typeid(Info.From)));
+
+            Info.From naked;
+
+            static if (is(From : Object)) {
+                naked = cast(From) from;
+
+                if (naked is null) {
+                    throw new ConvertorException(text("Cannot convert ", from.classinfo, " only supported ", this.from));
+                }
+            } else {
+
+                auto wrapper = (cast(Wrapper!(Info.From)) from);
+
+                if (wrapper is null) {
+                    throw new ConvertorException(text("Cannot convert ", from.identify, " only supported ", this.from));
+                }
+
+                naked = wrapper.value;
+            }
+
+
+            static if (is(Info.To : Object)) {
+                Info.To placeholder = make!(Info.To);
+
+                convertor(naked, placeholder, convertor, allocator);
+            } else {
+                PlaceholderImpl!(Info.To) placeholder = allocator.make!(PlaceholderImpl!(Info.To))(Info.To.init);
+
+                convertor(naked, placeholder.value, convertor, allocator);
+            }
+
+            return placeholder;
+        }
+
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
+            static if (is(Info.To : Object)) {
+
+                destructor(converted, this.convertor, allocator);
+            } else {
+                auto container = cast(Wrapper!(Info.To)) converted;
+
+                destructor(container.value, this.convertor);
+                allocator.dispose(converted);
+            }
         }
     }
 }
@@ -441,9 +624,9 @@ auto unwrap(T)(inout(Object) object) {
 
         auto wrapper = (cast(Wrapper!T) object);
 
-        assert(wrapper !is null, text("Cannot unwrap an object that does not implement ", typeid(Wrapper!T)));
+        assert(wrapper !is null, text(object.classinfo, " does not implement ", typeid(Wrapper!T), " ", typeid(T), " content cannot be extracted"));
 
-        return wrapper.value;
+        return wrapper;
     }
 }
 
@@ -462,6 +645,7 @@ TypeInfo identify(in Object object) {
 }
 
 template AdvisedConvertor(alias convertor, alias destructor) {
+    import std.traits;
 
     template AdvisedConvertor(To, From) {
         alias ConvertorInfo = maybeConvertor!(convertor, To, From);

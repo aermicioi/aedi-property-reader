@@ -58,6 +58,14 @@ class SdlangTagPropertyAccessor : PropertyAccessor!(Tag, Tag) {
 
         return property in (cast(Tag) component).tags;
     }
+
+    TypeInfo componentType(Tag component) const {
+        return typeid(Tag);
+    }
+
+    TypeInfo fieldType(Tag component, in string property) const {
+        return typeid(Tag);
+    }
 }
 
 class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
@@ -80,6 +88,14 @@ class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
 
         return property.isNumeric && ((cast(Tag) component).tags.length > property.to!size_t);
     }
+
+    TypeInfo componentType(Tag component) const {
+        return typeid(Tag);
+    }
+
+    TypeInfo fieldType(Tag component, in string property) const {
+        return typeid(Tag);
+    }
 }
 
 class SdlangAttributePropertyAccessor : PropertyAccessor!(Tag, Attribute) {
@@ -96,5 +112,13 @@ class SdlangAttributePropertyAccessor : PropertyAccessor!(Tag, Attribute) {
         enforce!Exception(component !is null, "Cannot access " ~ property ~ " of null component");
 
         return property in (cast(Tag) component).attributes;
+    }
+
+    TypeInfo componentType(Tag component) const {
+        return typeid(Tag);
+    }
+
+    TypeInfo fieldType(Tag component, in string property) const {
+        return typeid(Attribute);
     }
 }

@@ -72,8 +72,6 @@ unittest {
     assert(d == 1.0);
     assert(b == true);
     assert(c == Colorful.yes);
-    import std.stdio;
-    writeln(s);
     assert(as == ["pest" : "p", "test" : "t"]);
     assert(sd == ["second one", "third one"]);
 }
