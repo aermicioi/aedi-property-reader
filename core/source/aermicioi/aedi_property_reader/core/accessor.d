@@ -123,7 +123,8 @@ interface AllocatingPropertyAccessor(ComponentType, FieldType = ComponentType, K
 /**
 An accessor that queries stored accessors for component.
 **/
-class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType) {
+class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
+    PropertyAccessor!(ComponentType, FieldType, KeyType) {
 
     private {
 
@@ -132,6 +133,12 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
 
     public {
 
+        /**
+        Constructor for aggregate property accessor.
+
+        Params:
+            accessors = list of accessors used to extract fields from component.
+        **/
         this(PropertyAccessor!(ComponentType, FieldType)[] accessors...) {
             this.accessors = accessors.dup;
         }
@@ -245,7 +252,8 @@ ImplSpec:
     field of a component should be implicitly convertible to component type in order for it to be used to get next child
     in property chain.
 **/
-class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType)
+class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
+    PropertyAccessor!(ComponentType, FieldType, KeyType)
     if (isImplicitlyConvertible!(FieldType, ComponentType) && isInputRange!KeyType) {
 
     private {
@@ -256,6 +264,13 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
 
     public {
 
+        /**
+        Constructor for property path accessor
+
+        Params:
+            separator = separator used to separate field identities in a field chain.
+            accessor = accessor used to access consecutively new child field.
+        **/
         this(
             ElementType!KeyType separator,
             PropertyAccessor!(ComponentType, FieldType) accessor
@@ -342,7 +357,14 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
                     current = this.accessor.access(current, identity);
                 } else {
 
-                    throw new NotFoundException(text("Could not find ", identity, " in ", current, " for property path of ", path));
+                    throw new NotFoundException(text(
+                        "Could not find ",
+                        identity,
+                        " in ",
+                        current,
+                        " for property path of ",
+                        path
+                    ));
                 }
             }
 
@@ -449,7 +471,12 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
             accessor = accessor used to access property part of indexing sequence
             indexer = accessor used to access indexed part of indexing sequence
         **/
-        this(EType beggining, EType ending, PropertyAccessor!(ComponentType, FieldType, KeyType) accessor, PropertyAccessor!(ComponentType, FieldType, KeyType) indexer) {
+        this(
+            EType beggining,
+            EType ending,
+            PropertyAccessor!(ComponentType, FieldType, KeyType) accessor,
+            PropertyAccessor!(ComponentType, FieldType, KeyType) indexer
+        ) {
             this.beggining = beggining;
             this.ending = ending;
             this.accessor = accessor;
@@ -571,14 +598,23 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
             enforce!NotFoundException(this.has(component, path), text("Property ", path, " not found in ", component));
 
             auto splitted = path.splitter(this.beggining);
-            enforce!InvalidArgumentException(!splitted.empty && !splitted.front.empty, text("Malformed indexed property ", path, ", no property part found"));
+            enforce!InvalidArgumentException(
+                !splitted.empty && !splitted.front.empty,
+                text("Malformed indexed property ", path, ", no property part found")
+            );
 
             FieldType property = this.accessor.access(component, splitted.front);
             splitted.popFront;
-            enforce!InvalidArgumentException(!splitted.empty, text("Malformed indexed property ", path, ", no index part found"));
+            enforce!InvalidArgumentException(
+                !splitted.empty,
+                text("Malformed indexed property ", path, ", no index part found")
+            );
 
             foreach (identity; splitted) {
-                enforce!InvalidArgumentException(identity.endsWith(this.ending), text("Malformed indexed property ", path, ", no closing ] found"));
+                enforce!InvalidArgumentException(
+                    identity.endsWith(this.ending),
+                    text("Malformed indexed property ", path, ", no closing ] found")
+                );
 
                 property = this.indexer.access(property, identity.dropBack(1));
             }
@@ -675,7 +711,8 @@ auto arrayIndexedPropertyAccessor(T : PropertyAccessor!(ComponentType, FieldType
 /**
 Class that allows accessing properties that are wrapped in ticks.
 **/
-class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType)
+class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
+    PropertyAccessor!(ComponentType, FieldType, KeyType)
     if (isBidirectionalRange!KeyType) {
 
     private {
@@ -840,13 +877,27 @@ ImplSpec:
     Any field returned from accessor are wrapped in same tagged algebraic, therefore there is a constraint that
     tagged algebraic should be able to hold both the component and it's field.
 **/
-class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyAccessorType : PropertyAccessor!(X, Z, KeyType), X, Z, KeyType = string, Y) : PropertyAccessor!(Tagged, Tagged, KeyType) {
+class TaggedElementPropertyAccessorWrapper(
+    Tagged : TaggedAlgebraic!Y,
+    PropertyAccessorType : PropertyAccessor!(X, Z, KeyType),
+    X,
+    Z,
+    KeyType = string,
+    Y
+) : PropertyAccessor!(Tagged, Tagged, KeyType) {
 
     private {
         PropertyAccessorType accessor_;
     }
 
     public {
+
+        /**
+        Constructor for tagged element property accessor.
+
+        Params:
+            accessor = underlying accessor used to access fields out of a particular component type in a tagged algebraic type.
+        **/
         this(PropertyAccessorType accessor) {
             this.accessor = accessor;
         }
@@ -1145,50 +1196,50 @@ class VariantAccessor(
 
     public {
         static foreach (KType; KeyTypes) {
-    /**
-     Get a property out of component
+            /**
+            Get a property out of component
 
-     Params:
-         component = a component which has some properties identified by property.
-     Throws:
-         NotFoundException in case when no requested property is available.
-         InvalidArgumentException in case when passed arguments are somehow invalid for use.
-     Returns:
-         FieldType accessed property.
-     **/
+            Params:
+                component = a component which has some properties identified by property.
+            Throws:
+                NotFoundException in case when no requested property is available.
+                InvalidArgumentException in case when passed arguments are somehow invalid for use.
+            Returns:
+                FieldType accessed property.
+            **/
             FieldType access(ComponentType component, KType key) const {
                 return this.access(component, KeyType(key));
             }
 
-    /**
-     Check if requested property is present in component.
+            /**
+            Check if requested property is present in component.
 
-     Check if requested property is present in component.
-     The method could have allocation side effects due to the fact that
-     it is not restricted in calling access method of the accessor.
+            Check if requested property is present in component.
+            The method could have allocation side effects due to the fact that
+            it is not restricted in calling access method of the accessor.
 
-     Params:
-         component = component which is supposed to have property
-         property = speculated property that is to be tested if it is present in component
-     Returns:
-         true if property is in component
-     **/
+            Params:
+                component = component which is supposed to have property
+                property = speculated property that is to be tested if it is present in component
+            Returns:
+                true if property is in component
+            **/
             bool has(ComponentType component, KType key) const nothrow {
                 return this.has(component, KeyType(key));
             }
         }
 
-    /**
-     Get a property out of component
+        /**
+        Get a property out of component
 
-     Params:
-         component = a component which has some properties identified by property.
-     Throws:
-         NotFoundException in case when no requested property is available.
-         InvalidArgumentException in case when passed arguments are somehow invalid for use.
-     Returns:
-         FieldType accessed property.
-     **/
+        Params:
+            component = a component which has some properties identified by property.
+        Throws:
+            NotFoundException in case when no requested property is available.
+            InvalidArgumentException in case when passed arguments are somehow invalid for use.
+        Returns:
+            FieldType accessed property.
+        **/
         FieldType access(ComponentType component, in KeyType key) const {
             static foreach (Component; ComponentTypes) {{
                 static if (
@@ -1223,19 +1274,19 @@ class VariantAccessor(
             throw new NotFoundException(text("Could not find ", key, " in ", component));
         }
 
-    /**
-     Check if requested property is present in component.
+        /**
+        Check if requested property is present in component.
 
-     Check if requested property is present in component.
-     The method could have allocation side effects due to the fact that
-     it is not restricted in calling access method of the accessor.
+        Check if requested property is present in component.
+        The method could have allocation side effects due to the fact that
+        it is not restricted in calling access method of the accessor.
 
-     Params:
-         component = component which is supposed to have property
-         property = speculated property that is to be tested if it is present in component
-     Returns:
-         true if property is in component
-     **/
+        Params:
+            component = component which is supposed to have property
+            property = speculated property that is to be tested if it is present in component
+        Returns:
+            true if property is in component
+        **/
         bool has(in ComponentType component, in KeyType key) const nothrow {
             try {
                 static foreach (Component; ComponentTypes) {{
@@ -1311,6 +1362,12 @@ class RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyType
     }
 
     public {
+        /**
+        Constructor for runtime composite accessor.
+
+        Params:
+            accessor = underlying accessor used to access downcasted component.
+        **/
         this(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) {
             this.accessor = accessor;
         }
@@ -1340,19 +1397,23 @@ class RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyType
             return this.accessor_;
         }
 
-    /**
-     Get a property out of component
+        /**
+        Get a property out of component
 
-     Params:
-         component = a component which has some properties identified by property.
-     Throws:
-         NotFoundException in case when no requested property is available.
-         InvalidArgumentException in case when passed arguments are somehow invalid for use.
-     Returns:
-         FieldType accessed property.
-     **/
+        Params:
+            component = a component which has some properties identified by property.
+        Throws:
+            NotFoundException in case when no requested property is available.
+            InvalidArgumentException in case when passed arguments are somehow invalid for use.
+        Returns:
+            FieldType accessed property.
+        **/
         FieldType access(Object component, in KeyType path) const {
-            enforce!InvalidArgumentException(component.identify is typeid(ComponentType), text("Invalid component passed ", component.identify, " when expected ", typeid(ComponentType)));
+            enforce!InvalidArgumentException(
+                component.identify is typeid(ComponentType),
+                text("Invalid component passed ", component.identify, " when expected ", typeid(ComponentType))
+            );
+
             enforce!NotFoundException(this.has(component, path), text("Could not find property ", path));
 
             return this.accessor.access(component.unwrap!ComponentType, path);
@@ -1414,7 +1475,8 @@ ImplSpec:
     The accessor itself is not responsible for deallocation of placeholders that it returned. As a consequence
     no components should point to placeholders allocated by this accessor.
 **/
-class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : AllocatingPropertyAccessor!(ComponentType, Object, KeyType) {
+class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
+    AllocatingPropertyAccessor!(ComponentType, Object, KeyType) {
     import aermicioi.aedi_property_reader.core.convertor : identify, unwrap;
     import std.experimental.allocator;
 
@@ -1425,6 +1487,13 @@ class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = s
     }
 
     public {
+
+        /**
+        Constructor for runtime field accessor.
+
+        Params:
+            accessor = accessor used to access fields out of component that are to be type erased on return.
+        **/
         this(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) {
             this.allocator = theAllocator;
             this.accessor = accessor;
@@ -1531,23 +1600,26 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
     mixin AllocatorAwareMixin!(typeof(this));
 
     public {
+        /**
+        Default constructor for composite accessor.
+        **/
         this() {
-            import std.experimental.allocator;
+            import std.experimental.allocator : theAllocator;
 
             this.allocator = theAllocator;
         }
 
-    /**
-     Get a property out of component
+        /**
+        Get a property out of component
 
-     Params:
-         component = a component which has some properties identified by property.
-     Throws:
-         NotFoundException in case when no requested property is available.
-         InvalidArgumentException in case when passed arguments are somehow invalid for use.
-     Returns:
-         FieldType accessed property.
-     **/
+        Params:
+            component = a component which has some properties identified by property.
+        Throws:
+            NotFoundException in case when no requested property is available.
+            InvalidArgumentException in case when passed arguments are somehow invalid for use.
+        Returns:
+            FieldType accessed property.
+        **/
         Object access(Type component, in string property) const {
             foreach (string member; __traits(allMembers, Type)) {
 
@@ -1569,19 +1641,19 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
             throw new NotFoundException(text(typeid(Type), " does not have ", property, " property"));
         }
 
-    /**
-     Check if requested property is present in component.
+        /**
+        Check if requested property is present in component.
 
-     Check if requested property is present in component.
-     The method could have allocation side effects due to the fact that
-     it is not restricted in calling access method of the accessor.
+        Check if requested property is present in component.
+        The method could have allocation side effects due to the fact that
+        it is not restricted in calling access method of the accessor.
 
-     Params:
-         component = component which is supposed to have property
-         property = speculated property that is to be tested if it is present in component
-     Returns:
-         true if property is in component
-     **/
+        Params:
+            component = component which is supposed to have property
+            property = speculated property that is to be tested if it is present in component
+        Returns:
+            true if property is in component
+        **/
         bool has(in Type component, in string property) const nothrow {
 
             foreach (string member; __traits(allMembers, Type)) {

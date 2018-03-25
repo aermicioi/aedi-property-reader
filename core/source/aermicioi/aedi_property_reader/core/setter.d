@@ -44,6 +44,16 @@ Provides ability to set a property of FieldType into CompositeType.
 **/
 interface PropertySetter(CompositeType, FieldType = CompositeType, KeyType = string) {
 
+    /**
+    Set a field or property of CompositeType.
+
+    Params:
+        composite = composite that will store value
+        value = actual value that is assigned to a field in composite
+        property = the identity of field in composite
+    Throws:
+        InvalidArgumentException when value or composite is not what was expected
+    **/
     void set(ref CompositeType composite, FieldType value, KeyType property) const;
 
     /**
@@ -83,9 +93,22 @@ interface PropertySetter(CompositeType, FieldType = CompositeType, KeyType = str
     }
 }
 
+/**
+Associative array setter.
+**/
 class AssociativeArraySetter(Type, KeyType = Type) : PropertySetter!(Type[KeyType], Type, KeyType) {
 
     public {
+        /**
+        Set a field or property of CompositeType.
+
+        Params:
+            composite = composite that will store value
+            value = actual value that is assigned to a field in composite
+            property = the identity of field in composite
+        Throws:
+            InvalidArgumentException when value or composite is not what was expected
+        **/
         void set(ref Type[KeyType] composite, Type field, KeyType key) const {
             composite[key] = field;
         }
@@ -111,8 +134,21 @@ class AssociativeArraySetter(Type, KeyType = Type) : PropertySetter!(Type[KeyTyp
     }
 }
 
+/**
+Array setter.
+**/
 class ArraySetter(Type) : PropertySetter!(Type[], Type, size_t) {
 
+    /**
+    Set a field or property of CompositeType.
+
+    Params:
+        composite = composite that will store value
+        value = actual value that is assigned to a field in composite
+        property = the identity of field in composite
+    Throws:
+        InvalidArgumentException when value or composite is not what was expected
+    **/
     void set(ref Type[] composite, Type field, size_t key) const {
         enforce!InvalidArgumentException(key < composite.length, text(
             "Cannot assign ",
@@ -143,31 +179,29 @@ class ArraySetter(Type) : PropertySetter!(Type[], Type, size_t) {
      Returns:
          TypeInfo type information about passed component, or typeid(void) if component is not supported.
      **/
-    /**
-     Identify the type of supported component.
-
-     Identify the type of supported component. It returns type info of component
-     if it is supported by accessor, otherwise it will return typeid(void) denoting that
-     the type isn't supported by accessor. The accessor is not limited to returning the type
-     info of passed component, it can actually return type info of super type or any type
-     given the returned type is implicitly convertible or castable to ComponentType.
-
-     Params:
-         component = the component for which accessor should identify the underlying type
-
-     Returns:
-         TypeInfo type information about passed component, or typeid(void) if component is not supported.
-     **/
     TypeInfo componentType(ref Type[] composite) const nothrow {
         return typeid(Type[]);
     }
 }
 
+/**
+Composite (object, struct, union) setter.
+**/
 class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, string)
     if (isAggregateType!ComponentType) {
 
+    /**
+    Set a field or property of CompositeType.
+
+    Params:
+        composite = composite that will store value
+        value = actual value that is assigned to a field in composite
+        property = the identity of field in composite
+    Throws:
+        InvalidArgumentException when value or composite is not what was expected
+    **/
     void set(T)(ref ComponentType component, T field, string property) const {
-        import std.experimental.allocator;
+        import std.experimental.allocator : theAllocator, dispose;
         auto wrapped = field.placeholder(theAllocator);
         this.set(component, wrapped, property);
 
@@ -176,6 +210,9 @@ class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, st
         }
     }
 
+    /**
+    ditto
+    **/
     void set(ref ComponentType component, Object field, string property) const {
         static foreach (member; __traits(allMembers, ComponentType)) {{
             static if (isPublic!(ComponentType, member)) {
@@ -194,9 +231,15 @@ class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, st
                         __traits(getMember, component, member) = field.unwrap!FieldType;
                         return;
                     } else static if (
-                        isSomeFunction!m && anySatisfy!(isPropertyPropertySetter, __traits(getOverloads, ComponentType, member))
+                        isSomeFunction!m &&
+                        anySatisfy!(isPropertyPropertySetter, __traits(getOverloads, ComponentType, member))
                     ) {
-                        alias FieldType = Parameters!(match!(isPropertyPropertySetter, __traits(getOverloads, ComponentType, member)))[0];
+                        alias FieldType = Parameters!(
+                            match!(
+                                isPropertyPropertySetter,
+                                __traits(getOverloads, ComponentType, member)
+                                )
+                            )[0];
 
                         enforce!InvalidArgumentException(field.identify is typeid(FieldType), text(
                             "Cannot set value of type ", field.identify,
@@ -211,7 +254,13 @@ class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, st
             }
         }}
 
-        throw new NotFoundException(text("Component of type ", typeid(ComponentType), " does not have ", property, " property"));
+        throw new NotFoundException(text(
+            "Component of type ",
+            typeid(ComponentType),
+            " does not have ",
+            property,
+            " property"
+        ));
     }
 
     /**
@@ -234,12 +283,21 @@ class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, st
     }
 }
 
+/**
+Runtime composite setter that accepts erased Type, restores it's type and sets data in it.
+**/
 class RuntimeCompositeSetter(Type, FieldType = Type, KeyType = string) : PropertySetter!(Object, FieldType, KeyType) {
     private {
         PropertySetter!(Type, FieldType, KeyType) setter_;
     }
 
     public {
+        /**
+        Constructor for runtime composite setter.
+
+        Params:
+            setter = underlying setter used for assigning fields to component
+        **/
         this(PropertySetter!(Type, FieldType, KeyType) setter) {
             this.setter = setter;
         }
@@ -271,6 +329,16 @@ class RuntimeCompositeSetter(Type, FieldType = Type, KeyType = string) : Propert
             }
         }
 
+        /**
+        Set a field or property of CompositeType.
+
+        Params:
+            composite = composite that will store value
+            value = actual value that is assigned to a field in composite
+            property = the identity of field in composite
+        Throws:
+            InvalidArgumentException when value or composite is not what was expected
+        **/
         void set(ref Object composite, FieldType field, KeyType key) const {
             auto placeholder = composite.unwrap!Type;
             this.setter.set(placeholder, field, key);
@@ -301,12 +369,21 @@ class RuntimeCompositeSetter(Type, FieldType = Type, KeyType = string) : Propert
     }
 }
 
+/**
+Runtime field setter that accepts type erased fields, that are restored and then assigned to component.
+**/
 class RuntimeFieldSetter(Type, FieldType = Type, KeyType = string) : PropertySetter!(Type, Object, KeyType) {
     private {
         PropertySetter!(Type, FieldType, KeyType) setter_;
     }
 
     public {
+        /**
+        Constructor for runtime field setter.
+
+        Params:
+            setter = underlying setter that works directly with FieldType values
+        **/
         this(PropertySetter!(Type, FieldType, KeyType) setter) {
             this.setter = setter;
         }
@@ -338,6 +415,16 @@ class RuntimeFieldSetter(Type, FieldType = Type, KeyType = string) : PropertySet
             }
         }
 
+        /**
+        Set a field or property of CompositeType.
+
+        Params:
+            composite = composite that will store value
+            value = actual value that is assigned to a field in composite
+            property = the identity of field in composite
+        Throws:
+            InvalidArgumentException when value or composite is not what was expected
+        **/
         void set(ref Type composite, Object field, KeyType key) const {
             this.setter.set(composite, field.unwrap!FieldType, key);
         }

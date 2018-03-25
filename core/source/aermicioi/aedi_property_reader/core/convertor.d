@@ -44,14 +44,35 @@ import std.algorithm;
 import std.array;
 import std.experimental.logger;
 
+/**
+Functional convertor that is taking a component of type From and converts it into a component of type To.
+
+Params:
+    from = original component that is converted.
+    to = destination component that is constructed.
+    allocator = optional allocator used to allocate required memory during conversion.
+**/
 alias FunctionalConvertor(To, From) = void function(in From, ref To, RCIAllocator allocator = theAllocator);
+
+/**
+ditto
+**/
 alias DelegateConvertor(To, From) = void delegate(in From, ref To, RCIAllocator allocator = theAllocator);
 
-alias RuntimeFunctionalConvertor(To, From) = void function(in From, ref To, Convertor convertor, RCIAllocator allocator = theAllocator);
-alias RuntimeDelegateConvertor(To, From) = void delegate(in From, ref To, Convertor convertor, RCIAllocator allocator = theAllocator);
+/**
+Check wether T symbol is a functional convertor.
 
+Params:
+    T = symbol to be tested.
+
+Returns:
+    Symbols: Yes -> whether it is or not, From -> type of original component that function is accepting, To -> destination type that function is converting.
+**/
 template isConvertor(alias T) {
-    static if (is(typeof(&T) : void function(in Y, ref X, RCIAllocator), Y, X) || is(typeof(&T) : void delegate(in Y, ref X, RCIAllocator), Y, X)) {
+    static if (
+        is(typeof(&T) : void function(in Y, ref X, RCIAllocator), Y, X) ||
+        is(typeof(&T) : void delegate(in Y, ref X, RCIAllocator), Y, X)
+    ) {
         enum bool Yes = true;
 
         alias To = X;
@@ -62,6 +83,19 @@ template isConvertor(alias T) {
     }
 }
 
+/**
+Check whether symbol T is a functional convertor from type From to type To.
+
+Params:
+    T = symbol to test
+    To = destination type
+    From = original type
+
+Returns:
+    Yes -> whether it is or not,
+    From -> type of original component that function is accepting,
+    To -> destination type that function is converting.
+**/
 template isConvertor(alias T, To, From) {
     static if (isConvertor!T.Yes && is(isConvertor!T.To == To) && is(isConvertor!T.From == From)) {
         alias isConvertor = isConvertor!T;
@@ -70,6 +104,18 @@ template isConvertor(alias T, To, From) {
     }
 }
 
+/**
+Test whether template T can be instantiated as a functional convertor from From to To.
+
+Params:
+    T = template that is to be instantiated
+    To = destination type
+    From = original type
+Returns:
+    Yes -> whether it is possible to instantiate template as functional convertor
+    Convertor -> resulting functional convertor
+    Info -> data returned by isConvertor
+**/
 template maybeConvertor(alias T, To, From) {
     static if (isConvertor!(T!(To, From)).Yes) {
         enum Yes = true;
@@ -80,39 +126,29 @@ template maybeConvertor(alias T, To, From) {
     }
 }
 
-template isRuntimeConvertor(alias T) {
-    static if (is(typeof(&T) : void function(in Y, ref X, Convertor, RCIAllocator), Y, X) || is(typeof(&T) : void delegate(in Y, ref X, Convertor, RCIAllocator), Y, X)) {
-        enum bool Yes = true;
+/**
+Functional destructor responsible for destroying components of To type.
 
-        alias To = X;
-        alias From = Y;
-    } else {
-
-        enum bool Yes = false;
-    }
-}
-
-template isRuntimeConvertor(alias T, To, From) {
-    static if (isRuntimeConvertor!T.Yes && is(isConvertor!T.To == To) && is(isRuntimeConvertor!T.From == From)) {
-        alias isRuntimeConvertor = isRuntimeConvertor!T;
-    } else {
-        enum Yes = false;
-    }
-}
-
-template maybeRuntimeConvertor(alias T, To, From) {
-    static if (isRuntimeConvertor!(T!(To, From)).Yes) {
-        enum Yes = true;
-        alias Convertor = T!(To, From);
-        alias Info = isRuntimeConvertor!Convertor;
-    } else {
-        enum Yes = false;
-    }
-}
-
+Params:
+    to = the component that is to be destroyed.
+    allocator = the allocator originally used to allocate all memory for To component
+**/
 alias FunctionalDestructor(To) = void function (ref To, RCIAllocator = theAllocator);
+
+/**
+ditto
+**/
 alias DelegateDestructor(To) = void delegate (ref To, RCIAllocator = theAllocator);
 
+/**
+Check whether symbol T is a functional destructor.
+
+Params:
+    T = symbol to be tested.
+Returns:
+    Yes = whether it is functional destructor or not
+    To = the type of accepted components to be destructed
+**/
 template isDestructor(alias T) {
     static if (is(typeof(&T) : void function (ref X, RCIAllocator = theAllocator), X) || is(typeof(&T) : void delegate (ref X, RCIAllocator = theAllocator), X)) {
         enum bool Yes = true;
@@ -124,6 +160,17 @@ template isDestructor(alias T) {
     }
 }
 
+/**
+Check if symbol T is a functional destructor for component of type To
+
+Params:
+    T = symbol that is tested
+    To = the component that functional destructor may accept
+
+Returns:
+    Yes = whether it is functional destructor or not
+    To = the type of accepted components to be destructed
+**/
 template isDestructor(T, To) {
     static if (isDestructor!T.Yes && is(isDestructor!T.To == To)) {
         alias isDestructor = isDestructor!T;
@@ -132,6 +179,18 @@ template isDestructor(T, To) {
     }
 }
 
+/**
+Test if T template's instantiantiation with type To is a functional destructor for component of type To.
+
+Params:
+    T = template that is to be tested.
+    To = the type of component that T instantiation should manage destruction.
+
+Returns:
+    Yes -> whether it is possible to instantiate a functional destructor for To or not
+    Destructor -> the instantiated functional destructor
+    Info -> information from isDestructor check
+**/
 template maybeDestructor(alias T, To) {
     static if (isDestructor!(T!To).Yes) {
         enum Yes = true;
@@ -142,53 +201,135 @@ template maybeDestructor(alias T, To) {
     }
 }
 
-alias RuntimeFunctionalDestructor(To) = void function (ref To, Convertor, RCIAllocator = theAllocator);
-alias RuntimeDelegateDestructor(To) = void delegate (ref To, Convertor, RCIAllocator = theAllocator);
-
-template isRuntimeDestructor(alias T) {
-    static if (is(typeof(&T) : void function (ref X, Convertor, RCIAllocator), X) || is(typeof(&T) : void delegate (ref X, Convertor, RCIAllocator), X)) {
-        enum bool Yes = true;
-
-        alias To = X;
-    } else {
-
-        enum bool Yes = false;
-    }
-}
-
-template isRuntimeDestructor(T, To) {
-    static if (isRuntimeDestructor!T.Yes && is(isRuntimeDestructor!T.To == To)) {
-        alias isRuntimeDestructor = isRuntimeDestructor!T;
-    } else {
-        enum Yes = false;
-    }
-}
-
-template maybeRuntimeDestructor(alias T, To) {
-    static if (isRuntimeDestructor!(T!To).Yes) {
-        enum Yes = true;
-        alias Destructor = T!(To);
-        alias Info = isRuntimeDestructor!Destructor;
-    } else {
-        enum Yes = false;
-    }
-}
-
+/**
+Interface for components that are able to convert from one erased type to another erased type.
+**/
 interface Convertor {
     @property {
-        TypeInfo from() const;
-        TypeInfo to() const;
+
+        /**
+        Get the type info of component that convertor can convert from.
+
+        Get the type info of component that convertor can convert from.
+        The method is returning the default type that it is able to convert,
+        though it is not necessarily limited to this type only. More generalistic
+        checks should be done by convertsFrom method.
+
+        Returns:
+            type info of component that convertor is able to convert.
+        **/
+        TypeInfo from() const nothrow;
+
+        /**
+        Get the type info of component that convertor is able to convert to.
+
+        Get the type info of component that convertor is able to convert to.
+        The method is returning the default type that is able to convert,
+        though it is not necessarily limited to this type only. More generalistic
+        checks should be done by convertsTo method.
+
+        Returns:
+            type info of component that can be converted to.
+        **/
+        TypeInfo to() const nothrow;
     }
 
-    bool convertsFrom(TypeInfo from) const;
-    bool convertsFrom(in Object from) const;
-    bool convertsTo(TypeInfo to) const;
-    bool convertsTo(in Object to) const;
+    /**
+    Check whether convertor is able to convert from.
 
+    Check whether convertor is able to convert from.
+    The intent of method is to implement customized type checking
+    is not limited immediatly to supported default from component.
+
+    Params:
+        from = the type info of component that could potentially be converted by convertor.
+    Returns:
+        true if it is able to convert from, or false otherwise.
+    **/
+    bool convertsFrom(TypeInfo from) const nothrow;
+
+    /**
+    Check whether convertor is able to convert from.
+
+    Check whether convertor is able to convert from.
+    The method will try to extract type info out of from
+    object and use for subsequent type checking.
+    The intent of method is to implement customized type checking
+    is not limited immediatly to supported default from component.
+
+    Params:
+        from = the type info of component that could potentially be converted by convertor.
+    Returns:
+        true if it is able to convert from, or false otherwise.
+    **/
+    bool convertsFrom(in Object from) const nothrow;
+
+    /**
+    Check whether convertor is able to convert to.
+
+    Check whether convertor is able to convert to.
+    The intent of the method is to implement customized type checking
+    that is not limited immediatly to supported default to component.
+
+    Params:
+        to = type info of component that convertor could potentially convert to.
+
+    Returns:
+        true if it is able to convert to, false otherwise.
+    **/
+    bool convertsTo(TypeInfo to) const nothrow;
+
+    /**
+    Check whether convertor is able to convert to.
+
+    Check whether convertor is able to convert to.
+    The method will try to extract type info out of to object and use
+    for subsequent type checking.
+    The intent of the method is to implement customized type checking
+    that is not limited immediatly to supported default to component.
+
+    Params:
+        to = type info of component that convertor could potentially convert to.
+
+    Returns:
+        true if it is able to convert to, false otherwise.
+    **/
+    bool convertsTo(in Object to) const nothrow;
+
+    /**
+    Convert from component to component.
+
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when there is a converting error
+        InvalidArgumentException when arguments passed are not of right type or state
+    Returns:
+        Resulting converted component.
+    **/
     Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator);
+
+    /**
+    Destroy component created using this convertor.
+
+    Destroy component created using this convertor.
+    Since convertor could potentially allocate memory for
+    converted component, only itself is containing history of allocation,
+    and therefore it is responsible as well to destroy and free allocated
+    memory with allocator.
+
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    **/
     void destruct(ref Object converted, RCIAllocator allocator = theAllocator);
 }
 
+/**
+A convertor that is using functional convertor and destructor for conversion logic.
+**/
 class CallbackConvertor(alias convertor, alias destructor) : Convertor
     if (isConvertor!convertor.Yes && isDestructor!destructor.Yes) {
 
@@ -200,42 +341,97 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
 
         @property {
             /**
-            Get from
+            Get the type info of component that convertor can convert from.
+
+            Get the type info of component that convertor can convert from.
+            The method is returning the default type that it is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsFrom method.
 
             Returns:
-                TypeInfo
+                type info of component that convertor is able to convert.
             **/
             TypeInfo from() @safe nothrow pure const {
                 return typeid(Info.From);
             }
 
             /**
-            Get to
+            Get the type info of component that convertor is able to convert to.
+
+            Get the type info of component that convertor is able to convert to.
+            The method is returning the default type that is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsTo method.
 
             Returns:
-                TypeInfo
+                type info of component that can be converted to.
             **/
             TypeInfo to() @safe nothrow pure const {
                 return typeid(Info.To);
             }
         }
 
-        bool convertsFrom(TypeInfo from) const {
+        /**
+        Check whether convertor is able to convert from.
+
+        Params:
+            from = the type info of component that could potentially be converted by convertor.
+        Returns:
+            true if it is able to convert from, or false otherwise.
+        **/
+        bool convertsFrom(TypeInfo from) const nothrow {
             return typeid(Info.From) is from;
         }
 
-        bool convertsFrom(in Object from) const {
+        /**
+        ditto
+        **/
+        bool convertsFrom(in Object from) const nothrow {
             return this.convertsFrom(from.identify);
         }
 
-        bool convertsTo(TypeInfo to) const {
+        /**
+        Check whether convertor is able to convert to.
+
+        Params:
+            to = type info of component that convertor could potentially convert to.
+
+        Returns:
+            true if it is able to convert to, false otherwise.
+        **/
+        bool convertsTo(TypeInfo to) const nothrow {
             return typeid(Info.To) is to;
         }
 
-        bool convertsTo(in Object to) const {
+        /**
+        ditto
+        **/
+        bool convertsTo(in Object to) const nothrow {
             return this.convertsTo(to.identify);
         }
 
+        /**
+        Convert from component to component.
+
+        Convert from component to component.
+        In case when functional convertor's from argument is rooted in Object
+        class, the convertor will attempt to downcast passed component to
+        it's rightfull type. If not, the convertor will attempt to downcast
+        from component to placeholding object of value that is accepted by functional
+        convertor.
+        For converted to component, in case when it is rooted in Object class
+        nothing special is performed, while otherwise it will be wrapped into placeholding
+        object allocated by allocator that will be returned to callee.
+
+        Params:
+            from = original component that is to be converted.
+            to = destination object that will be constructed out for original one.
+            allocator = optional allocator that could be used to construct to component.
+        Throws:
+            ConvertorException when convertor is not able to convert from, or to component.
+        Returns:
+            Resulting converted component.
+        **/
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
         {
             enforce!ConvertorException(this.convertsTo(to), text(to, " is not supported by convertor expected ", typeid(Info.To)));
@@ -274,6 +470,20 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
             return placeholder;
         }
 
+        /**
+        Destroy component created using this convertor.
+
+        Destroy component created using this convertor.
+        The method will attempt to downcast converted component
+        to type supported by functional destructor when the type is rooted in
+        Object class, otherwise it will attempt to downcast converted to placeholding
+        object of value supported by functional destructor. In latest case, the
+        method will dispose out of placeholding object using passed allocator.
+
+        Params:
+            converted = component that should be destroyed.
+            allocator = allocator used to allocate converted component.
+        **/
         void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
             static if (is(Info.To : Object)) {
 
@@ -288,132 +498,9 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
     }
 }
 
-class RuntimeConvertor(alias convertor, alias destructor)
-    if (isRuntimeConvertor!convertor && isRuntimeDestructor!destructor) {
-
-    private {
-        alias Info = isRuntimeConvertor!convertor;
-
-        Convertor convertor_;
-    }
-
-    public {
-
-        @property {
-            /**
-            Set convertor
-
-            Params:
-                convertor = convertor passed to runtime converting callback for optionall use in converting complex components.
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) convertor(Convertor convertor) @safe nothrow pure {
-                this.convertor_ = convertor;
-
-                return this;
-            }
-
-            /**
-            Get convertor
-
-            Returns:
-                Convertor
-            **/
-            inout(Convertor) convertor() @safe nothrow pure inout {
-                return this.convertor_;
-            }
-
-            /**
-            Get from
-
-            Returns:
-                TypeInfo
-            **/
-            TypeInfo from() @safe nothrow pure const {
-                return typeid(Info.From);
-            }
-
-            /**
-            Get to
-
-            Returns:
-                TypeInfo
-            **/
-            TypeInfo to() @safe nothrow pure const {
-                return typeid(Info.To);
-            }
-        }
-
-        bool convertsFrom(TypeInfo from) const {
-            return typeid(Info.From) is from;
-        }
-
-        bool convertsFrom(in Object from) const {
-            return this.convertsFrom(from.identify);
-        }
-
-        bool convertsTo(TypeInfo to) const {
-            return typeid(Info.To) is to;
-        }
-
-        bool convertsTo(in Object to) const {
-            return this.convertsTo(to.identify);
-        }
-
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
-        {
-            enforce!ConvertorException(this.convertsTo(to), text(to, " is not supported by convertor expected ", typeid(Info.To)));
-            enforce!ConvertorException(this.convertsFrom(from), text(this.unwrap(from), " is not supported by convertor expected ", typeid(Info.From)));
-
-            Info.From naked;
-
-            static if (is(From : Object)) {
-                naked = cast(From) from;
-
-                if (naked is null) {
-                    throw new ConvertorException(text("Cannot convert ", from.classinfo, " only supported ", this.from));
-                }
-            } else {
-
-                auto wrapper = (cast(Placeholder!(Info.From)) from);
-
-                if (wrapper is null) {
-                    throw new ConvertorException(text("Cannot convert ", from.identify, " only supported ", this.from));
-                }
-
-                naked = wrapper.value;
-            }
-
-
-            static if (is(Info.To : Object)) {
-                Info.To placeholder = make!(Info.To);
-
-                convertor(naked, placeholder, convertor, allocator);
-            } else {
-                PlaceholderImpl!(Info.To) placeholder = allocator.make!(PlaceholderImpl!(Info.To))(Info.To.init);
-
-                convertor(naked, placeholder.value, convertor, allocator);
-            }
-
-            return placeholder;
-        }
-
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
-            static if (is(Info.To : Object)) {
-
-                destructor(converted, this.convertor, allocator);
-            } else {
-                auto container = cast(Placeholder!(Info.To)) converted;
-
-                destructor(container.value, this.convertor);
-                allocator.dispose(converted);
-            }
-        }
-    }
-}
-
+/**
+A convertor that is delegating converting task to a set of child convertors.
+**/
 class AggregateConvertor : Convertor {
     import std.algorithm;
 
@@ -457,42 +544,90 @@ class AggregateConvertor : Convertor {
 
         @property {
             /**
-            Get from
+            Get the type info of component that convertor can convert from.
+
+            Get the type info of component that convertor can convert from.
+            The method is returning the default type that it is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsFrom method.
 
             Returns:
-                TypeInfo
+                type info of component that convertor is able to convert.
             **/
             TypeInfo from() @safe nothrow pure const {
                 return typeid(void);
             }
 
             /**
-            Get to
+            Get the type info of component that convertor is able to convert to.
+
+            Get the type info of component that convertor is able to convert to.
+            The method is returning the default type that is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsTo method.
 
             Returns:
-                TypeInfo
+                type info of component that can be converted to.
             **/
             TypeInfo to() @safe nothrow pure const {
                 return typeid(void);
             }
         }
 
+        /**
+        Check whether convertor is able to convert from.
+
+        Params:
+            from = the type info of component that could potentially be converted by convertor.
+        Returns:
+            true if it is able to convert from, or false otherwise.
+        **/
         bool convertsFrom(TypeInfo from) const {
             return this.convertors.canFind!(c => c.convertsFrom(from));
         }
 
+        /**
+        ditto
+        **/
         bool convertsFrom(in Object from) const {
             return this.convertors.canFind!(c => c.convertsFrom(from));
         }
 
+        /**
+        Check whether convertor is able to convert to.
+
+        Params:
+            to = type info of component that convertor could potentially convert to.
+
+        Returns:
+            true if it is able to convert to, false otherwise.
+        **/
         bool convertsTo(TypeInfo to) const {
             return this.convertors.canFind!(c => c.convertsTo(to));
         }
 
+        /**
+        ditto
+        **/
         bool convertsTo(in Object to) const {
             return this.convertors.canFind!(c => c.convertsTo(to));
         }
 
+        /**
+        Convert from component to component.
+
+        Finds a right convertor from component to component and uses it
+        to execute conversion from component to component.
+
+        Params:
+            from = original component that is to be converted.
+            to = destination object that will be constructed out for original one.
+            allocator = optional allocator that could be used to construct to component.
+        Throws:
+            ConvertorException when convertor is not able to convert from, or to component.
+        Returns:
+            Resulting converted component.
+        **/
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
         {
             auto convertors = this.convertors.find!(c => c.convertsFrom(from) && c.convertsTo(to));
@@ -504,8 +639,17 @@ class AggregateConvertor : Convertor {
             throw new ConvertorException(text("Could not convert ", typeid(from), " to type ", to));
         }
 
+        /**
+        Destroy component created using this convertor.
+
+        Find a suitable convertor for destruction and use it to execute destruction.
+
+        Params:
+            converted = component that should be destroyed.
+            allocator = allocator used to allocate converted component.
+        **/
         void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
-            auto convertors = this.convertors.find!(c => c.convertsFrom(from) && c.convertsTo(to));
+            auto convertors = this.convertors.find!(c => c.convertsTo(converted));
 
             if (convertors.empty) {
                 throw new ConvertorException(text("Could not destroy ", converted));
@@ -516,53 +660,117 @@ class AggregateConvertor : Convertor {
     }
 }
 
+/**
+A convertor that simply doesn't do any conversion and returns existing object
+**/
 class NoOpConvertor : Convertor {
     import std.algorithm;
 
     public {
         @property {
             /**
-            Get from
+            Get the type info of component that convertor can convert from.
+
+            Get the type info of component that convertor can convert from.
+            The method is returning the default type that it is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsFrom method.
 
             Returns:
-                TypeInfo
+                type info of component that convertor is able to convert.
             **/
             TypeInfo from() @safe nothrow pure const {
                 return typeid(Object);
             }
 
             /**
-            Get to
+            Get the type info of component that convertor is able to convert to.
+
+            Get the type info of component that convertor is able to convert to.
+            The method is returning the default type that is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsTo method.
 
             Returns:
-                TypeInfo
+                type info of component that can be converted to.
             **/
             TypeInfo to() @safe nothrow pure const {
                 return typeid(Object);
             }
         }
 
+        /**
+        Check whether convertor is able to convert from.
+
+        Params:
+            from = the type info of component that could potentially be converted by convertor.
+        Returns:
+            true if it is able to convert from, or false otherwise.
+        **/
         bool convertsFrom(TypeInfo from) const {
             return this.from is from;
         }
 
+        /**
+        ditto
+        **/
         bool convertsFrom(in Object from) const {
             return this.convertsTo(typeid(from));
         }
 
+        /**
+        Check whether convertor is able to convert to.
+
+        Params:
+            to = type info of component that convertor could potentially convert to.
+
+        Returns:
+            true if it is able to convert to, false otherwise.
+        **/
         bool convertsTo(TypeInfo to) const {
             return this.to is from;
         }
 
+        /**
+        ditto
+        **/
         bool convertsTo(in Object to) const {
             return this.convertsTo(typeid(to));
         }
 
+        /**
+        Convert from component to component.
+
+        It will simply pass existing from component as to component
+        as consequence requested to component should be same as type info
+        of from component.
+
+        Params:
+            from = original component that is to be converted.
+            to = destination object that will be constructed out for original one.
+            allocator = optional allocator that could be used to construct to component.
+        Throws:
+            ConvertorException when convertor is not able to convert from, or to component.
+        Returns:
+            Resulting converted component.
+        **/
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
         {
+            enforce!ConvertorException(
+                from.identify is to,
+                text("Cannot do no op when expected ", to, " type is not of same type as original from ", from.identify, " type")
+            );
+
             return cast() from;
         }
 
+        /**
+        Does not destruct anything since it is not allocating anything.
+
+        Params:
+            converted = component that should be destroyed.
+            allocator = allocator used to allocate converted component.
+        **/
         void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
 
         }
