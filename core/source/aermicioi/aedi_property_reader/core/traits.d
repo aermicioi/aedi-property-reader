@@ -76,3 +76,16 @@ template match(alias predicate, Types...) {
         static assert(false, "No match found for passed template args");
     }
 }
+
+void n(T)(lazy T value) nothrow {
+    try {
+        value();
+    } catch (Exception e) {
+
+    }
+}
+
+package {
+    enum isD(T, X) = is(T : X);
+
+}

@@ -93,7 +93,7 @@ auto sdlang(SdlangElement value, RCIAllocator allocator = theAllocator) {
         ubyte[]
     )) {
 
-        container.set(new SdlangConvertor!(T, SdlangElement), fullyQualifiedName!T);
+        container.set(SdlangConvertor!(T, SdlangElement)(), fullyQualifiedName!T);
     }
 
     return container;

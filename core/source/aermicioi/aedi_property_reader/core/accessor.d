@@ -43,23 +43,86 @@ import std.variant;
 import std.traits;
 import std.meta;
 import aermicioi.util.traits;
+import std.experimental.logger;
+import aermicioi.aedi_property_reader.core.traits : isD, n;
 
+/**
+Interface for objects that are able to get child component out of parent one.
+
+The intent of property accessor is to provide runtime means of accessing various properties
+out of a component which could be a D object, or struct. The implementation is free in allocation
+policies in order to satisfy the property access, though the burden of freeing allocated memory
+is left on code using the accessor.
+**/
 interface PropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) {
 
+
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
     FieldType access(ComponentType component, in KeyType property) const;
 
-    bool has(in ComponentType component, in KeyType property) const;
+    /**
+     Check if requested property is present in component.
 
-    TypeInfo componentType(ComponentType component) const;
-    TypeInfo fieldType(ComponentType component, in KeyType property) const;
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+    bool has(in ComponentType component, in KeyType property) const nothrow;
+
+    /**
+     Identify the type of supported component.
+
+     Identify the type of supported component. It returns type info of component
+     if it is supported by accessor, otherwise it will return typeid(void) denoting that
+     the type isn't supported by accessor. The accessor is not limited to returning the type
+     info of passed component, it can actually return type info of super type or any type
+     given the returned type is implicitly convertible or castable to ComponentType.
+
+     Params:
+         component = the component for which accessor should identify the underlying type
+
+     Returns:
+         TypeInfo type information about passed component, or typeid(void) if component is not supported.
+     **/
+    TypeInfo componentType(ComponentType component) const nothrow;
 }
 
+/**
+Interface for accessor objects that are aware of an allocator and supposedly will use it
+to allocate memory for returned component.
+
+Interface for accessor objects that are aware of an allocator and supposedly will use it
+to allocate memory for returned component.
+ImplSpec:
+    The allocator in accessor is considered mutable even if the object is constant, therefore
+    it should be safe to access it from const methods. In case of immutable implementor the
+    behavior is undefined, and therefore it is advised to avoid such cases.
+**/
 interface AllocatingPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
     PropertyAccessor!(ComponentType, FieldType, KeyType),
     AllocatorAware!() {
 
 }
 
+/**
+An accessor that queries stored accessors for component.
+**/
 class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType) {
 
     private {
@@ -73,40 +136,44 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
             this.accessors = accessors.dup;
         }
 
-        /**
-        Set accessors
+        @property {
+            /**
+            Set accessors
 
-        Params:
-            accessors = accessors that implement various logic of accessing a property out of component
+            Params:
+                accessors = accessors that implement various logic of accessing a property out of component
 
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) accessors(PropertyAccessor!(ComponentType, FieldType, KeyType)[] accessors) @safe nothrow pure {
-            this.accessors_ = accessors;
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) accessors(PropertyAccessor!(ComponentType, FieldType, KeyType)[] accessors) @safe nothrow pure {
+                this.accessors_ = accessors;
 
-            return this;
+                return this;
+            }
+
+            /**
+            Get accessors
+
+            Returns:
+                PropertyAccessor!(ComponentType, FieldType, KeyType)
+            **/
+            inout(PropertyAccessor!(ComponentType, FieldType, KeyType)[]) accessors() @safe nothrow pure inout {
+                return this.accessors_;
+            }
         }
 
-        /**
-        ditto
-        **/
-        typeof(this) accessors(PropertyAccessor!(ComponentType, FieldType, KeyType)[] accessors...) @safe nothrow pure {
-            this.accessors_ = accessors;
+    /**
+     Get a property out of component
 
-            return this;
-        }
-
-        /**
-        Get accessors
-
-        Returns:
-            PropertyAccessor!(ComponentType, FieldType, KeyType)
-        **/
-        inout(PropertyAccessor!(ComponentType, FieldType, KeyType)[]) accessors() @safe nothrow pure inout {
-            return this.accessors_;
-        }
-
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         FieldType access(ComponentType component, in KeyType property) const {
 
             foreach (accessor; this.accessors) {
@@ -121,7 +188,20 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
             throw new NotFoundException("Could not find element");
         }
 
-        bool has(in ComponentType component, in KeyType property) const {
+    /**
+     Check if requested property is present in component.
+
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+        bool has(in ComponentType component, in KeyType property) const nothrow {
 
             foreach (accessor; this.accessors) {
 
@@ -133,16 +213,38 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
             return false;
         }
 
-        TypeInfo componentType(ComponentType component) const {
-            return typeid(ComponentType);
-        }
+        /**
+        Identify the type of supported component.
 
-        TypeInfo fieldType(ComponentType component, in KeyType property) const {
-            return typeid(FieldType);
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(ComponentType component) const nothrow {
+            return typeid(ComponentType);
         }
     }
 }
 
+/**
+An accessor that splits property into chunks using a separator, and recursively queries an accessor for next property from
+returned child property.
+
+An accessor that splits property into chunks using a separator,and recursively queries an accessor for next property from
+returned child property.
+ImplSpec:
+    Since a single accessor is used to fetch subsequent properties, a constraint on property accessors are placed, such as
+    field of a component should be implicitly convertible to component type in order for it to be used to get next child
+    in property chain.
+**/
 class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType)
     if (isImplicitlyConvertible!(FieldType, ComponentType) && isInputRange!KeyType) {
 
@@ -162,56 +264,69 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
             this.accessor = accessor;
         }
 
-        /**
-        Set accessor
+        @property {
+            /**
+            Set accessor
 
-        Params:
-            accessor = accessor instance responsible for getting a property out of component
+            Params:
+                accessor = accessor instance responsible for getting a property out of component
 
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) accessor(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) @safe nothrow pure {
-            this.accessor_ = accessor;
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) accessor(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) @safe nothrow pure {
+                this.accessor_ = accessor;
 
-            return this;
+                return this;
+            }
+
+            /**
+            Get accessor
+
+            Returns:
+                PropertyAccessor!(ComponentType, FieldType, KeyType)
+            **/
+            inout(PropertyAccessor!(ComponentType, FieldType, KeyType)) accessor() @safe nothrow pure inout {
+                return this.accessor_;
+            }
+
+            /**
+            Set propertyAccessor
+
+            Params:
+                propertyAccessor = property splitter used to cut up the property path into multiple points
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) separator(ElementType!KeyType separator) @safe nothrow pure {
+                this.separator_ = separator;
+
+                return this;
+            }
+
+            /**
+            Get propertyAccessor
+
+            Returns:
+                ElementType!KeyType
+            **/
+            inout(ElementType!KeyType) separator() @safe nothrow pure inout {
+                return this.separator_;
+            }
         }
 
-        /**
-        Get accessor
+    /**
+     Get a property out of component
 
-        Returns:
-            PropertyAccessor!(ComponentType, FieldType, KeyType)
-        **/
-        inout(PropertyAccessor!(ComponentType, FieldType, KeyType)) accessor() @safe nothrow pure inout {
-            return this.accessor_;
-        }
-
-        /**
-        Set propertyAccessor
-
-        Params:
-            propertyAccessor = property splitter used to cut up the property path into multiple points
-
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) separator(ElementType!KeyType separator) @safe nothrow pure {
-            this.separator_ = separator;
-
-            return this;
-        }
-
-        /**
-        Get propertyAccessor
-
-        Returns:
-            ElementType!KeyType
-        **/
-        inout(ElementType!KeyType) separator() @safe nothrow pure inout {
-            return this.separator_;
-        }
-
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         FieldType access(ComponentType component, in KeyType path) const {
             import std.algorithm;
             import std.range;
@@ -234,40 +349,83 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
             return current;
         }
 
-        bool has(in ComponentType component, in KeyType path) const {
+    /**
+     Check if requested property is present in component.
 
-            auto identities = path.splitter(this.separator);
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
 
-            ComponentType current = cast(ComponentType) component;
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+        bool has(in ComponentType component, in KeyType path) const nothrow {
 
-            foreach (identity; identities) {
-                if (!this.accessor.has(current, identity)) {
-                    return false;
+            try {
+
+                auto identities = path.splitter(this.separator);
+
+                ComponentType current = cast(ComponentType) component;
+
+                foreach (identity; identities) {
+                    if (!this.accessor.has(current, identity)) {
+                        return false;
+                    }
+
+                    if (this.accessor.has(current, identity)) {
+                        current = this.accessor.access(current, identity);
+                    }
                 }
 
-                if (this.accessor.has(current, identity)) {
-                    current = this.accessor.access(current, identity);
-                }
+                return true;
+            } catch (Exception e) {
+                error("Failed to access a property path ", path, " due to ", e).n;
             }
 
-            return true;
+            return false;
         }
 
-        TypeInfo componentType(ComponentType component) const {
+        /**
+        Identify the type of supported component.
+
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(ComponentType component) const nothrow {
             return this.accessor.componentType(component);
-        }
-
-        TypeInfo fieldType(ComponentType component, in KeyType property) const {
-            return this.accessor.fieldType(component, property);
         }
     }
 }
 
+/**
+ditto
+**/
 auto propertyPathAccessor(T : PropertyAccessor!(ComponentType, FieldType, KeyType), ComponentType, FieldType, KeyType)
     (ElementType!KeyType separator, T accessor) {
     return new PropertyPathAccessor!(ComponentType, FieldType, KeyType)(separator, accessor);
 }
 
+/**
+An accessor that allows accessing of a property and it's childs with array syntax.
+
+An accessor that allows accessing of a property and it's childs with array syntax.
+ImplSpec:
+    Two accessors are used for getting an indexed property's child. The first one is used
+    for accessing an indexed property of a component, and the second one is used for subsequent
+    access of child components recursively.
+**/
 class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType)
     if (isBidirectionalRange!KeyType) {
 
@@ -282,6 +440,15 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
 
     public {
 
+        /**
+        Constructor for array indexed accessor
+
+        Params:
+            beggining = beggining token denoting the start of an array indexing
+            ending = ending token denoting the end of an array indexing
+            accessor = accessor used to access property part of indexing sequence
+            indexer = accessor used to access indexed part of indexing sequence
+        **/
         this(EType beggining, EType ending, PropertyAccessor!(ComponentType, FieldType, KeyType) accessor, PropertyAccessor!(ComponentType, FieldType, KeyType) indexer) {
             this.beggining = beggining;
             this.ending = ending;
@@ -389,6 +556,17 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
             return this.indexer_;
         }
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         FieldType access(ComponentType component, in KeyType path) const {
             enforce!NotFoundException(this.has(component, path), text("Property ", path, " not found in ", component));
 
@@ -408,58 +586,95 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
             return property;
         }
 
-        bool has(in ComponentType component, in KeyType path) const {
+    /**
+     Check if requested property is present in component.
 
-            auto splitted = path.splitter(this.beggining);
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
 
-            if (splitted.empty) {
-                return false;
-            }
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+        bool has(in ComponentType component, in KeyType path) const nothrow {
 
-            if (splitted.front.empty) {
-                return false;
-            }
+            try {
 
-            if (!this.accessor.has(component, splitted.front)) {
-                return false;
-            }
+                auto splitted = path.splitter(this.beggining);
 
-            FieldType property = this.accessor.access(cast(ComponentType) component, splitted.front);
-            splitted.popFront;
-            if (splitted.empty) {
-                return false;
-            }
-
-            foreach (identity; splitted) {
-                if (!identity.endsWith(this.ending)) {
+                if (splitted.empty) {
                     return false;
                 }
 
-                if (!this.indexer.has(property, identity.dropBack(1))) {
+                if (splitted.front.empty) {
                     return false;
                 }
 
-                property = this.indexer.access(property, identity.dropBack(1));
+                if (!this.accessor.has(component, splitted.front)) {
+                    return false;
+                }
+
+                FieldType property = this.accessor.access(cast(ComponentType) component, splitted.front);
+                splitted.popFront;
+                if (splitted.empty) {
+                    return false;
+                }
+
+                foreach (identity; splitted) {
+                    if (!identity.endsWith(this.ending)) {
+                        return false;
+                    }
+
+                    if (!this.indexer.has(property, identity.dropBack(1))) {
+                        return false;
+                    }
+
+                    property = this.indexer.access(property, identity.dropBack(1));
+                }
+
+                return true;
+            } catch (Exception e) {
+                error("Failed to check existance of indexed path ", path, " due to ", e).n;
             }
 
-            return true;
+            return false;
         }
 
-        TypeInfo componentType(ComponentType component) const {
+        /**
+        Identify the type of supported component.
+
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(ComponentType component) const nothrow {
             return typeid(ComponentType);
-        }
-
-        TypeInfo fieldType(ComponentType component, in KeyType property) const {
-            return typeid(FieldType);
         }
     }
 }
 
+/**
+ditto
+**/
 auto arrayIndexedPropertyAccessor(T : PropertyAccessor!(ComponentType, FieldType, KeyType), ComponentType, FieldType, KeyType)
     (ElementType!KeyType beggining, ElementType!KeyType ending, T accessor, T indexer) {
     return new ArrayIndexedPropertyAccessor!(ComponentType, FieldType, KeyType)(beggining, ending, accessor, indexer);
 }
 
+/**
+Class that allows accessing properties that are wrapped in ticks.
+**/
 class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType)
     if (isBidirectionalRange!KeyType) {
 
@@ -472,6 +687,13 @@ class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType =
 
     public {
 
+        /**
+        Constructor for ticked accessor
+
+        Params:
+            tick = token used to tick the property
+            accessor = accessor used to access property wrapped in ticks
+        **/
         this(EType tick, PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) {
             this.tick = tick;
             this.accessor = accessor;
@@ -527,35 +749,97 @@ class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType =
             return this.accessor_;
         }
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         FieldType access(ComponentType component, in KeyType path) const {
             enforce!InvalidArgumentException(this.valid(path), text("Not found or malformed ticked property ", path));
 
             return this.accessor.access(component, path.drop(1).dropBack(1));
         }
 
+    /**
+     Check if requested property is present in component.
+
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
         bool has(in ComponentType component, in KeyType path) const {
 
-            return this.valid(path) && this.accessor.has(component, path.strip(this.tick));
+            try {
+
+                return this.valid(path) && this.accessor.has(component, path.strip(this.tick));
+            } catch (Exception e) {
+
+                error("Failed to check if ticked property exists due to: ", e).n;
+            }
+
+            return false;
         }
 
-        TypeInfo componentType(ComponentType component) const {
+        /**
+        Identify the type of supported component.
+
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(ComponentType component) const nothrow {
             return this.accessor.componentType(component);
         }
 
-        TypeInfo fieldType(ComponentType component, in KeyType property) const {
-            return this.accessor.fieldType(component, property);
-        }
+        private bool valid(in KeyType path) const nothrow {
+            try {
 
-        private bool valid(in KeyType path) const {
-            return (path.front == this.tick) && (path.back == this.tick);
+                return (path.front == this.tick) && (path.back == this.tick);
+            } catch (Exception e) {
+
+                error("Failed to check if path is ticked due to: ", e).n;
+            }
+
+            return false;
         }
     }
 }
 
+/**
+ditto
+**/
 auto tickedAccessor(T : PropertyAccessor!(ComponentType, FieldType, KeyType), ComponentType, FieldType, KeyType)(ElementType!KeyType tick, T accessor) {
     return new TickedPropertyAccessor!(ComponentType, FieldType, KeyType)(tick, accessor);
 }
 
+/**
+Property accessor that is decaying tagged algebraic to a type accepted by decorated accessor.
+
+ImplSpec:
+    Any tagged algebraic will be decayed to type X which is accepted by decorated property or fail to do so.
+    Any field returned from accessor are wrapped in same tagged algebraic, therefore there is a constraint that
+    tagged algebraic should be able to hold both the component and it's field.
+**/
 class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyAccessorType : PropertyAccessor!(X, Z, KeyType), X, Z, KeyType = string, Y) : PropertyAccessor!(Tagged, Tagged, KeyType) {
 
     private {
@@ -594,6 +878,17 @@ class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyA
             }
         }
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         Tagged access(Tagged component, in KeyType property) const
         {
             if (this.has(component, property)) {
@@ -605,51 +900,77 @@ class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyA
             throw new NotFoundException(text(component, " does not have ", property));
         }
 
-        bool has(in Tagged component, in KeyType property) const {
-            import std.meta;
-            import aermicioi.util.traits;
+    /**
+     Check if requested property is present in component.
 
-            static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
-                static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
-                    if (mixin("component.Kind." ~ e ~ " == component.kind")) {
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
 
-                        return this.accessor.has(cast(const(X)) component, property);
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+        bool has(in Tagged component, in KeyType property) const nothrow {
+            try {
+
+                import std.meta;
+                import aermicioi.util.traits;
+
+                static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
+                    static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
+                        if (mixin("component.Kind." ~ e ~ " == component.kind")) {
+
+                            return this.accessor.has(cast(const(X)) component, property);
+                        }
+
+                        return false;
                     }
-
-                    return false;
                 }
+
+                assert(false, "TaggedAlgebraic does not have " ~ fullyQualifiedName!X ~ " as member");
+
+            } catch (Exception e) {
+                error("Failed to unwrap tagged component ", component, " due to ", e).n;
             }
 
-            assert(false, "TaggedAlgebraic does not have " ~ fullyQualifiedName!X ~ " as member");
+            return false;
         }
 
-        TypeInfo componentType(Tagged component) const {
-            import std.meta;
-            import aermicioi.util.traits;
+        /**
+        Identify the type of supported component.
 
-            static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
-                static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
-                    if (mixin("component.Kind." ~ e ~ " == component.kind")) {
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
 
-                        return this.accessor.componentType(cast(X) component);
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(Tagged component) const nothrow {
+            try {
+
+                import std.meta;
+                import aermicioi.util.traits;
+
+                static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
+                    static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
+                        if (mixin("component.Kind." ~ e ~ " == component.kind")) {
+
+                            return this.accessor.componentType(cast(X) component);
+                        }
                     }
                 }
-            }
 
-            assert(false, "Got stored a value that is not in tagged algebraic");
-        }
-
-        TypeInfo fieldType(Tagged component, in KeyType property) const {
-            import std.meta;
-            import aermicioi.util.traits;
-
-            static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
-                static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
-                    if (mixin("component.Kind." ~ e ~ " == component.kind")) {
-
-                        return this.accessor.fieldType(cast(X) component, property);
-                    }
-                }
+            } catch (Exception e) {
+                error("Failed to unwrap tagged component ", component, " due to ", e).n;
             }
 
             assert(false, "Got stored a value that is not in tagged algebraic");
@@ -657,14 +978,31 @@ class TaggedElementPropertyAccessorWrapper(Tagged : TaggedAlgebraic!Y, PropertyA
     }
 }
 
+/**
+ditto
+**/
 auto taggedAccessor(Tagged, T : PropertyAccessor!(Composite, Field, Key), Composite, Field, Key)(T accessor) {
     return new TaggedElementPropertyAccessorWrapper!(Tagged, T)(accessor);
 }
 
+/**
+Implements logic for accessing associative arrays.
+**/
 class AssociativeArrayAccessor(Type, Key = Type) : PropertyAccessor!(Type[Key], Type, Key) {
 
     public {
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         Type access(Type[Key] component, in Key property) const {
             auto peek = property in component;
             enforce!NotFoundException(peek, text("Could not find ", property, " in associative array ", component));
@@ -672,44 +1010,114 @@ class AssociativeArrayAccessor(Type, Key = Type) : PropertyAccessor!(Type[Key], 
             return *peek;
         }
 
-        bool has(in Type[Key] component, in Key property) const {
+    /**
+     Check if requested property is present in component.
+
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+        bool has(in Type[Key] component, in Key property) const nothrow {
             return (property in component) !is null;
         }
 
-        TypeInfo componentType(Type[Key] component) const {
-            return typeid(Type[Key]);
-        }
+        /**
+        Identify the type of supported component.
 
-        TypeInfo fieldType(Type[Key] component, in Key property) const {
-            return typeid(Type);
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(Type[Key] component) const nothrow {
+            return typeid(Type[Key]);
         }
     }
 }
 
+/**
+Accessor implementing array access.
+**/
 class ArrayAccessor(Type) : PropertyAccessor!(Type[], Type, size_t) {
 
     public {
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         Type access(Type[] component, in size_t property) const {
             enforce!NotFoundException(this.has(component, property), text("Could not find property ", property, " in array ", component));
 
             return component[property];
         }
 
-        bool has(in Type[] component, in size_t property) const {
+    /**
+     Check if requested property is present in component.
+
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+        bool has(in Type[] component, in size_t property) const nothrow {
             return property < component.length;
         }
 
-        TypeInfo componentType(Type[] component) const {
-            return typeid(Type[]);
-        }
+        /**
+        Identify the type of supported component.
 
-        TypeInfo fieldType(Type[] component, in size_t property) const {
-            return typeid(Type);
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(Type[] component) const nothrow {
+            return typeid(Type[]);
         }
     }
 }
 
+/**
+Accessor implementing logic for accessingstd.variant.
+
+ImplSpec:
+    The accessor can accept any variant of ComponentType. The restriction is that the underlying stored data should be
+    of either associative array or dynamic array in order to access the contents of them. The return type is as well a
+    variant that must be able to store associative's array field, or arrays elements.
+**/
 class VariantAccessor(
     ComponentType,
     FieldType = ComponentType,
@@ -737,15 +1145,50 @@ class VariantAccessor(
 
     public {
         static foreach (KType; KeyTypes) {
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
             FieldType access(ComponentType component, KType key) const {
                 return this.access(component, KeyType(key));
             }
 
-            bool has(ComponentType component, KType key) const {
+    /**
+     Check if requested property is present in component.
+
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+            bool has(ComponentType component, KType key) const nothrow {
                 return this.has(component, KeyType(key));
             }
         }
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         FieldType access(ComponentType component, in KeyType key) const {
             static foreach (Component; ComponentTypes) {{
                 static if (
@@ -780,50 +1223,87 @@ class VariantAccessor(
             throw new NotFoundException(text("Could not find ", key, " in ", component));
         }
 
-        bool has(in ComponentType component, in KeyType key) const {
-            static foreach (Component; ComponentTypes) {{
-                static if (
-                    is(Component : X[W], X, W) &&
-                    anySatisfy!(ApplyLeft!(isD, X), FieldTypes) &&
-                    anySatisfy!(ApplyLeft!(isD, W), KeyTypes)
-                ) {
-                    if (
-                        (component.type is typeid(Component)) &&
-                        (key.type is typeid(W)) &&
-                        ((key.get!W in component.get!Component) !is null)
-                    ) {
-                        return true;
-                    }
-                }
+    /**
+     Check if requested property is present in component.
 
-                static if (
-                    is(Component : Y[], Y) &&
-                    anySatisfy!(ApplyLeft!(isD, Y), FieldTypes) &&
-                    anySatisfy!(ApplyLeft!(isD, size_t), KeyTypes)
-                ) {
-                    if (
-                        (component.type is typeid(Component)) &&
-                        (key.type is typeid(size_t)) &&
-                        (key.get!size_t < component.get!Component.length)
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+        bool has(in ComponentType component, in KeyType key) const nothrow {
+            try {
+                static foreach (Component; ComponentTypes) {{
+                    static if (
+                        is(Component : X[W], X, W) &&
+                        anySatisfy!(ApplyLeft!(isD, X), FieldTypes) &&
+                        anySatisfy!(ApplyLeft!(isD, W), KeyTypes)
                     ) {
-                        return true;
+                        if (
+                            (component.type is typeid(Component)) &&
+                            (key.type is typeid(W)) &&
+                            ((key.get!W in component.get!Component) !is null)
+                        ) {
+                            return true;
+                        }
                     }
-                }
-            }}
+
+                    static if (
+                        is(Component : Y[], Y) &&
+                        anySatisfy!(ApplyLeft!(isD, Y), FieldTypes) &&
+                        anySatisfy!(ApplyLeft!(isD, size_t), KeyTypes)
+                    ) {
+                        if (
+                            (component.type is typeid(Component)) &&
+                            (key.type is typeid(size_t)) &&
+                            (key.get!size_t < component.get!Component.length)
+                        ) {
+                            return true;
+                        }
+                    }
+                }}
+            } catch (Exception e) {
+                error("Accessing contents of a variant failed with following exception: ", e).n;
+            }
 
             return false;
         }
 
-        TypeInfo componentType(ComponentType component) const {
-            return typeid(ComponentType);
-        }
+        /**
+        Identify the type of supported component.
 
-        TypeInfo fieldType(ComponentType component, in KeyType property) const {
-            return typeid(FieldType);
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(ComponentType component) const nothrow {
+            return typeid(ComponentType);
         }
     }
 }
 
+/**
+Accessor that accepts ComponentType with it's type erased up to Object or wrapped in a Placeholder!ComponentType if it is
+not rooted into Object class (i.e. any value type, and extern c++ objects)
+
+ImplSpec:
+    The accessor will accept any object, after which it will attempt to downcast it's original type ComponentType if it is
+    rooted in Object, otherwise the object will be downcasted to Placeholder!ComponentType. Failing to do so will result in
+    an exception
+**/
 class RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(Object, FieldType, KeyType) {
     import aermicioi.aedi_property_reader.core.convertor : identify, unwrap;
     private {
@@ -860,34 +1340,80 @@ class RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyType
             return this.accessor_;
         }
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         FieldType access(Object component, in KeyType path) const {
+            enforce!InvalidArgumentException(component.identify is typeid(ComponentType), text("Invalid component passed ", component.identify, " when expected ", typeid(ComponentType)));
             enforce!NotFoundException(this.has(component, path), text("Could not find property ", path));
 
             return this.accessor.access(component.unwrap!ComponentType, path);
         }
 
-        bool has(in Object component, in KeyType path) const {
+    /**
+     Check if requested property is present in component.
 
-            return (component !is null) && component.unwrap!ComponentType && this.accessor.has(component.unwrap!ComponentType, path);
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+        bool has(in Object component, in KeyType path) const nothrow {
+            return (component !is null) &&
+                (component.identify is typeid(ComponentType)) &&
+                component.unwrap!ComponentType &&
+                this.accessor.has(component.unwrap!ComponentType, path);
         }
 
-        TypeInfo componentType(Object component) const {
-            TypeInfo type = component.identify;
+        /**
+        Identify the type of supported component.
 
-            if (type is typeid(ComponentType)) {
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(Object component) const nothrow {
+            if (component.identify is typeid(ComponentType)) {
 
                 return this.accessor.componentType(component.unwrap!ComponentType);
             }
 
-            return type;
-        }
-
-        TypeInfo fieldType(Object component, in KeyType property) const {
-            return this.accessor.fieldType(component.unwrap!ComponentType, property);
+            return typeid(void);
         }
     }
 }
 
+/**
+An accessor that erases returned property's type.
+
+ImplSpec:
+    The accessor will simply upcast any property field to Object if they are rooted in Object class, otherwise
+    it will allocate a Placeholder!FieldType for returned value and return it erased up to Object class. As such
+    it is advised to use an allocator that will dispose automatically it's contents once they are not required.
+    The accessor itself is not responsible for deallocation of placeholders that it returned. As a consequence
+    no components should point to placeholders allocated by this accessor.
+**/
 class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : AllocatingPropertyAccessor!(ComponentType, Object, KeyType) {
     import aermicioi.aedi_property_reader.core.convertor : identify, unwrap;
     import std.experimental.allocator;
@@ -929,6 +1455,17 @@ class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = s
             return this.accessor_;
         }
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         Object access(ComponentType component, in KeyType path) const {
             import aermicioi.aedi_property_reader.core.convertor : placeholder;
             enforce!NotFoundException(this.has(component, path), text("Could not find property ", path));
@@ -936,21 +1473,55 @@ class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = s
             return this.accessor.access(component, path).placeholder(cast() this.allocator);
         }
 
-        bool has(in ComponentType component, in KeyType path) const {
+    /**
+     Check if requested property is present in component.
+
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+        bool has(in ComponentType component, in KeyType path) const nothrow {
 
             return this.accessor.has(component, path);
         }
 
-        TypeInfo componentType(ComponentType component) const {
+        /**
+        Identify the type of supported component.
+
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(ComponentType component) const nothrow {
             return this.accessor.componentType(component);
         }
 
-        TypeInfo fieldType(ComponentType component, in KeyType property) const {
-            return this.accessor.fieldType(component, property);
-        }
     }
 }
 
+/**
+Accessor that allows access to fields and properties of a component of Type.
+
+ImplSpec:
+    The returned field will be erased up to Object class if it is rooted in Object class, or will
+    be placed into a Placeholder!(field type) that is allocated using an allocator. As such it is advised
+    that allocator used in the accessor to be disposable after accessing of components was done. As a consequence
+    no components should point to placeholders allocated by this accessor.
+**/
 class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string) {
     import std.traits;
     import std.meta;
@@ -966,6 +1537,17 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
             this.allocator = theAllocator;
         }
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
         Object access(Type component, in string property) const {
             foreach (string member; __traits(allMembers, Type)) {
 
@@ -987,7 +1569,20 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
             throw new NotFoundException(text(typeid(Type), " does not have ", property, " property"));
         }
 
-        bool has(in Type component, in string property) const {
+    /**
+     Check if requested property is present in component.
+
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+        bool has(in Type component, in string property) const nothrow {
 
             foreach (string member; __traits(allMembers, Type)) {
 
@@ -1009,33 +1604,38 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
             return false;
         }
 
-        TypeInfo componentType(Type component) const {
+        /**
+        Identify the type of supported component.
+
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(Type component) const nothrow {
             return typeid(Type);
         }
 
-        TypeInfo fieldType(Type component, in string property) const {
-            foreach (string member; __traits(allMembers, Type)) {
-
-                static if (isPublic!(component, member)) {
-                    if (member == property) {
-                        static if (
-                            isField!(Type, member) ||
-                            (
-                                isSomeFunction!(__traits(getMember, component, member)) &&
-                                anySatisfy!(isPropertyGetter, __traits(getOverloads, component, member)))
-                            ) {
-
-                            return typeid(typeof(__traits(getMember, component, member)));
-                        }
-                    }
-                }
-            }
-
-            throw new NotFoundException(text(typeid(Type), " does not have ", property, " property"));
-        }
     }
 }
 
+/**
+Creates a dlang dsl language for accessing properties out of a ComponentType.
+
+Params:
+    accessor = accessor used to access property like values
+    indexer = accessor used to access indexed like values
+
+Returns:
+    PropertyPathAccessor!(ComponentType, FieldType, KeyType) with dsl like configuration.
+**/
 auto dsl(ComponentType, FieldType, KeyType)(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor, PropertyAccessor!(ComponentType, FieldType, KeyType) indexer) {
     return new PropertyPathAccessor!(ComponentType, FieldType, KeyType)(
         '.',
@@ -1058,8 +1658,4 @@ auto dsl(ComponentType, FieldType, KeyType)(PropertyAccessor!(ComponentType, Fie
             )
         )
     );
-}
-
-private {
-    enum isD(T, X) = is(T : X);
 }

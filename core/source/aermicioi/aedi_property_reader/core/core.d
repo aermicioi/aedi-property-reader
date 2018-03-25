@@ -43,7 +43,7 @@ struct ConvertorContext(DocumentContainerType : DocumentContainer!(DocumentType,
     alias container this;
 
     ref typeof(this) register(To)(string identity) {
-        container.set(new AdvisedConvertor!(To, FieldType)(), identity);
+        container.set(AdvisedConvertor!(To, FieldType)(), identity);
 
         return this;
     }

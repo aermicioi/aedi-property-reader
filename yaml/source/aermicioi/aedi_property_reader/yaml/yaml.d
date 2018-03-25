@@ -90,7 +90,7 @@ auto yaml(Node value, RCIAllocator allocator = theAllocator) {
         string,
         SysTime
     )) {
-        container.set(new YamlConvertor!(T, Node), fullyQualifiedName!T);
+        container.set(YamlConvertor!(T, Node)(), fullyQualifiedName!T);
     }
 
     return container;

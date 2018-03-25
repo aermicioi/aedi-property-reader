@@ -39,21 +39,75 @@ import std.traits;
 import std.meta;
 import std.exception;
 
+/**
+Provides ability to set a property of FieldType into CompositeType.
+**/
 interface PropertySetter(CompositeType, FieldType = CompositeType, KeyType = string) {
 
     void set(ref CompositeType composite, FieldType value, KeyType property) const;
 
-    TypeInfo componentType(ref CompositeType composite) const;
+    /**
+     Identify the type of supported component.
+
+     Identify the type of supported component. It returns type info of component
+     if it is supported by accessor, otherwise it will return typeid(void) denoting that
+     the type isn't supported by accessor. The accessor is not limited to returning the type
+     info of passed component, it can actually return type info of super type or any type
+     given the returned type is implicitly convertible or castable to ComponentType.
+
+     Params:
+         component = the component for which accessor should identify the underlying type
+
+     Returns:
+         TypeInfo type information about passed component, or typeid(void) if component is not supported.
+     **/
+    TypeInfo componentType(ref CompositeType composite) const nothrow;
+
+    /**
+     Identify the type of supported component.
+
+     Identify the type of supported component. It returns type info of component
+     if it is supported by accessor, otherwise it will return typeid(void) denoting that
+     the type isn't supported by accessor. The accessor is not limited to returning the type
+     info of passed component, it can actually return type info of super type or any type
+     given the returned type is implicitly convertible or castable to ComponentType.
+
+     Params:
+         component = the component for which accessor should identify the underlying type
+
+     Returns:
+         TypeInfo type information about passed component, or typeid(void) if component is not supported.
+     **/
+    final TypeInfo componentType(CompositeType composite) const nothrow {
+        return this.componentType(composite);
+    }
 }
 
 class AssociativeArraySetter(Type, KeyType = Type) : PropertySetter!(Type[KeyType], Type, KeyType) {
 
-    void set(ref Type[KeyType] composite, Type field, KeyType key) const {
-        composite[key] = field;
-    }
+    public {
+        void set(ref Type[KeyType] composite, Type field, KeyType key) const {
+            composite[key] = field;
+        }
 
-    TypeInfo componentType(ref Type[KeyType] composite) const {
-        return typeid(Type[KeyType]);
+        /**
+         Identify the type of supported component.
+
+         Identify the type of supported component. It returns type info of component
+         if it is supported by accessor, otherwise it will return typeid(void) denoting that
+         the type isn't supported by accessor. The accessor is not limited to returning the type
+         info of passed component, it can actually return type info of super type or any type
+         given the returned type is implicitly convertible or castable to ComponentType.
+
+         Params:
+             component = the component for which accessor should identify the underlying type
+
+         Returns:
+             TypeInfo type information about passed component, or typeid(void) if component is not supported.
+         **/
+        TypeInfo componentType(ref Type[KeyType] composite) const nothrow {
+            return typeid(Type[KeyType]);
+        }
     }
 }
 
@@ -74,7 +128,37 @@ class ArraySetter(Type) : PropertySetter!(Type[], Type, size_t) {
         composite[key] = field;
     }
 
-    TypeInfo componentType(ref Type[] composite) const {
+    /**
+     Identify the type of supported component.
+
+     Identify the type of supported component. It returns type info of component
+     if it is supported by accessor, otherwise it will return typeid(void) denoting that
+     the type isn't supported by accessor. The accessor is not limited to returning the type
+     info of passed component, it can actually return type info of super type or any type
+     given the returned type is implicitly convertible or castable to ComponentType.
+
+     Params:
+         component = the component for which accessor should identify the underlying type
+
+     Returns:
+         TypeInfo type information about passed component, or typeid(void) if component is not supported.
+     **/
+    /**
+     Identify the type of supported component.
+
+     Identify the type of supported component. It returns type info of component
+     if it is supported by accessor, otherwise it will return typeid(void) denoting that
+     the type isn't supported by accessor. The accessor is not limited to returning the type
+     info of passed component, it can actually return type info of super type or any type
+     given the returned type is implicitly convertible or castable to ComponentType.
+
+     Params:
+         component = the component for which accessor should identify the underlying type
+
+     Returns:
+         TypeInfo type information about passed component, or typeid(void) if component is not supported.
+     **/
+    TypeInfo componentType(ref Type[] composite) const nothrow {
         return typeid(Type[]);
     }
 }
@@ -130,7 +214,22 @@ class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, st
         throw new NotFoundException(text("Component of type ", typeid(ComponentType), " does not have ", property, " property"));
     }
 
-    TypeInfo componentType(ref ComponentType composite) const {
+    /**
+     Identify the type of supported component.
+
+     Identify the type of supported component. It returns type info of component
+     if it is supported by accessor, otherwise it will return typeid(void) denoting that
+     the type isn't supported by accessor. The accessor is not limited to returning the type
+     info of passed component, it can actually return type info of super type or any type
+     given the returned type is implicitly convertible or castable to ComponentType.
+
+     Params:
+         component = the component for which accessor should identify the underlying type
+
+     Returns:
+         TypeInfo type information about passed component, or typeid(void) if component is not supported.
+     **/
+    TypeInfo componentType(ref ComponentType composite) const nothrow {
         return typeid(ComponentType);
     }
 }
@@ -177,8 +276,27 @@ class RuntimeCompositeSetter(Type, FieldType = Type, KeyType = string) : Propert
             this.setter.set(placeholder, field, key);
         }
 
-        TypeInfo componentType(ref Object composite) const {
-            return composite.identify;
+        /**
+        Identify the type of supported component.
+
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(ref Object composite) const nothrow {
+            if (composite.identify is typeid(Type)) {
+                return this.setter.componentType(composite.unwrap!Type);
+            }
+
+            return typeid(void);
         }
     }
 }
@@ -224,7 +342,22 @@ class RuntimeFieldSetter(Type, FieldType = Type, KeyType = string) : PropertySet
             this.setter.set(composite, field.unwrap!FieldType, key);
         }
 
-        TypeInfo componentType(ref Type composite) const {
+        /**
+        Identify the type of supported component.
+
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(ref Type composite) const nothrow {
             return typeid(Type);
         }
     }

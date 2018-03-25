@@ -37,6 +37,8 @@ import std.conv;
 import std.experimental.allocator;
 import std.exception : enforce;
 import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.core.setter;
+import aermicioi.aedi_property_reader.core.inspector;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import std.algorithm;
 import std.array;
@@ -249,7 +251,7 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
                 }
             } else {
 
-                auto wrapper = (cast(Wrapper!(Info.From)) from);
+                auto wrapper = (cast(Placeholder!(Info.From)) from);
 
                 if (wrapper is null) {
                     throw new ConvertorException(text("Cannot convert ", from.identify, " only supported ", this.from));
@@ -277,7 +279,7 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
 
                 destructor(converted, allocator);
             } else {
-                auto container = cast(Wrapper!(Info.To)) converted;
+                auto container = cast(Placeholder!(Info.To)) converted;
 
                 destructor(container.value);
                 allocator.dispose(converted);
@@ -375,7 +377,7 @@ class RuntimeConvertor(alias convertor, alias destructor)
                 }
             } else {
 
-                auto wrapper = (cast(Wrapper!(Info.From)) from);
+                auto wrapper = (cast(Placeholder!(Info.From)) from);
 
                 if (wrapper is null) {
                     throw new ConvertorException(text("Cannot convert ", from.identify, " only supported ", this.from));
@@ -403,7 +405,7 @@ class RuntimeConvertor(alias convertor, alias destructor)
 
                 destructor(converted, this.convertor, allocator);
             } else {
-                auto container = cast(Wrapper!(Info.To)) converted;
+                auto container = cast(Placeholder!(Info.To)) converted;
 
                 destructor(container.value, this.convertor);
                 allocator.dispose(converted);
@@ -574,7 +576,7 @@ To convert(To, From)(Convertor convertor, From from, RCIAllocator allocator = th
         Object converted = convertor.convert(from, typeid(To), allocator);
     } else {
 
-        Object converted = convertor.convert(scoped!(WrapperImpl!From)(from), typeid(To), allocator);
+        Object converted = convertor.convert(scoped!(PlaceholderImpl!From)(from), typeid(To), allocator);
     }
 
     static if (is(To : Object)) {
@@ -583,28 +585,74 @@ To convert(To, From)(Convertor convertor, From from, RCIAllocator allocator = th
     } else {
 
         scope(exit) allocator.dispose(converted);
-        return (cast(Wrapper!To) converted).value;
+        return (cast(Placeholder!To) converted).value;
     }
 }
 
-interface Placeholder {
-    TypeInfo type() const;
+interface Placeholder(T) : TypeAware {
+
+    @property {
+
+        ref inout(T) value() nothrow @safe inout;
+        ref T value(ref T value) nothrow @safe;
+
+        final ref T value(T value) {
+            return this.value(value);
+        }
+
+        alias value this;
+    }
 }
 
-class PlaceholderImpl(T) : WrapperImpl!T, Placeholder {
+interface TypeAware {
+    TypeInfo type() const nothrow @property;
+}
+
+class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
+
+    private {
+        T payload;
+    }
 
     this() @disable;
 
     this(ref T value) {
-        super(value);
+        this.value = value;
     }
 
     this(T value) {
-        super(value);
+        this(value);
     }
 
     TypeInfo type() const {
         return typeid(T);
+    }
+
+    @property {
+        /**
+        Set value
+
+        Params:
+            value = value to be stored
+
+        Returns:
+            value
+        **/
+        ref T value(ref T value) @safe nothrow {
+            this.payload = value;
+
+            return this.payload;
+        }
+
+        /**
+        Get value
+
+        Returns:
+            ref T
+        **/
+        ref inout(T) value() @safe nothrow inout {
+            return this.payload;
+        }
     }
 }
 
@@ -616,32 +664,39 @@ auto placeholder(T)(auto ref T value, RCIAllocator allocator = theAllocator) {
     }
 }
 
-auto unwrap(T)(inout(Object) object) {
+auto unwrap(T)(inout(Object) object) nothrow {
+    import aermicioi.aedi_property_reader.core.traits : n;
     static if (is(T : Object)) {
 
         return cast(T) object;
     } else {
 
-        auto wrapper = (cast(Wrapper!T) object);
+        auto wrapper = (cast(Placeholder!T) object);
 
-        assert(wrapper !is null, text(object.classinfo, " does not implement ", typeid(Wrapper!T), " ", typeid(T), " content cannot be extracted"));
+        assert(wrapper !is null, text(object.classinfo, " does not implement ", typeid(Placeholder!T), " ", typeid(T), " content cannot be extracted")).n;
 
         return wrapper;
     }
 }
 
-TypeInfo identify(in Object object) {
+TypeInfo identify(T : Object)(in T object) nothrow {
     if (object is null) {
         return typeid(null);
     }
 
-    Placeholder p = cast(Placeholder) object;
+    TypeAware p = cast(TypeAware) object;
 
     if (p !is null) {
         return p.type;
     }
 
     return object.classinfo;
+}
+
+TypeInfo identify(T)(in T type)
+    if (!is(T : Object)) {
+
+    return typeid(T);
 }
 
 template AdvisedConvertor(alias convertor, alias destructor) {
@@ -653,7 +708,7 @@ template AdvisedConvertor(alias convertor, alias destructor) {
 
         static if (ConvertorInfo.Yes && DestructorInfo.Yes) {
 
-            alias AdvisedConvertor = CallbackConvertor!(ConvertorInfo.Convertor, DestructorInfo.Destructor);
+            alias AdvisedConvertor = () => new CallbackConvertor!(ConvertorInfo.Convertor, DestructorInfo.Destructor);
         } else {
 
             import std.traits : fullyQualifiedName;
@@ -662,7 +717,7 @@ template AdvisedConvertor(alias convertor, alias destructor) {
                 fullyQualifiedName!From,
                 " to ",
                 fullyQualifiedName!To,
-                " ",
+                " when ",
                 fullyQualifiedName!convertor,
                 " implements convertor ",
                 ConvertorInfo.Yes,
@@ -674,3 +729,64 @@ template AdvisedConvertor(alias convertor, alias destructor) {
         }
     }
 }
+
+template AdvisedConvertor(alias Accessor, alias Setter, alias FromInspector, alias ToInspector) {
+    template AdvisedConvertor(To, From)
+        if (isAggregate!To && isAggregate!From) {
+
+        static if (
+            is (typeof(Accessor!From)) &&
+            is (typeof(Setter!To)) &&
+            is (typeof(FromInspector!From)) &&
+            is (typeof(ToInspector!To))
+        ) {
+            alias AdvisedConvertor = () => {
+                import aermicioi.aedi_property_reader.core.mapper : CompositeMapper;
+                import aermicioi.aedi_property_reader.core.inspector : Inspector;
+                import aermicioi.aedi_property_reader.core.accessor : CompositeAccessor;
+                import aermicioi.aedi_property_reader.core.setter : CompositeSetter;
+
+                auto convertor = new CompositeConvertor!(To, From)();
+                CompositeMapper!(From, To) mapper = new CompositeMapper!(From, To)();
+                mapper.fromInspector = new FromInspector!From;
+                mapper.toInspector = new ToInspector!To;
+                mapper.accessor = new Accessor!From;
+                mapper.setter = new Setter!To;
+                convertor.mapper = mapper;
+                return convertor;
+            };
+        } else {
+
+            import std.traits : fullyQualifiedName;
+            static assert(false, text(
+                "Cannot convert type ",
+                fullyQualifiedName!From,
+                " to ",
+                fullyQualifiedName!To,
+                " when ",
+                fullyQualifiedName!Accessor,
+                " is able to access ",
+                is (typeof(Accessor!From)),
+                ", ",
+                fullyQualifiedName!Setter,
+                " is able to set ",
+                is (typeof(Setter!To)),
+                ", ",
+                fullyQualifiedName!FromInspector,
+                " is able to inspect ",
+                is (typeof(FromInspector!From)),
+                ", ",
+                fullyQualifiedName!ToInspector,
+                " is able to inspect ",
+                is (typeof(ToInspector!To))
+            ));
+        }
+    }
+}
+
+alias CompositeConvertor = AdvisedConvertor!(
+    CompositeAccessor,
+    CompositeSetter,
+    CompositeInspector,
+    CompositeInspector
+);

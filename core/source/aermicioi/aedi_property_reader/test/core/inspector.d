@@ -44,7 +44,7 @@ unittest {
     auto inspector = new AssociativeArrayInspector!string;
 
     assert(inspector.typeOf(elems, "foo") is typeid(string));
-    assertThrown!NotFoundException(inspector.typeOf(elems, "boo") is typeid(string));
+    assert(inspector.typeOf(elems, "boo") is typeid(string));
 
     assert(inspector.properties(elems).sort.equal(["foo", "moo"]));
     assert(inspector.has(elems, "foo"));
@@ -60,7 +60,7 @@ unittest {
     auto inspector = new ArrayInspector!string;
 
     assert(inspector.typeOf(elems, 0) is typeid(string));
-    assertThrown!NotFoundException(inspector.typeOf(elems, 2) is typeid(string));
+    assert(inspector.typeOf(elems, 2) is typeid(void));
 
     assert(inspector.properties(elems).sort.equal([0, 1]));
     assert(inspector.has(elems, 0));
@@ -106,7 +106,7 @@ unittest {
     assert(inspector.typeOf(p, "moo") is typeid(string));
     assert(inspector.typeOf(p, "getter") is typeid(int));
     assert(inspector.typeOf(p, "loo") is typeid(long));
-    assertThrown!NotFoundException(inspector.typeOf(p, "poo") is typeid(long));
+    assert(inspector.typeOf(p, "poo") is typeid(void));
 
     assert(inspector.properties(p).sort.equal(["foo", "getter", "getter_", "loo", "moo"]));
 }

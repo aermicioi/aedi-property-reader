@@ -36,6 +36,8 @@ import taggedalgebraic : TaggedAlgebraic;
 import std.exception;
 import std.algorithm;
 import std.array;
+import std.experimental.logger;
+import aermicioi.aedi_property_reader.core.traits : n;
 
 union XmlElementUnion {
     string attribute;
@@ -44,8 +46,22 @@ union XmlElementUnion {
 
 alias XmlElement = TaggedAlgebraic!XmlElementUnion;
 
+/**
+An accessor allowing access to child xml elements out of a parent element by their name
+**/
 class XmlElementPropertyAccessor : PropertyAccessor!Element {
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
     Element access(Element component, in string property) const {
 
         if (this.has(component, property)) {
@@ -55,23 +71,59 @@ class XmlElementPropertyAccessor : PropertyAccessor!Element {
         throw new NotFoundException("Xml tag " ~ component.toString ~ " doesn't have child " ~ property);
     }
 
-    bool has(in Element component, string property) const {
-        enforce!Exception(component !is null, "Cannot access " ~ property ~ " of null component");
+    /**
+     Check if requested property is present in component.
 
-        return component.elements.canFind!(e => e.tag.name == property);
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+    bool has(in Element component, string property) const nothrow {
+        return (component !is null) && component.elements.canFind!(e => e.tag.name == property);
     }
 
-    TypeInfo componentType(Element component) const {
-        return typeid(Element);
-    }
+    /**
+     Identify the type of supported component.
 
-    TypeInfo fieldType(Element component, in string property) const {
+     Identify the type of supported component. It returns type info of component
+     if it is supported by accessor, otherwise it will return typeid(void) denoting that
+     the type isn't supported by accessor. The accessor is not limited to returning the type
+     info of passed component, it can actually return type info of super type or any type
+     given the returned type is implicitly convertible or castable to ComponentType.
+
+     Params:
+         component = the component for which accessor should identify the underlying type
+
+     Returns:
+         TypeInfo type information about passed component, or typeid(void) if component is not supported.
+     **/
+    TypeInfo componentType(Element component) const nothrow {
         return typeid(Element);
     }
 }
 
+/**
+An accessor allowing access of child xml elements by their index in parent element
+**/
 class XmlElementIndexAccessor : PropertyAccessor!Element {
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
     Element access(Element component, in string property) const {
 
         if (this.has(component, property)) {
@@ -83,14 +135,48 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
         throw new NotFoundException("Xml tag " ~ component.toString ~ " doesn't have child on index " ~ property);
     }
 
-    bool has(in Element component, string property) const {
-        import std.string;
-        import std.conv;
-        enforce!Exception(component !is null, "Cannot access " ~ property ~ " of null component");
+    /**
+     Check if requested property is present in component.
 
-        return property.isNumeric && (component.elements.length > property.to!size_t);
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+    bool has(in Element component, string property) const nothrow {
+        try {
+            import std.string;
+            import std.conv;
+
+            return (component !is null) && property.isNumeric && (component.elements.length > property.to!size_t);
+        } catch (Exception e) {
+
+            error("Failed to check property ", property, " existence due to ", e).n;
+        }
+
+        return false;
     }
 
+    /**
+     Identify the type of supported component.
+
+     Identify the type of supported component. It returns type info of component
+     if it is supported by accessor, otherwise it will return typeid(void) denoting that
+     the type isn't supported by accessor. The accessor is not limited to returning the type
+     info of passed component, it can actually return type info of super type or any type
+     given the returned type is implicitly convertible or castable to ComponentType.
+
+     Params:
+         component = the component for which accessor should identify the underlying type
+
+     Returns:
+         TypeInfo type information about passed component, or typeid(void) if component is not supported.
+     **/
     TypeInfo componentType(Element component) const {
         return typeid(Element);
     }
@@ -101,6 +187,17 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
 }
 
 class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
     string access(Element component, in string property) const {
 
         if (this.has(component, property)) {
@@ -110,17 +207,40 @@ class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
         throw new NotFoundException("Xml tag " ~ component.toString ~ " doesn't have attribute " ~ property);
     }
 
-    bool has(in Element component, in string property) const {
-        enforce!Exception(component !is null, "Cannot access " ~ property ~ " of null component");
+    /**
+     Check if requested property is present in component.
 
-        return (property in component.tag.attr) !is null;
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+    bool has(in Element component, in string property) const nothrow {
+        return (component !is null) && ((property in component.tag.attr) !is null);
     }
 
-    TypeInfo componentType(Element component) const {
+    /**
+     Identify the type of supported component.
+
+     Identify the type of supported component. It returns type info of component
+     if it is supported by accessor, otherwise it will return typeid(void) denoting that
+     the type isn't supported by accessor. The accessor is not limited to returning the type
+     info of passed component, it can actually return type info of super type or any type
+     given the returned type is implicitly convertible or castable to ComponentType.
+
+     Params:
+         component = the component for which accessor should identify the underlying type
+
+     Returns:
+         TypeInfo type information about passed component, or typeid(void) if component is not supported.
+     **/
+    TypeInfo componentType(Element component) const nothrow {
         return typeid(Element);
     }
 
-    TypeInfo fieldType(Element component, in string property) const {
-        return typeid(string);
-    }
 }

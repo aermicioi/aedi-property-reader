@@ -82,7 +82,7 @@ auto properd(string[string] value, RCIAllocator allocator = theAllocator) {
 
     static if (is(StringToScalarConvTypeGuesser: StdConvTypeGuesser!(S, ToTypes), S, ToTypes...)) {
         static foreach (To; ToTypes) {
-            container.set(new StdConvAdvisedConvertor!(To, S), fullyQualifiedName!To);
+            container.set(StdConvAdvisedConvertor!(To, S)(), fullyQualifiedName!To);
         }
     }
 

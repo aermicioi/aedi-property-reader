@@ -298,13 +298,3 @@ class AdvisedDocumentContainer(DocumentType, FieldType, alias AdvisedConvertor) 
         }
     }
 }
-
-class AdvisedComponentContainer(DocumentType, Object, alias AdvisedConvertor = NoOpConvertor) : DocumentContainer!(DocumentType, Object) {
-
-    public {
-
-        this(DocumentType document) {
-            super(document);
-        }
-    }
-}

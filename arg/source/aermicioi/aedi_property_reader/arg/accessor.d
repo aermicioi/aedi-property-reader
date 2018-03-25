@@ -37,6 +37,9 @@ import std.string;
 import std.conv;
 import std.range;
 
+/**
+Accessor filtering a list of strings out of strings that are not containing a command line property
+**/
 class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
 
     private static struct Filter {
@@ -45,107 +48,147 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
         const(string)[] component;
         const(string)[] buff;
 
-        this(const(string)[] component, string property) {
-            this.component = component;
-            this.property = property;
-            take(1);
-        }
-
-        Filter save() {
-            return this;
-        }
-
-        string front() {
-
-            return buff[0];
-        }
-
-        void popFront() {
-            if (buff.length > 1) {
-
-                buff = buff.drop(1);
-                return;
+        nothrow {
+            this(const(string)[] component, string property) {
+                this.component = component;
+                this.property = property;
+                take(1);
             }
 
-            if (buff.length > 0) {
-
-                buff = buff.drop(1);
-                this.advance;
+            Filter save() {
+                return this;
             }
-        }
 
-        bool empty() {
-            return buff.empty && component.empty;
-        }
+            string front() {
 
-        private void take(size_t amount = 1) {
-            buff = (component.length >= amount) ? component.take(amount) : component.take(component.length);
-            component = (component.length >= amount) ? component.drop(amount) : component.drop(component.length);
-        }
+                return buff[0];
+            }
 
-        private void advance() {
-            while (!component.empty) {
+            void popFront() {
+                if (buff.length > 1) {
 
-                if (component.front.commonPrefix("--").equal("--")) {
-                    auto splitted = component.front.splitter("=");
-
-                    if ((splitted.front.strip('-') == property) && !splitted.take(1).empty) {
-                        take(1);
-                        return;
-                    }
-
-                    if ((component.length > 1) && (splitted.front.strip('-') == property) && splitted.drop(1).front.commonPrefix("--").empty) {
-                        take(2);
-                        return;
-                    }
-                }
-
-                if (component.front.commonPrefix("--").equal("-")) {
-                    import std.stdio;
-
-                    if ((component.front.strip('-').equal(property)) || ((property.length == 1) && component.front.strip('-').canFind(property))) {
-                        take(1);
-                        return;
-                    }
-                }
-
-                if (!component.front.splitter("=").drop(1).empty && component.front.splitter("=").front.equal(property)) {
-                    take(1);
+                    buff = buff.drop(1);
                     return;
                 }
 
-                if (property.isNumeric) {
-                    auto up = property.to!size_t;
-                    size_t current;
+                if (buff.length > 0) {
 
-                    auto count = component.countUntil!(c => c.commonPrefix("--").empty && c.splitter("=").drop(1).empty && (current++ == up));
-                    component = component.drop(count);
-                    take(1);
-                    component = null;
-                    return;
+                    buff = buff.drop(1);
+                    this.advance;
                 }
+            }
 
-                component = component.empty ? component : component.drop(1);
+            bool empty() {
+                return buff.empty && component.empty;
+            }
+
+            private void take(size_t amount = 1) {
+                buff = (component.length >= amount) ? component.take(amount) : component.take(component.length);
+                component = (component.length >= amount) ? component.drop(amount) : component.drop(component.length);
+            }
+
+            private void advance() {
+                while (!component.empty) {
+                    try {
+
+                        if (component.front.commonPrefix("--").equal("--")) {
+                            auto splitted = component.front.splitter("=");
+
+                            if ((splitted.front.strip('-') == property) && !splitted.take(1).empty) {
+                                take(1);
+                                return;
+                            }
+
+                            if ((component.length > 1) && (splitted.front.strip('-') == property) && splitted.drop(1).front.commonPrefix("--").empty) {
+                                take(2);
+                                return;
+                            }
+                        }
+
+                        if (component.front.commonPrefix("--").equal("-")) {
+                            import std.stdio;
+
+                            if ((component.front.strip('-').equal(property)) || ((property.length == 1) && component.front.strip('-').canFind(property))) {
+                                take(1);
+                                return;
+                            }
+                        }
+
+                        if (!component.front.splitter("=").drop(1).empty && component.front.splitter("=").front.equal(property)) {
+                            take(1);
+                            return;
+                        }
+
+                        if (property.isNumeric) {
+                            auto up = property.to!size_t;
+                            size_t current;
+
+                            auto count = component.countUntil!(c => c.commonPrefix("--").empty && c.splitter("=").drop(1).empty && (current++ == up));
+                            component = component.drop(count);
+                            take(1);
+                            component = null;
+                            return;
+                        }
+
+                        component = component.empty ? component : component.drop(1);
+                    } catch (Exception e) {
+                        assert(false, text("Could not filter out command line arguments for ", property));
+                    }
+                }
             }
         }
-
-
     }
 
+    /**
+     Get a property out of component
+
+     Params:
+         component = a component which has some properties identified by property.
+     Throws:
+         NotFoundException in case when no requested property is available.
+         InvalidArgumentException in case when passed arguments are somehow invalid for use.
+     Returns:
+         FieldType accessed property.
+     **/
     const(string)[] access(const(string)[] component, string property) const {
 
         return Filter(component, property).array;
     }
 
-    bool has(in const(string)[] component, string property) const {
+    /**
+     Check if requested property is present in component.
+
+     Check if requested property is present in component.
+     The method could have allocation side effects due to the fact that
+     it is not restricted in calling access method of the accessor.
+
+     Params:
+         component = component which is supposed to have property
+         property = speculated property that is to be tested if it is present in component
+     Returns:
+         true if property is in component
+     **/
+    bool has(in const(string)[] component, string property) const nothrow {
 
         return !Filter(component, property).empty;
     }
 
-    TypeInfo componentType(const(string)[] component) const {
-        return typeid(const(string)[]);
-    }
-    TypeInfo fieldType(const(string)[] component, in string property) const {
+    /**
+     Identify the type of supported component.
+
+     Identify the type of supported component. It returns type info of component
+     if it is supported by accessor, otherwise it will return typeid(void) denoting that
+     the type isn't supported by accessor. The accessor is not limited to returning the type
+     info of passed component, it can actually return type info of super type or any type
+     given the returned type is implicitly convertible or castable to ComponentType.
+
+     Params:
+         component = the component for which accessor should identify the underlying type
+
+     Returns:
+         TypeInfo type information about passed component, or typeid(void) if component is not supported.
+     **/
+    TypeInfo componentType(const(string)[] component) const nothrow {
         return typeid(const(string)[]);
     }
 }

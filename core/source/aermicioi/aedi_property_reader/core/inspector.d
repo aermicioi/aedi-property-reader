@@ -36,58 +36,191 @@ import std.conv;
 import aermicioi.util.traits : isPropertyGetter, isPropertySetter, isPublic, isField;
 import aermicioi.aedi : NotFoundException;
 import aermicioi.aedi_property_reader.core.convertor : unwrap, identify;
+import aermicioi.aedi_property_reader.core.traits : isD;
+import taggedalgebraic;
 
+/**
+Provides type and field information of a composite component at runtime.
+**/
 interface Inspector(ComponentType, KeyType = string) {
 
-    TypeInfo typeOf(ComponentType component, in KeyType property) const;
+    /**
+    Identify the type of child field of component.
 
-    TypeInfo typeOf(ComponentType component) const;
+    Params:
+        component = a composite component (class, struct, assoc array etc.) containing some fields
 
-    bool has(ComponentType component, in KeyType property) const;
+    Returns:
+        Type of field, or typeid(void) if field is not present in component
+    **/
+    TypeInfo typeOf(ComponentType component, in KeyType property) const nothrow;
 
-    KeyType[] properties(ComponentType component) const;
+    /**
+    Identify the type of component itself.
+
+    Identify the type of component itself. It will inspect the component and will return accurate
+    type info that the component represents.
+
+    Params:
+        component = component which should be identified.
+
+    Returns:
+        Type info of component, or typeid(void) if component cannot be identified by inspector
+    **/
+    TypeInfo typeOf(ComponentType component) const nothrow;
+
+    /**
+    Check if component has a field or a property.
+
+    Params:
+        component = component with fields
+        property = component property that is tested for existence
+
+    Returns:
+        true if field is present either in readonly, or writeonly form (has getters and setters).
+    **/
+    bool has(ComponentType component, in KeyType property) const nothrow;
+
+    /**
+    Return a list of properties that component holds.
+
+    Params:
+        component = the component with fields
+
+    Returns:
+        an arary of property identities.
+    **/
+    KeyType[] properties(ComponentType component) const nothrow;
 }
 
+/**
+Associative array inspector.
+**/
 class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspector!(ComponentType[KeyType], KeyType) {
 
-    TypeInfo typeOf(ComponentType[KeyType] component, in KeyType property) const {
-        enforce!NotFoundException(this.has(component, property), text("No ", property, " property for ", component, " found"));
+    /**
+    Identify the type of child field of component.
+
+    Params:
+        component = a composite component (class, struct, assoc array etc.) containing some fields
+
+    Returns:
+        Type of field, or typeid(void) if field is not present in component
+    **/
+    TypeInfo typeOf(ComponentType[KeyType] component, in KeyType property) const nothrow {
 
         return typeid(ComponentType);
     }
 
-    TypeInfo typeOf(ComponentType[KeyType] component) const {
+    /**
+    Identify the type of component itself.
+
+    Identify the type of component itself. It will inspect the component and will return accurate
+    type info that the component represents.
+
+    Params:
+        component = component which should be identified.
+
+    Returns:
+        Type info of component, or typeid(void) if component cannot be identified by inspector
+    **/
+    TypeInfo typeOf(ComponentType[KeyType] component) const nothrow {
         return typeid(ComponentType[KeyType]);
     }
 
-    bool has(ComponentType[KeyType] component, in KeyType property) const {
+    /**
+    Check if component has a field or a property.
+
+    Params:
+        component = component with fields
+        property = component property that is tested for existence
+
+    Returns:
+        true if field is present either in readonly, or writeonly form (has getters and setters).
+    **/
+    bool has(ComponentType[KeyType] component, in KeyType property) const nothrow {
         return (property in component) !is null;
     }
 
-    KeyType[] properties(ComponentType[KeyType] component) const {
+    /**
+    Return a list of properties that component holds.
+
+    Params:
+        component = the component with fields
+
+    Returns:
+        an arary of property identities.
+    **/
+    KeyType[] properties(ComponentType[KeyType] component) const nothrow {
         import std.array;
 
         return component.byKey.array;
     }
 }
 
+/**
+Array inspector
+**/
 class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t) {
 
-    TypeInfo typeOf(ComponentType[] component, in size_t property) const {
-        enforce!NotFoundException(this.has(component, property), text("No ", property, " property for ", component, " found"));
+    /**
+    Identify the type of child field of component.
 
-        return typeid(ComponentType);
+    Params:
+        component = a composite component (class, struct, assoc array etc.) containing some fields
+
+    Returns:
+        Type of field, or typeid(void) if field is not present in component
+    **/
+    TypeInfo typeOf(ComponentType[] component, in size_t property) const nothrow {
+        if (property < component.length) {
+
+            return typeid(ComponentType);
+        }
+
+        return typeid(void);
     }
 
-    TypeInfo typeOf(ComponentType[] component) const {
+    /**
+    Identify the type of component itself.
+
+    Identify the type of component itself. It will inspect the component and will return accurate
+    type info that the component represents.
+
+    Params:
+        component = component which should be identified.
+
+    Returns:
+        Type info of component, or typeid(void) if component cannot be identified by inspector
+    **/
+    TypeInfo typeOf(ComponentType[] component) const nothrow {
         return typeid(ComponentType[]);
     }
 
-    bool has(ComponentType[] component, in size_t property) const {
+    /**
+    Check if component has a field or a property.
+
+    Params:
+        component = component with fields
+        property = component property that is tested for existence
+
+    Returns:
+        true if field is present either in readonly, or writeonly form (has getters and setters).
+    **/
+    bool has(ComponentType[] component, in size_t property) const nothrow {
         return component.length > property;
     }
 
-    size_t[] properties(ComponentType[] component) const {
+    /**
+    Return a list of properties that component holds.
+
+    Params:
+        component = the component with fields
+
+    Returns:
+        an arary of property identities.
+    **/
+    size_t[] properties(ComponentType[] component) const nothrow {
         import std.array;
         import std.range;
 
@@ -95,40 +228,255 @@ class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t) {
     }
 }
 
-class CompositeInspector(ComponentType) : Inspector!(ComponentType, string)
-    if (isAggregateType!ComponentType) {
+class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : Inspector!Type, Type) : Inspector!Tagged
+    if (anySatisfy!(ApplyRight!(isD, Type), Fields!Union)) {
 
-    TypeInfo typeOf(ComponentType component, in string property) const {
-        enforce!NotFoundException(this.has(component, property), text("No ", property, " property for ", component, " found"));
+    private {
+        Inspector!Type inspector_;
+    }
 
-        static foreach (member; __traits(allMembers, ComponentType)) {
-            static if (isPublic!(ComponentType, member)) {{
-                alias m = Alias!(__traits(getMember, component, member));
-                if (member == property) {
-                    static if (
-                        isField!(ComponentType, member) ||
-                        (isSomeFunction!m && anySatisfy!(isPropertyGetter, __traits(getOverloads, component, member)))
-                    ) {
+    @property {
+        /**
+        Set inspector
 
-                        return typeid(typeof(__traits(getMember, component, member)));
+        Params:
+            inspector = inspector used to inspect underlying tagged value
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) inspector(Inspector!Type inspector) @safe nothrow pure {
+            this.inspector_ = inspector;
+
+            return this;
+        }
+
+        /**
+        Get inspector
+
+        Returns:
+            Inspector!Type
+        **/
+        inout(Inspector!Type) inspector() @safe nothrow pure inout {
+            return this.inspector_;
+        }
+    }
+
+    /**
+    Identify the type of child field of component.
+
+    Params:
+        component = a composite component (class, struct, assoc array etc.) containing some fields
+
+    Returns:
+        Type of field, or typeid(void) if field is not present in component
+    **/
+    TypeInfo typeOf(Tagged component, in string property) const nothrow {
+        try {
+
+            import std.meta;
+            import aermicioi.util.traits;
+
+            static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
+                static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
+                    if (mixin("component.Kind." ~ e ~ " == component.kind")) {
+
+                        return this.inspector.typeOf(cast(const(Type)) component, property);
                     }
+
+                    return typeid(void);
                 }
-            }}
+            }
+
+        } catch (Exception e) {
+            error("Failed to unwrap tagged component ", component, " due to ", e).n;
         }
 
         return typeid(void);
     }
 
-    TypeInfo typeOf(ComponentType component) const {
+    /**
+    Identify the type of component itself.
+
+    Identify the type of component itself. It will inspect the component and will return accurate
+    type info that the component represents.
+
+    Params:
+        component = component which should be identified.
+
+    Returns:
+        Type info of component, or typeid(void) if component cannot be identified by inspector
+    **/
+    TypeInfo typeOf(ComponentType component) const nothrow {
+        try {
+
+            import std.meta;
+            import aermicioi.util.traits;
+
+            static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
+                static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
+                    if (mixin("component.Kind." ~ e ~ " == component.kind")) {
+
+                        return this.inspector.typeOf(cast(const(Type)) component);
+                    }
+
+                    return typeid(void);
+                }
+            }
+
+        } catch (Exception e) {
+            error("Failed to unwrap tagged component ", component, " due to ", e).n;
+        }
+
+        return typeid(void);
+    }
+
+    /**
+    Check if component has a field or a property.
+
+    Params:
+        component = component with fields
+        property = component property that is tested for existence
+
+    Returns:
+        true if field is present either in readonly, or writeonly form (has getters and setters).
+    **/
+    bool has(ComponentType component, in KeyType property) const nothrow {
+        try {
+
+            import std.meta;
+            import aermicioi.util.traits;
+
+            static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
+                static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
+                    if (mixin("component.Kind." ~ e ~ " == component.kind")) {
+
+                        return this.inspector.has(cast(const(Type)) component, property);
+                    }
+
+                    return false;
+                }
+            }
+
+        } catch (Exception e) {
+            error("Failed to unwrap tagged component ", component, " due to ", e).n;
+        }
+
+        return false;
+    }
+
+    /**
+    Return a list of properties that component holds.
+
+    Params:
+        component = the component with fields
+
+    Returns:
+        an arary of property identities.
+    **/
+    KeyType[] properties(ComponentType component) const nothrow {
+        try {
+
+            import std.meta;
+            import aermicioi.util.traits;
+
+            static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
+                static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
+                    if (mixin("component.Kind." ~ e ~ " == component.kind")) {
+
+                        return this.inspector.properties(cast(const(Type)) component);
+                    }
+
+                    return [];
+                }
+            }
+
+        } catch (Exception e) {
+            error("Failed to unwrap tagged component ", component, " due to ", e).n;
+        }
+
+        return [];
+    }
+}
+
+/**
+Inspector for composite components (structs, objects, unions, etc.).
+**/
+class CompositeInspector(ComponentType) : Inspector!(ComponentType, string)
+    if (isAggregateType!ComponentType) {
+
+    /**
+    Identify the type of child field of component.
+
+    Params:
+        component = a composite component (class, struct, assoc array etc.) containing some fields
+
+    Returns:
+        Type of field, or typeid(void) if field is not present in component
+    **/
+    TypeInfo typeOf(ComponentType component, in string property) const nothrow {
+        if (this.has(component, property)) {
+            static foreach (member; __traits(allMembers, ComponentType)) {
+                static if (isPublic!(ComponentType, member)) {{
+                    alias m = Alias!(__traits(getMember, component, member));
+                    if (member == property) {
+                        static if (
+                            isField!(ComponentType, member) ||
+                            (isSomeFunction!m && anySatisfy!(isPropertyGetter, __traits(getOverloads, component, member)))
+                        ) {
+
+                            return typeid(typeof(__traits(getMember, component, member)));
+                        }
+                    }
+                }}
+            }
+        }
+
+
+        return typeid(void);
+    }
+
+    /**
+    Identify the type of component itself.
+
+    Identify the type of component itself. It will inspect the component and will return accurate
+    type info that the component represents.
+
+    Params:
+        component = component which should be identified.
+
+    Returns:
+        Type info of component, or typeid(void) if component cannot be identified by inspector
+    **/
+    TypeInfo typeOf(ComponentType component) const nothrow {
         return typeid(ComponentType);
     }
 
-    bool has(ComponentType component, in string property) const {
+    /**
+    Check if component has a field or a property.
+
+    Params:
+        component = component with fields
+        property = component property that is tested for existence
+
+    Returns:
+        true if field is present either in readonly, or writeonly form (has getters and setters).
+    **/
+    bool has(ComponentType component, in string property) const nothrow {
         import std.algorithm : canFind;
         return this.properties(component).canFind(property);
     }
 
-    string[] properties(ComponentType component) const {
+    /**
+    Return a list of properties that component holds.
+
+    Params:
+        component = the component with fields
+
+    Returns:
+        an arary of property identities.
+    **/
+    string[] properties(ComponentType component) const nothrow {
         string[] props;
 
         static foreach (member; __traits(allMembers, ComponentType)) {
@@ -149,6 +497,14 @@ class CompositeInspector(ComponentType) : Inspector!(ComponentType, string)
     }
 }
 
+/**
+An inspector that accepts a component with erased type for inspecting.
+
+An inspector that accepts a component with erased type for inspecting. It will
+attempt to downcast the component to rightful type, if Type is rooted into Object
+or it will attempt to downcast to object implementing Placeholder!Type interface
+that effectively is storage for inspected component.
+**/
 class RuntimeInspector(Type, KeyType = string) : Inspector!(Object, KeyType) {
     private {
         Inspector!(Type, KeyType) inspector_;
@@ -186,7 +542,16 @@ class RuntimeInspector(Type, KeyType = string) : Inspector!(Object, KeyType) {
             }
         }
 
-        TypeInfo typeOf(Object wrapped, in KeyType property) const {
+        /**
+        Identify the type of child field of component.
+
+        Params:
+            component = a composite component (class, struct, assoc array etc.) containing some fields
+
+        Returns:
+            Type of field, or typeid(void) if field is not present in component
+        **/
+        TypeInfo typeOf(Object wrapped, in KeyType property) const nothrow {
             if (wrapped.identify is typeid(Type)) {
 
                 return this.inspector.typeOf(wrapped.unwrap!Type, property);
@@ -195,7 +560,19 @@ class RuntimeInspector(Type, KeyType = string) : Inspector!(Object, KeyType) {
             return wrapped.classinfo;
         }
 
-        TypeInfo typeOf(Object component) const {
+        /**
+        Identify the type of component itself.
+
+        Identify the type of component itself. It will inspect the component and will return accurate
+        type info that the component represents.
+
+        Params:
+            component = component which should be identified.
+
+        Returns:
+            Type info of component, or typeid(void) if component cannot be identified by inspector
+        **/
+        TypeInfo typeOf(Object component) const nothrow {
             if (component.identify is typeid(Type)) {
 
                 return this.inspector.typeOf(component.unwrap!Type);
@@ -204,11 +581,30 @@ class RuntimeInspector(Type, KeyType = string) : Inspector!(Object, KeyType) {
             return component.classinfo;
         }
 
-        bool has(Object wrapped, in KeyType property) const {
+        /**
+        Check if component has a field or a property.
+
+        Params:
+            component = component with fields
+            property = component property that is tested for existence
+
+        Returns:
+            true if field is present either in readonly, or writeonly form (has getters and setters).
+        **/
+        bool has(Object wrapped, in KeyType property) const nothrow {
             return this.inspector.has(wrapped.unwrap!Type, property);
         }
 
-        KeyType[] properties(Object wrapped) const {
+        /**
+        Return a list of properties that component holds.
+
+        Params:
+            component = the component with fields
+
+        Returns:
+            an arary of property identities.
+        **/
+        KeyType[] properties(Object wrapped) const nothrow {
             return this.inspector.properties(wrapped.unwrap!Type);
         }
     }

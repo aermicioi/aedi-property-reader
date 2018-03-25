@@ -82,7 +82,7 @@ auto xml(XmlElement value, RCIAllocator allocator = theAllocator) {
 
     static if (is(StringToScalarConvTypeGuesser : StdConvTypeGuesser!(S, Types), S, Types...)) {
         static foreach (T; Types) {
-            container.set(new XmlConvertor!(T, S), fullyQualifiedName!T);
+            container.set(XmlConvertor!(T, S)(), fullyQualifiedName!T);
         }
     }
 

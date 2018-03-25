@@ -45,93 +45,12 @@ interface Mapper(From, To = From) {
     void map(From from, ref To to, RCIAllocator allocator = theAllocator);
 }
 
-interface MutableMapper(From, To = From, FieldType = From) : Mapper!(From, To) {
-
-    @property {
-        /**
-        Set accessor
-
-        Params:
-            accessor = accesor used to access a field from component
-
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) accessor(PropertyAccessor!(From, FieldType) accessor) @safe nothrow pure;
-
-        /**
-        Get accessor
-
-        Returns:
-            PropertyAccessor!(From, FieldType)
-        **/
-        inout(PropertyAccessor!(From, FieldType)) accessor() @safe nothrow pure inout;
-
-
-        /**
-        Set setter
-
-        Params:
-            setter = setter used to set a field to component
-
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) setter(PropertySetter!(To, FieldType) setter) @safe nothrow pure;
-
-        /**
-        Get setter
-
-        Returns:
-            PropertySetter!(To, FieldType)
-        **/
-        inout(PropertySetter!(To, FieldType)) setter() @safe nothrow pure inout;
-
-        /**
-        Set fromInspector
-
-        Params:
-            fromInspector = inspector used to get runtime info about component from which to map fields
-
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) fromInspector(Inspector!From fromInspector) @safe nothrow pure;
-
-        /**
-        Get fromInspector
-
-        Returns:
-            Inspector!From
-        **/
-        inout(Inspector!From) fromInspector() @safe nothrow pure inout;
-
-        /**
-        Set toInspector
-
-        Params:
-            toInspector = inspector used to provide runtime info about component which will store mapped components
-
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) toInspector(Inspector!To toInspector) @safe nothrow pure;
-
-        /**
-        Get toInspector
-
-        Returns:
-            Inspector!To
-        **/
-        inout(Inspector!To) toInspector() @safe nothrow pure inout;
-    }
-}
-
 class CompositeMapper(From, To) : Mapper!(From, To) {
 
     private {
         import std.typecons : Rebindable;
         bool conversion_;
+        bool force_;
 
         Convertor[] convertors_;
 
@@ -293,15 +212,40 @@ class CompositeMapper(From, To) : Mapper!(From, To) {
             inout(const Inspector!To) toInspector() @safe nothrow pure inout {
                 return this.toInspector_.get;
             }
+
+            /**
+            Set force
+
+            Params:
+                force = whether to force attempt in setting a property in a mapped component
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) force(bool force) @safe nothrow pure {
+                this.force_ = force;
+
+                return this;
+            }
+
+            /**
+            Get force
+
+            Returns:
+                bool
+            **/
+            inout(bool) force() @safe nothrow pure inout {
+                return this.force_;
+            }
         }
 
         void map(From from, ref To to, RCIAllocator allocator = theAllocator) {
 
-            trace("Mapping ", this.fromInspector.properties(from), " of ", typeid(from), " to ", typeid(to));
+            trace("Mapping ", this.fromInspector.properties(from), " of ", from.identify, " to ", to.identify);
             foreach (property; this.fromInspector.properties(from)) {
 
                 trace("Migrating ", property, " property ");
-                if (this.toInspector.has(to, property)) {
+                if (this.toInspector.has(to, property) || this.force) {
 
                     Object value = this.accessor.access(from, property);
                     if (this.fromInspector.typeOf(from, property) != this.toInspector.typeOf(to, property)) {
@@ -335,23 +279,29 @@ class CompositeMapper(From, To) : Mapper!(From, To) {
                         }
                     }
 
-                    this.setter.set(
-                        to,
-                        value,
-                        property
-                    );
+                    try {
 
-                    trace("Migrated ", property, " from ", typeid(from), " to ", typeid(to));
+                        this.setter.set(
+                            to,
+                            value,
+                            property
+                        );
+
+                        trace("Migrated ", property, " from ", from.identify, " to ", to.identify);
+                    } catch (Exception e) {
+
+                        trace("Couldn't ", this.force ? "forcefully " : "", "set property ", property, " to ", to.identify, " from ", from.identify);
+                    }
                 } else {
 
-                    error(typeid(to), " element does not have ", property);
+                    error(to.identify, " element does not have ", property);
                 }
             }
         }
     }
 }
 
-class CompositeConvertor(From, To) : Convertor {
+class CompositeConvertor(To, From) : Convertor {
 
     private {
         Mapper!(From, To) mapper_;
@@ -476,7 +426,7 @@ class RuntimeMapper : Mapper!(Object, Object) {
             Get factory
 
             Returns:
-                MutableMapper!Object delegate ()
+                Mapper!Object delegate ()
             **/
             inout(Mapper!Object delegate (
                 in PropertyAccessor!Object,
@@ -506,7 +456,7 @@ class RuntimeMapper : Mapper!(Object, Object) {
             Get destructor
 
             Returns:
-                void delegate(MutableMapper!Object)
+                void delegate(Mapper!Object)
             **/
             inout(void delegate(Mapper!Object)) destructor() @safe nothrow pure inout {
                 return this.destructor_;
@@ -600,6 +550,8 @@ class RuntimeMapper : Mapper!(Object, Object) {
             enforce!InvalidArgumentException(!fromInspectors.empty, text("No inspector for ", from.identify, " has been provided, cannot map to ", to.identify));
             enforce!InvalidArgumentException(!toInspectors.empty, text("No inspector for ", to.identify, " has been provided, cannot map from ", to.identify));
 
+            import std.stdio;
+            writeln(to.identify);
             auto mapper = this.factory()(
                 accessors.front,
                 setters.front,

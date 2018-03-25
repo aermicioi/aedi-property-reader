@@ -49,8 +49,8 @@ unittest {
     document.accessor = new AssociativeArrayAccessor!string;
     document.allocator = theAllocator;
 
-    document.set(new StdConvAdvisedConvertor!(long, string), "long");
-    document.set(new StdConvAdvisedConvertor!(string, string), "string");
+    document.set(StdConvAdvisedConvertor!(long, string)(), "long");
+    document.set(StdConvAdvisedConvertor!(string, string)(), "string");
 
     assert(document.has("foo"));
     assert(!document.has("coo"));

@@ -101,10 +101,10 @@ unittest {
     assertThrown!ConvertorException(mapper.map(from, to));
 
     mapper.convertors = cast(Convertor[]) [
-        new StdConvAdvisedConvertor!(int, string)(),
-        new StdConvAdvisedConvertor!(string, string)(),
-        new StdConvAdvisedConvertor!(double, string)(),
-        new StdConvAdvisedConvertor!(long, string)(),
+        StdConvAdvisedConvertor!(int, string)(),
+        StdConvAdvisedConvertor!(string, string)(),
+        StdConvAdvisedConvertor!(double, string)(),
+        StdConvAdvisedConvertor!(long, string)(),
     ];
     mapper.map(from, to);
 
@@ -136,10 +136,10 @@ unittest {
     assertThrown!ConvertorException(mapper.map(from, to));
 
     mapper.convertors = cast(Convertor[]) [
-        new StdConvAdvisedConvertor!(int, string)(),
-        new StdConvAdvisedConvertor!(string, string)(),
-        new StdConvAdvisedConvertor!(double, string)(),
-        new StdConvAdvisedConvertor!(long, string)(),
+        StdConvAdvisedConvertor!(int, string)(),
+        StdConvAdvisedConvertor!(string, string)(),
+        StdConvAdvisedConvertor!(double, string)(),
+        StdConvAdvisedConvertor!(long, string)(),
     ];
     mapper.map(from, to);
 
@@ -169,10 +169,10 @@ unittest {
         (new CompositeMapper!(Object, Object))
             .conversion(true)
             .convertors(cast(Convertor[]) [
-                new StdConvAdvisedConvertor!(int, string)(),
-                new StdConvAdvisedConvertor!(string, string)(),
-                new StdConvAdvisedConvertor!(double, string)(),
-                new StdConvAdvisedConvertor!(long, string)(),
+                StdConvAdvisedConvertor!(int, string)(),
+                StdConvAdvisedConvertor!(string, string)(),
+                StdConvAdvisedConvertor!(double, string)(),
+                StdConvAdvisedConvertor!(long, string)(),
             ])
             .accessor(accessor)
             .setter(setter)
@@ -202,11 +202,36 @@ unittest {
     assert(to.unwrap!Placeholder.f == from.unwrap!(string[string])["f"].to!double);
     assert(to.unwrap!Placeholder.m == from.unwrap!(string[string])["m"].to!long);
 
+    mapper.factory = (
+        in PropertyAccessor!Object accessor,
+        in PropertySetter!Object setter,
+        in Inspector!Object from,
+        in Inspector!Object to
+    ) =>
+        (new CompositeMapper!(Object, Object))
+            .conversion(true)
+            .convertors(cast(Convertor[]) [
+                StdConvAdvisedConvertor!(int, string)(),
+                StdConvAdvisedConvertor!(string, string)(),
+                StdConvAdvisedConvertor!(double, string)(),
+                StdConvAdvisedConvertor!(long, string)(),
+                StdConvAdvisedConvertor!(string, int)(),
+                StdConvAdvisedConvertor!(string, double)(),
+                StdConvAdvisedConvertor!(string, long)(),
+            ])
+            .accessor(accessor)
+            .setter(setter)
+            .fromInspector(from)
+            .toInspector(to)
+            .force(true);
+
     auto cfrom = cast(Object) [
         "a": "a"
     ].placeholder;
 
     mapper.map(to, cfrom);
+    import std.stdio;
+    cfrom.unwrap!(string[string]).writeln;
 
     assert(to.unwrap!Placeholder.i == cfrom.unwrap!(string[string])["i"].to!int);
     assert(to.unwrap!Placeholder.p == cfrom.unwrap!(string[string])["p"]);
