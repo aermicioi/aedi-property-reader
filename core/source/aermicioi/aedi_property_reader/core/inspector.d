@@ -35,7 +35,7 @@ import std.exception;
 import std.conv;
 import aermicioi.util.traits : isPropertyGetter, isPropertySetter, isPublic, isField;
 import aermicioi.aedi : NotFoundException;
-import aermicioi.aedi_property_reader.core.convertor : unwrap, identify;
+import aermicioi.aedi_property_reader.core.placeholder : unwrap, identify;
 import aermicioi.aedi_property_reader.core.traits : isD;
 import taggedalgebraic;
 

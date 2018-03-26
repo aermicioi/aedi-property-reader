@@ -35,6 +35,7 @@ import aermicioi.aedi_property_reader.core.inspector;
 import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.core.setter;
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.placeholder;
 import aermicioi.aedi_property_reader.core.std_conv;
 import std.experimental.allocator;
 import std.exception;

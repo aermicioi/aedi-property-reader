@@ -32,6 +32,7 @@ module aermicioi.aedi_property_reader.core.setter;
 import aermicioi.aedi : NotFoundException;
 import aermicioi.aedi_property_reader.core.exception;
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.placeholder;
 import aermicioi.util.traits : isPublic, isField;
 import aermicioi.aedi_property_reader.core.traits;
 import std.conv;

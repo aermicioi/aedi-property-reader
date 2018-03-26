@@ -31,6 +31,7 @@ module aermicioi.aedi_property_reader.core.document;
 
 import aermicioi.aedi;
 import aermicioi.aedi_property_reader.core.exception : ConvertorException;
+import aermicioi.aedi_property_reader.core.placeholder;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi.storage.wrapper;
 import std.meta;

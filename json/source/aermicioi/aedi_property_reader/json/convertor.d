@@ -40,7 +40,10 @@ import std.traits;
 import std.conv : to;
 import std.experimental.allocator;
 
-alias JsonConvertor = AdvisedConvertor!(convert, destruct);
+alias JsonConvertor = ChainedAdvisedConvertor!(
+    AdvisedConvertor!(convert, destruct),
+    CompositeAdvisedConvertor
+).AdvisedConvertorImplementation;
 
 /**
 Convert JSONValue into T scalar/array/assocarray value.

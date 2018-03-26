@@ -38,7 +38,10 @@ import std.string : strip;
 import std.conv : to, ConvException;
 import std.experimental.allocator;
 
-alias XmlConvertor = AdvisedConvertor!(convert, destruct);
+alias XmlConvertor = ChainedAdvisedConvertor!(
+    AdvisedConvertor!(convert, destruct),
+    CompositeAdvisedConvertor
+).AdvisedConvertorImplementation;
 
 /**
 Convert from Element into To scalar/array/assocarray value.

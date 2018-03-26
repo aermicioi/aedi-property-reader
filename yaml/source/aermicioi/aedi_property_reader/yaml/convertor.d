@@ -43,7 +43,11 @@ import std.conv;
 import std.range;
 import std.exception;
 
-alias YamlConvertor = AdvisedConvertor!(convert, destruct);
+alias YamlConvertor = ChainedAdvisedConvertor!(
+    AdvisedConvertor!(convert, destruct),
+    CompositeAdvisedConvertor
+).AdvisedConvertorImplementation;
+
 
 void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (!is(To == enum)) {

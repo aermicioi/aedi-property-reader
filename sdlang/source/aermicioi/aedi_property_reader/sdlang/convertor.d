@@ -37,7 +37,10 @@ import sdlang;
 import std.conv;
 import std.experimental.allocator;
 
-alias SdlangConvertor = AdvisedConvertor!(convert, destruct);
+alias SdlangConvertor = ChainedAdvisedConvertor!(
+    AdvisedConvertor!(convert, destruct),
+    CompositeAdvisedConvertor
+).AdvisedConvertorImplementation;
 
 void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
 	try {

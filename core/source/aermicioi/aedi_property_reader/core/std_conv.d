@@ -33,13 +33,36 @@ import std.conv : to;
 import std.experimental.allocator;
 import aermicioi.aedi_property_reader.core.convertor;
 
+/**
+Convert from component to component using std.conv.to family of functions.
+
+Params:
+    from = original component to be converted
+    to = resulting component
+    allocator = ignored allocator as .to family of functions are not using allocators
+Throws:
+    See std.conv.to for throwed exceptions
+**/
 void convert(To, From)(From from, ref To to, RCIAllocator allocator = theAllocator) {
     to = from.to!To;
 }
 
+/**
+Destruct to component.
+
+Params:
+    to = component to destroy
+    allocator = ignored allocator as .to family of functions doesn't use allocators yet.
+**/
 void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     destroy(to);
     to = To.init;
 }
 
-alias StdConvAdvisedConvertor = AdvisedConvertor!(convert, destruct);
+/**
+Advised callback convertor with std.conv.to convertor and destructor.
+**/
+alias StdConvAdvisedConvertor = ChainedAdvisedConvertor!(
+    AdvisedConvertor!(convert, destruct),
+    CompositeAdvisedConvertor
+).AdvisedConvertorImplementation;

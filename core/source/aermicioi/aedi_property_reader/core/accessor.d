@@ -30,21 +30,22 @@ Authors:
 module aermicioi.aedi_property_reader.core.accessor;
 
 import aermicioi.aedi.storage.allocator_aware;
+import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi.exception.invalid_cast_exception;
+import aermicioi.aedi_property_reader.core.exception;
+import aermicioi.util.traits;
+import aermicioi.aedi_property_reader.core.traits : isD, n;
+import aermicioi.aedi_property_reader.core.placeholder;
 import taggedalgebraic;
 import std.array;
 import std.conv;
-import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi.exception.invalid_cast_exception;
 import std.algorithm;
 import std.range;
 import std.exception : enforce;
-import aermicioi.aedi_property_reader.core.exception;
 import std.variant;
 import std.traits;
 import std.meta;
-import aermicioi.util.traits;
 import std.experimental.logger;
-import aermicioi.aedi_property_reader.core.traits : isD, n;
 
 /**
 Interface for objects that are able to get child component out of parent one.
@@ -1356,7 +1357,7 @@ ImplSpec:
     an exception
 **/
 class RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(Object, FieldType, KeyType) {
-    import aermicioi.aedi_property_reader.core.convertor : identify, unwrap;
+    import aermicioi.aedi_property_reader.core.placeholder : identify, unwrap;
     private {
         PropertyAccessor!(ComponentType, FieldType, KeyType) accessor_;
     }
@@ -1477,7 +1478,7 @@ ImplSpec:
 **/
 class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
     AllocatingPropertyAccessor!(ComponentType, Object, KeyType) {
-    import aermicioi.aedi_property_reader.core.convertor : identify, unwrap;
+    import aermicioi.aedi_property_reader.core.placeholder : identify, unwrap;
     import std.experimental.allocator;
 
     mixin AllocatorAwareMixin!(typeof(this));
@@ -1536,7 +1537,7 @@ class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = s
          FieldType accessed property.
      **/
         Object access(ComponentType component, in KeyType path) const {
-            import aermicioi.aedi_property_reader.core.convertor : placeholder;
+            import aermicioi.aedi_property_reader.core.placeholder : placeholder;
             enforce!NotFoundException(this.has(component, path), text("Could not find property ", path));
 
             return this.accessor.access(component, path).placeholder(cast() this.allocator);

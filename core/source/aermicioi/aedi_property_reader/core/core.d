@@ -33,8 +33,6 @@ import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.document;
-import std.json;
-import std.xml;
 import std.meta;
 
 struct ConvertorContext(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType) {

@@ -40,8 +40,10 @@ import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.core.setter;
 import aermicioi.aedi_property_reader.core.inspector;
 import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.core.placeholder;
 import std.algorithm;
 import std.array;
+import std.traits;
 import std.experimental.logger;
 
 /**
@@ -777,6 +779,17 @@ class NoOpConvertor : Convertor {
     }
 }
 
+/**
+Convert from into component of type To using a convertor for this.
+
+Params:
+    convertor = the convertor used to convert from component into To
+    from = original component that is to be converted
+    allocator = optional allocator used to allocate memory for converted component
+
+Returns:
+    To converted component
+**/
 To convert(To, From)(Convertor convertor, From from, RCIAllocator allocator = theAllocator) {
     import std.typecons : scoped;
     static if (is(From : Object)) {
@@ -797,176 +810,70 @@ To convert(To, From)(Convertor convertor, From from, RCIAllocator allocator = th
     }
 }
 
-interface Placeholder(T) : TypeAware {
+/**
+A callback convertor factory advised with functional convertor and destructor.
 
-    @property {
+Params:
+    convertor = functional convertor used for callback convertor
+    destructor = functional destructor used for callback convertor
 
-        ref inout(T) value() nothrow @safe inout;
-        ref T value(ref T value) nothrow @safe;
-
-        final ref T value(T value) {
-            return this.value(value);
-        }
-
-        alias value this;
-    }
-}
-
-interface TypeAware {
-    TypeInfo type() const nothrow @property;
-}
-
-class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
-
-    private {
-        T payload;
-    }
-
-    this() @disable;
-
-    this(ref T value) {
-        this.value = value;
-    }
-
-    this(T value) {
-        this(value);
-    }
-
-    TypeInfo type() const {
-        return typeid(T);
-    }
-
-    @property {
-        /**
-        Set value
-
-        Params:
-            value = value to be stored
-
-        Returns:
-            value
-        **/
-        ref T value(ref T value) @safe nothrow {
-            this.payload = value;
-
-            return this.payload;
-        }
-
-        /**
-        Get value
-
-        Returns:
-            ref T
-        **/
-        ref inout(T) value() @safe nothrow inout {
-            return this.payload;
-        }
-    }
-}
-
-auto placeholder(T)(auto ref T value, RCIAllocator allocator = theAllocator) {
-    static if (is(T : Object)) {
-        return value;
-    } else {
-        return allocator.make!(PlaceholderImpl!T)(value);
-    }
-}
-
-auto unwrap(T)(inout(Object) object) nothrow {
-    import aermicioi.aedi_property_reader.core.traits : n;
-    static if (is(T : Object)) {
-
-        return cast(T) object;
-    } else {
-
-        auto wrapper = (cast(Placeholder!T) object);
-
-        assert(wrapper !is null, text(object.classinfo, " does not implement ", typeid(Placeholder!T), " ", typeid(T), " content cannot be extracted")).n;
-
-        return wrapper;
-    }
-}
-
-TypeInfo identify(T : Object)(in T object) nothrow {
-    if (object is null) {
-        return typeid(null);
-    }
-
-    TypeAware p = cast(TypeAware) object;
-
-    if (p !is null) {
-        return p.type;
-    }
-
-    return object.classinfo;
-}
-
-TypeInfo identify(T)(in T type)
-    if (!is(T : Object)) {
-
-    return typeid(T);
-}
-
+Returns:
+    AdvisedConvertor(To, From) template ready to instantiate a callback convertor for To, and From types using convertor and destructor.
+**/
 template AdvisedConvertor(alias convertor, alias destructor) {
     import std.traits;
 
-    template AdvisedConvertor(To, From) {
+    template CheckMessage(To, From) {
+        alias ConvertorInfo = maybeConvertor!(convertor, To, From);
+        alias DestructorInfo = maybeDestructor!(destructor, To);
+
+        import std.traits : fullyQualifiedName;
+        enum CheckMessage = text(
+            "Cannot convert type ",
+            fullyQualifiedName!From,
+            " to ",
+            fullyQualifiedName!To,
+            " when ",
+            fullyQualifiedName!convertor,
+            " implements convertor ",
+            ConvertorInfo.Yes,
+            " ",
+            fullyQualifiedName!destructor,
+            " implements destructor ",
+            DestructorInfo.Yes
+            );
+    }
+
+    template AdvisedConvertorImplementation(To, From) {
         alias ConvertorInfo = maybeConvertor!(convertor, To, From);
         alias DestructorInfo = maybeDestructor!(destructor, To);
 
         static if (ConvertorInfo.Yes && DestructorInfo.Yes) {
 
-            alias AdvisedConvertor = () => new CallbackConvertor!(ConvertorInfo.Convertor, DestructorInfo.Destructor);
+            alias AdvisedConvertorImplementation = () => new CallbackConvertor!(ConvertorInfo.Convertor, DestructorInfo.Destructor);
         } else {
 
-            import std.traits : fullyQualifiedName;
-            static assert(false, text(
-                "Cannot convert type ",
-                fullyQualifiedName!From,
-                " to ",
-                fullyQualifiedName!To,
-                " when ",
-                fullyQualifiedName!convertor,
-                " implements convertor ",
-                ConvertorInfo.Yes,
-                " ",
-                fullyQualifiedName!destructor,
-                " implements destructor ",
-                DestructorInfo.Yes
-                ));
+            static assert(false, CheckMessage!(To, From));
         }
     }
 }
 
+/**
+A composite convertor factory advised with accessor, setter, and inspectors.
+
+Params:
+    Accessor = accessor used to extract data out of From component
+    Setter = setter used to set extracted data into To component
+    FromInspector = inspector used to inspect From components for accessible fields
+    ToInspector = inspector used to inspect To components for settable fields
+Returns:
+    AdvisedConvertor(To, From) template ready to instantiate a composite convertor for To, and From types using advised accessor, setter, and inspectors.
+**/
 template AdvisedConvertor(alias Accessor, alias Setter, alias FromInspector, alias ToInspector) {
-    template AdvisedConvertor(To, From)
-        if (isAggregate!To && isAggregate!From) {
 
-        static if (
-            is (typeof(Accessor!From)) &&
-            is (typeof(Setter!To)) &&
-            is (typeof(FromInspector!From)) &&
-            is (typeof(ToInspector!To))
-        ) {
-            alias AdvisedConvertor = () => {
-                import aermicioi.aedi_property_reader.core.mapper : CompositeMapper;
-                import aermicioi.aedi_property_reader.core.inspector : Inspector;
-                import aermicioi.aedi_property_reader.core.accessor : CompositeAccessor;
-                import aermicioi.aedi_property_reader.core.setter : CompositeSetter;
-
-                auto convertor = new CompositeConvertor!(To, From)();
-                CompositeMapper!(From, To) mapper = new CompositeMapper!(From, To)();
-                mapper.fromInspector = new FromInspector!From;
-                mapper.toInspector = new ToInspector!To;
-                mapper.accessor = new Accessor!From;
-                mapper.setter = new Setter!To;
-                convertor.mapper = mapper;
-                return convertor;
-            };
-        } else {
-
-            import std.traits : fullyQualifiedName;
-            static assert(false, text(
+    template CheckMessage(To, From) {
+        import std.traits : fullyQualifiedName;
+        enum CheckMessage = text(
                 "Cannot convert type ",
                 fullyQualifiedName!From,
                 " to ",
@@ -987,12 +894,81 @@ template AdvisedConvertor(alias Accessor, alias Setter, alias FromInspector, ali
                 fullyQualifiedName!ToInspector,
                 " is able to inspect ",
                 is (typeof(ToInspector!To))
-            ));
+            );
+    }
+
+    template AdvisedConvertorImplementation(To, From)
+        if (isAggregateType!To && isAggregateType!From) {
+
+        static if (
+            is (typeof(Accessor!From)) &&
+            is (typeof(Setter!To)) &&
+            is (typeof(FromInspector!From)) &&
+            is (typeof(ToInspector!To))
+        ) {
+            alias AdvisedConvertorImplementation = () => {
+                import aermicioi.aedi_property_reader.core.mapper : CompositeMapper;
+                import aermicioi.aedi_property_reader.core.inspector : Inspector;
+                import aermicioi.aedi_property_reader.core.accessor : CompositeAccessor;
+                import aermicioi.aedi_property_reader.core.setter : CompositeSetter;
+
+                auto convertor = new CompositeConvertor!(To, From)();
+                CompositeMapper!(From, To) mapper = new CompositeMapper!(From, To)();
+                mapper.fromInspector = new FromInspector!From;
+                mapper.toInspector = new ToInspector!To;
+                mapper.accessor = new Accessor!From;
+                mapper.setter = new Setter!To;
+                convertor.mapper = mapper;
+                return convertor;
+            };
+        } else {
+
+            static assert(false, CheckMessage!(To, From));
         }
     }
 }
 
-alias CompositeConvertor = AdvisedConvertor!(
+template ChainedAdvisedConvertor(AdvisedConvertors...) {
+
+    template CheckMessage(To, From) {
+        import std.traits : fullyQualifiedName;
+        import aermicioi.util.traits : getMember;
+        enum CheckMessage = text(
+            "None of advised convertors are able to convert ",
+            fullyQualifiedName!From,
+            " to ",
+            fullyQualifiedName!To,
+            " where advised convertors are failing with: ",
+            staticMap!(
+                ApplyRight!(AliasSeq, " "),
+                staticMap!(
+                    ApplyRight!(Instantiate, To, From),
+                    staticMap!(
+                        ApplyRight!(getMember, "CheckMessage"),
+                        AdvisedConvertors
+                    )
+                )
+            )
+        );
+    }
+
+    template AdvisedConvertorImplementation(To, From) {
+
+        static foreach (AdvisedConvertor; AdvisedConvertors) {
+            import std.traits;
+            static if (!is(typeof(Yes)) && is(typeof(AdvisedConvertor.AdvisedConvertorImplementation!(To, From)))) {
+                enum Yes = true;
+                alias AdvisedConvertorImplementation = AdvisedConvertor.AdvisedConvertorImplementation!(To, From);
+            }
+        }
+
+        static if (!is(typeof(Yes))) {
+            static assert(false, CheckMessage!(To, From));
+        }
+    }
+}
+
+alias CompositeAdvisedConvertor = AdvisedConvertor!(
     CompositeAccessor,
     CompositeSetter,
     CompositeInspector,

@@ -84,4 +84,7 @@ void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     to = To.init;
 }
 
-alias ArgumentAdvisedConvertor = AdvisedConvertor!(convert, destruct);
+alias ArgumentAdvisedConvertor = ChainedAdvisedConvertor!(
+    AdvisedConvertor!(convert, destruct),
+    CompositeAdvisedConvertor
+).AdvisedConvertorImplementation;

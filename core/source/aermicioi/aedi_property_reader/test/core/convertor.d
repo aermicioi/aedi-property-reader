@@ -31,6 +31,7 @@ module aermicioi.aedi_property_reader.core.test.convertor;
 
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.exception;
+import aermicioi.aedi_property_reader.core.placeholder;
 import std.conv;
 import std.experimental.allocator;
 import std.exception;

@@ -29,18 +29,45 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.core.type_guesser;
 
+/**
+Interface for components that are able to guess the D type of serialized component.
+**/
 interface TypeGuesser(SerializedType) {
 
     public {
 
+        /**
+        Guess the D type of serialized based on information available in it.
+
+        Params:
+            serialized = the component for which guesser will attempt to guess the type.
+
+        Returns:
+            TypeInfo guessed type
+        **/
         TypeInfo guess(SerializedType serialized);
     }
 }
 
+/**
+Guesser based on std.conv.to family of functions.
+
+Guesser based on std.conv.to family of functions. It will attempt to convert sequentially
+to all ConvertableTypes until one succeeds, for which the typeinfo will be returned.
+**/
 class StdConvTypeGuesser(SerializedType, ConvertableTypes...) : TypeGuesser!SerializedType {
 
     public {
 
+        /**
+        Guess the D type of serialized based on eager attempts to convert serialized to one of ConvertableTypes.
+
+        Params:
+            serialized = the component for which guesser will attempt to guess the type.
+
+        Returns:
+            TypeInfo guessed type for which std.conv.to didn't fail.
+        **/
         TypeInfo guess(SerializedType serialized) {
             import std.conv;
 
@@ -58,7 +85,14 @@ class StdConvTypeGuesser(SerializedType, ConvertableTypes...) : TypeGuesser!Seri
     }
 }
 
+/**
+Alias for StdConvTypeGuesser with serialized type as string.
+**/
 alias StringStdConvTypeGuesser(ConvertableTypes...) = StdConvTypeGuesser!(string, ConvertableTypes);
+
+/**
+Alias for StringStdConvTypeGuesser with scalar types as convertable types.
+**/
 alias StringToScalarConvTypeGuesser = StringStdConvTypeGuesser!(
     bool,
     long,

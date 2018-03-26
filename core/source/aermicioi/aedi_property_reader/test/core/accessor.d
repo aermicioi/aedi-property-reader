@@ -30,8 +30,9 @@ Authors:
 module aermicioi.aedi_property_reader.test.core.core;
 
 import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.convertor : unwrap;
+import aermicioi.aedi_property_reader.core.placeholder : unwrap;
 import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.core.placeholder;
 import aermicioi.aedi_property_reader.core.exception;
 import std.exception;
 import std.experimental.allocator;
