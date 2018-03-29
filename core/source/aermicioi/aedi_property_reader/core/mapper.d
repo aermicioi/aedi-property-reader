@@ -41,11 +41,91 @@ import std.exception;
 import std.algorithm;
 import std.conv;
 
+/**
+Interface for components that are able to map from one type to another one.
+**/
 interface Mapper(From, To = From) {
 
+    /**
+    Map from component to component.
+
+    Map from component to component, or transfer data from component to component
+    with optional conversion of data along the way.
+
+    Params:
+        from = original component that has it's data transferred
+        to = destination component that receives transferred data
+        allocator = optional allocator that could be used by convertors when doing field conversion
+    **/
     void map(From from, ref To to, RCIAllocator allocator = theAllocator);
+
+    @property {
+        /**
+        Set convertors
+
+        Params:
+            convertors = set a list of convertors to be used by mapper to automatically convert a mapped field to designated type
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) convertors(Convertor[] convertors) @safe nothrow pure;
+
+        /**
+        Get convertors
+
+        Returns:
+            Convertor[]
+        **/
+        inout(Convertor[]) convertors() @safe nothrow pure inout;
+
+        /**
+        Set force
+
+        Params:
+            force = forces mapper to try and set a field even if it is not existent
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) force(bool force) @safe nothrow pure;
+
+        /**
+        Get force
+
+        Returns:
+            bool
+        **/
+        inout(bool) force() @safe nothrow pure inout;
+
+        /**
+        Set conversion
+
+        Params:
+            conversion = whether to enable or not automatic conversion of fields using convertors.
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) conversion(bool conversion) @safe nothrow pure;
+
+        /**
+        Get conversion
+
+        Returns:
+            bool
+        **/
+        inout(bool) conversion() @safe nothrow pure inout;
+    }
 }
 
+/**
+An implementation of a mapper that specifically converts From component To component.
+
+An implementation of a mapper that specifically converts From component To component.
+It will use inspectors for From and To component to get information about component fields
+at runtime, and then use accessor and setter implementations to transfer data from one
+component to another, with optional conversion of data using passed convertors.
+**/
 class CompositeMapper(From, To) : Mapper!(From, To) {
 
     private {
@@ -240,6 +320,17 @@ class CompositeMapper(From, To) : Mapper!(From, To) {
             }
         }
 
+        /**
+        Map from component to component.
+
+        Map from component to component, or transfer data from component to component
+        with optional conversion of data along the way.
+
+        Params:
+            from = original component that has it's data transferred
+            to = destination component that receives transferred data
+            allocator = optional allocator that could be used by convertors when doing field conversion
+        **/
         void map(From from, ref To to, RCIAllocator allocator = theAllocator) {
 
             trace("Mapping ", this.fromInspector.properties(from), " of ", from.identify, " to ", to.identify);
@@ -275,7 +366,7 @@ class CompositeMapper(From, To) : Mapper!(From, To) {
 
                             throw new InvalidArgumentException(text(
                                 "Invalid assignment ", property, " has type of ", this.fromInspector.typeOf(from, property),
-                                " in from component while in to component it has ", this.toInspector.typeOf(to, property)
+                                " in from component while in to component it is ", this.toInspector.typeOf(to, property)
                             ));
                         }
                     }
@@ -302,13 +393,55 @@ class CompositeMapper(From, To) : Mapper!(From, To) {
     }
 }
 
-class CompositeConvertor(To, From) : Convertor {
+/**
+An implementation of convertor that is using a mapper to map from component to component.
+**/
+class CompositeConvertor(To, From) : CombinedConvertor {
 
     private {
         Mapper!(From, To) mapper_;
     }
 
     public {
+        /**
+        Set used convertors
+
+        Params:
+            convertors = list of convertors to be used.
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) convertors(Convertor[] convertors) @safe nothrow {
+            this.mapper.convertors = convertors;
+        }
+
+        /**
+        Add a convertor to existing list
+
+        Params:
+            convertor = convertor to be added to
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) add(Convertor convertor) @safe nothrow {
+            this.mapper.convertors = this.mapper.convertors ~ convertor;
+        }
+
+        /**
+        Remove a convertor from existing list
+
+        Params:
+            convertor = convertor to be removed
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) remove(Convertor convertor) @safe nothrow {
+            this.mapper.convertors = this.mapper.convertors.filter!(c => c != convertor).array;
+        }
+
         @property {
             /**
             Set mapper
@@ -335,31 +468,120 @@ class CompositeConvertor(To, From) : Convertor {
                 return this.mapper_;
             }
 
+            /**
+            Get the type info of component that convertor can convert from.
+
+            Get the type info of component that convertor can convert from.
+            The method is returning the default type that it is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsFrom method.
+
+            Returns:
+                type info of component that convertor is able to convert.
+            **/
             TypeInfo from() const {
                 return typeid(From);
             }
 
+            /**
+            Get the type info of component that convertor is able to convert to.
+
+            Get the type info of component that convertor is able to convert to.
+            The method is returning the default type that is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsTo method.
+
+            Returns:
+                type info of component that can be converted to.
+            **/
             TypeInfo to() const {
                 return typeid(To);
             }
         }
 
+        /**
+        Check whether convertor is able to convert from.
+
+        Check whether convertor is able to convert from.
+        The intent of method is to implement customized type checking
+        is not limited immediatly to supported default from component.
+
+        Params:
+            from = the type info of component that could potentially be converted by convertor.
+        Returns:
+            true if it is able to convert from, or false otherwise.
+        **/
         bool convertsFrom(TypeInfo from) const {
             return this.from is from;
         }
 
+        /**
+        Check whether convertor is able to convert from.
+
+        Check whether convertor is able to convert from.
+        The method will try to extract type info out of from
+        object and use for subsequent type checking.
+        The intent of method is to implement customized type checking
+        is not limited immediatly to supported default from component.
+
+        Params:
+            from = the type info of component that could potentially be converted by convertor.
+        Returns:
+            true if it is able to convert from, or false otherwise.
+        **/
         bool convertsFrom(in Object from) const {
             return this.convertsFrom(from.identify);
         }
 
-        bool convertsTo(TypeInfo to) const {
+        /**
+        Check whether convertor is able to convert to.
+
+        Check whether convertor is able to convert to.
+        The intent of the method is to implement customized type checking
+        that is not limited immediatly to supported default to component.
+
+        Params:
+            to = type info of component that convertor could potentially convert to.
+
+        Returns:
+            true if it is able to convert to, false otherwise.
+        **/
+        bool convertsTo(TypeInfo to) const nothrow {
             return this.to is to;
         }
 
-        bool convertsTo(in Object to) const {
+        /**
+        Check whether convertor is able to convert to.
+
+        Check whether convertor is able to convert to.
+        The method will try to extract type info out of to object and use
+        for subsequent type checking.
+        The intent of the method is to implement customized type checking
+        that is not limited immediatly to supported default to component.
+
+        Params:
+            to = type info of component that convertor could potentially convert to.
+
+        Returns:
+            true if it is able to convert to, false otherwise.
+        **/
+        bool convertsTo(in Object to) const nothrow {
             return this.convertsTo(to.identify);
         }
 
+        /**
+        Convert from component to component.
+
+        Params:
+            from = original component that is to be converted.
+            to = destination object that will be constructed out for original one.
+            allocator = optional allocator that could be used to construct to component.
+        Throws:
+            ConvertorException when there is a converting error
+            InvalidArgumentException when arguments passed are not of right type or state
+        Returns:
+            Resulting converted component.
+        **/
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) {
             enforce!InvalidArgumentException(this.convertsFrom(from), text(
                 "Cannot convert ", from.identify, " to ", typeid(To), " not supported by ", typeid(this)
@@ -374,6 +596,19 @@ class CompositeConvertor(To, From) : Convertor {
             this.mapper.map(from.unwrap!From, to, allocator);
         }
 
+        /**
+        Destroy component created using this convertor.
+
+        Destroy component created using this convertor.
+        Since convertor could potentially allocate memory for
+        converted component, only itself is containing history of allocation,
+        and therefore it is responsible as well to destroy and free allocated
+        memory with allocator.
+
+        Params:
+            converted = component that should be destroyed.
+            allocator = allocator used to allocate converted component.
+        **/
         void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
             enforce!InvalidArgumentException(this.convertsFrom(from), text(
                 "Cannot destruct ", from.identify, " to ", typeid(To), " not supported by ", typeid(this)
@@ -385,9 +620,23 @@ class CompositeConvertor(To, From) : Convertor {
     }
 }
 
+/**
+An implementation of mapper, that works solely with components that have their type erased.
+
+An implementation of mapper, that works solely with components that have their type erased.
+At runtime it will attempt to match inspectors, accessor and setter for original component and
+destination, then use them to create a specific mapper for that configuration and use it to
+transfer data from origin component to destination one. If no matches are found, no transfer is performed
+and an exception should be thrown.
+**/
 class RuntimeMapper : Mapper!(Object, Object) {
 
     private {
+        bool conversion_;
+        bool force_;
+
+        Convertor[] convertors_;
+
         PropertyAccessor!Object[] accessors_;
         PropertySetter!Object[] setters_;
         Inspector!Object[] inspectors_;
@@ -403,6 +652,81 @@ class RuntimeMapper : Mapper!(Object, Object) {
 
     public {
         @property {
+            /**
+            Set convertors
+
+            Params:
+                convertors = a list of convertors that could optionally be used to convert mapped fields
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) convertors(Convertor[] convertors) @safe nothrow pure {
+                this.convertors_ = convertors;
+
+                return this;
+            }
+
+            /**
+            Get convertors
+
+            Returns:
+                Convertor[]
+            **/
+            inout(Convertor[]) convertors() @safe nothrow pure inout {
+                return this.convertors_;
+            }
+
+            /**
+            Set conversion
+
+            Params:
+                conversion = whether to automatically convert or not mapped fields to desired type
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) conversion(bool conversion) @safe nothrow pure {
+                this.conversion_ = conversion;
+
+                return this;
+            }
+
+            /**
+            Get conversion
+
+            Returns:
+                bool
+            **/
+            inout(bool) conversion() @safe nothrow pure inout {
+                return this.conversion_;
+            }
+
+            /**
+            Set force
+
+            Params:
+                force = whether force or not an attempt to set an inexistent field.
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) force(bool force) @safe nothrow pure {
+                this.force_ = force;
+
+                return this;
+            }
+
+            /**
+            Get force
+
+            Returns:
+                bool
+            **/
+            inout(bool) force() @safe nothrow pure inout {
+                return this.force_;
+            }
+
             /**
             Set factory
 
@@ -540,7 +864,20 @@ class RuntimeMapper : Mapper!(Object, Object) {
 
         }
 
-        void map(Object from, ref Object to, RCIAllocator allocator = theAllocator) const {
+        /**
+        Map from component to component.
+
+        Map from component to component, or transfer data from component to component
+        with optional conversion of data along the way.
+
+        Params:
+            from = original component that has it's data transferred
+            to = destination component that receives transferred data
+            allocator = optional allocator that could be used by convertors when doing field conversion
+        Throws:
+            InvalidArgumentException when no either accessor, setter, or inspector is found.
+        **/
+        void map(Object from, ref Object to, RCIAllocator allocator = theAllocator) {
             auto accessors = this.accessors.filter!(accessor => accessor.componentType(from) is from.identify);
             auto setters = this.setters.filter!(setter => setter.componentType(to) is to.identify);
             auto fromInspectors = this.inspectors.filter!(inspector => inspector.typeOf(from) is from.identify);
@@ -559,6 +896,9 @@ class RuntimeMapper : Mapper!(Object, Object) {
                 fromInspectors.front,
                 toInspectors.front
             );
+            mapper.force = this.force;
+            mapper.conversion = this.conversion;
+            mapper.convertors = this.convertors;
 
             mapper.map(from, to, allocator);
 

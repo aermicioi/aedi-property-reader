@@ -161,6 +161,17 @@ unittest {
     auto to = cast(Object) Placeholder().placeholder;
 
     auto mapper = new RuntimeMapper;
+    mapper.conversion = true;
+    mapper.force = true;
+    mapper.convertors = cast(Convertor[]) [
+                StdConvAdvisedConvertor!(int, string)(),
+                StdConvAdvisedConvertor!(string, string)(),
+                StdConvAdvisedConvertor!(double, string)(),
+                StdConvAdvisedConvertor!(long, string)(),
+                StdConvAdvisedConvertor!(string, int)(),
+                StdConvAdvisedConvertor!(string, double)(),
+                StdConvAdvisedConvertor!(string, long)(),
+            ];
     mapper.factory = (
         in PropertyAccessor!Object accessor,
         in PropertySetter!Object setter,
@@ -168,13 +179,6 @@ unittest {
         in Inspector!Object to
     ) =>
         (new CompositeMapper!(Object, Object))
-            .conversion(true)
-            .convertors(cast(Convertor[]) [
-                StdConvAdvisedConvertor!(int, string)(),
-                StdConvAdvisedConvertor!(string, string)(),
-                StdConvAdvisedConvertor!(double, string)(),
-                StdConvAdvisedConvertor!(long, string)(),
-            ])
             .accessor(accessor)
             .setter(setter)
             .fromInspector(from)
@@ -210,29 +214,16 @@ unittest {
         in Inspector!Object to
     ) =>
         (new CompositeMapper!(Object, Object))
-            .conversion(true)
-            .convertors(cast(Convertor[]) [
-                StdConvAdvisedConvertor!(int, string)(),
-                StdConvAdvisedConvertor!(string, string)(),
-                StdConvAdvisedConvertor!(double, string)(),
-                StdConvAdvisedConvertor!(long, string)(),
-                StdConvAdvisedConvertor!(string, int)(),
-                StdConvAdvisedConvertor!(string, double)(),
-                StdConvAdvisedConvertor!(string, long)(),
-            ])
             .accessor(accessor)
             .setter(setter)
             .fromInspector(from)
-            .toInspector(to)
-            .force(true);
+            .toInspector(to);
 
     auto cfrom = cast(Object) [
         "a": "a"
     ].placeholder;
 
     mapper.map(to, cfrom);
-    import std.stdio;
-    cfrom.unwrap!(string[string]).writeln;
 
     assert(to.unwrap!Placeholder.i == cfrom.unwrap!(string[string])["i"].to!int);
     assert(to.unwrap!Placeholder.p == cfrom.unwrap!(string[string])["p"]);

@@ -31,8 +31,8 @@ module aermicioi.aedi_property_reader.core.document;
 
 import aermicioi.aedi;
 import aermicioi.aedi_property_reader.core.exception : ConvertorException;
-import aermicioi.aedi_property_reader.core.placeholder;
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.placeholder;
 import aermicioi.aedi.storage.wrapper;
 import std.meta;
 import std.conv;
@@ -44,8 +44,21 @@ import std.algorithm;
 import std.array;
 import std.experimental.logger;
 
+/**
+An implementation of Container interface from aedi IoC providing access to
+components that are stored into a document.
 
-class DocumentContainer(DocumentType, FieldType = DocumentType) : Container, Storage!(Convertor, string), AllocatorAware!() {
+An implementation of Container interface from aedi IoC providing access to
+components that are stored into a document where a document could be anything
+that is accessable by a PropertyAccessor implementation. Components stored in
+document will be converted according to convertor associated to property
+path from document.
+**/
+class DocumentContainer(DocumentType, FieldType = DocumentType) :
+    Container, Storage!(Convertor, string),
+    AllocatorAware!(),
+    Convertor
+{
 
     mixin AllocatorAwareMixin!(typeof(this));
 
@@ -59,6 +72,13 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) : Container, Sto
     }
 
     public {
+
+        /**
+        Constructor for a container for document.
+
+        Params:
+            document = document stored in container.
+        **/
         this(DocumentType document) {
             this.document = document;
         }
@@ -252,19 +272,8 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) : Container, Sto
 
                 TypeInfo guess = this.guesser.guess(document.value);
             }
-
-            auto convertors = this.convertors.byValue.filter!(c => c.convertsTo(guess));
-
-            if (!convertors.empty) {
-                trace("Guessed convertable type of ", guess, " commencing conversion");
-
-                converted = convertors.front.convert(document, guess, this.allocator);
-                this.components[identity] = converted;
-                return converted;
-            }
-
-            trace("No suitable convertor found for ", typeid(FieldType));
-            throw new ConvertorException(text("Could not convert ", identity, " of ", typeid(FieldType), " type"));
+            trace("Guessed ", guess, " type, commencing conversion");
+            return this.convert(document, guess, this.allocator);
         }
 
         /**
@@ -287,9 +296,166 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) : Container, Sto
 
             return this.accessor.has(this.document, identity);
         }
+
+        @property {
+
+            /**
+            Get the type info of component that convertor can convert from.
+
+            Get the type info of component that convertor can convert from.
+            The method is returning the default type that it is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsFrom method.
+
+            Returns:
+                type info of component that convertor is able to convert.
+            **/
+            TypeInfo from() const nothrow {
+                return typeid(void);
+            }
+
+            /**
+            Get the type info of component that convertor is able to convert to.
+
+            Get the type info of component that convertor is able to convert to.
+            The method is returning the default type that is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsTo method.
+
+            Returns:
+                type info of component that can be converted to.
+            **/
+            TypeInfo to() const nothrow {
+                return typeid(void);
+            }
+        }
+
+        /**
+        Check whether convertor is able to convert from.
+
+        Check whether convertor is able to convert from.
+        The intent of method is to implement customized type checking
+        is not limited immediatly to supported default from component.
+
+        Params:
+            from = the type info of component that could potentially be converted by convertor.
+        Returns:
+            true if it is able to convert from, or false otherwise.
+        **/
+        bool convertsFrom(TypeInfo from) const nothrow {
+            return this.convertors.byValue.canFind!(convertor => convertor.convertsFrom(from));
+        }
+
+        /**
+        Check whether convertor is able to convert from.
+
+        Check whether convertor is able to convert from.
+        The method will try to extract type info out of from
+        object and use for subsequent type checking.
+        The intent of method is to implement customized type checking
+        is not limited immediatly to supported default from component.
+
+        Params:
+            from = the type info of component that could potentially be converted by convertor.
+        Returns:
+            true if it is able to convert from, or false otherwise.
+        **/
+        bool convertsFrom(in Object from) const nothrow {
+            return this.convertors.byValue.canFind!(convertor => convertor.convertsFrom(from));
+        }
+
+        /**
+        Check whether convertor is able to convert to.
+
+        Check whether convertor is able to convert to.
+        The intent of the method is to implement customized type checking
+        that is not limited immediatly to supported default to component.
+
+        Params:
+            to = type info of component that convertor could potentially convert to.
+
+        Returns:
+            true if it is able to convert to, false otherwise.
+        **/
+        bool convertsTo(TypeInfo to) const nothrow {
+            return this.convertors.byValue.canFind!(convertor => convertor.convertsTo(to));
+        }
+
+        /**
+        Check whether convertor is able to convert to.
+
+        Check whether convertor is able to convert to.
+        The method will try to extract type info out of to object and use
+        for subsequent type checking.
+        The intent of the method is to implement customized type checking
+        that is not limited immediatly to supported default to component.
+
+        Params:
+            to = type info of component that convertor could potentially convert to.
+
+        Returns:
+            true if it is able to convert to, false otherwise.
+        **/
+        bool convertsTo(in Object to) const nothrow {
+            return this.convertors.byValue.canFind!(convertor => convertor.convertsTo(to));
+        }
+
+        /**
+        Convert from component to component.
+
+        Params:
+            from = original component that is to be converted.
+            to = destination object that will be constructed out for original one.
+            allocator = optional allocator that could be used to construct to component.
+        Throws:
+            ConvertorException when there is a converting error
+            InvalidArgumentException when arguments passed are not of right type or state
+        Returns:
+            Resulting converted component.
+        **/
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) {
+            trace("Searching for convertor for ", from.identify, " to ", to);
+            auto convertors = this.convertors.byValue.filter!(
+                c => c.convertsTo(to) && c.convertsFrom(from)
+            );
+
+            if (!convertors.empty) {
+                trace("Found convertor ", convertors.front.classinfo, " for ", from.identify, " to ", to);
+
+                return convertors.front.convert(from, to, allocator);
+            }
+
+            trace("No suitable convertor found for ", from.identify, " to ", to);
+            throw new ConvertorException(text("Could not convert ", from.identify));
+        }
+
+        /**
+        Destroy component created using this convertor.
+
+        Destroy component created using this convertor.
+        Since convertor could potentially allocate memory for
+        converted component, only itself is containing history of allocation,
+        and therefore it is responsible as well to destroy and free allocated
+        memory with allocator.
+
+        Params:
+            converted = component that should be destroyed.
+            allocator = allocator used to allocate converted component.
+        **/
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
+            auto destructors = this.convertors.byValue.filter!(convertor => convertor.convertsTo(converted));
+
+            enforce!ConvertorException(!destructors.empty, text("Could not destroy ", converted.identify, ", no suitable convertor found."));
+
+            destructors.front.destruct(converted, allocator);
+        }
     }
 }
 
+/**
+An implementation of document container that holds an advised convertor along the document for usage as default constructor for convertors
+in configuration api.
+**/
 class AdvisedDocumentContainer(DocumentType, FieldType, alias AdvisedConvertor) : DocumentContainer!(DocumentType, FieldType) {
 
     public {

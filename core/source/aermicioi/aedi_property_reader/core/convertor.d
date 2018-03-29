@@ -501,9 +501,55 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
 }
 
 /**
+Interface for convertors that could rely on another convertors to convert a value.
+**/
+interface CombinedConvertor : Convertor {
+
+    /**
+    Set used convertors
+
+    Params:
+        convertors = list of convertors to be used.
+
+    Returns:
+        typeof(this)
+    **/
+    typeof(this) convertors(Convertor[] convertors) @safe nothrow;
+
+    /**
+    ditto
+    **/
+    final T convertors(this T)(Convertor convertors...) @safe nothrow {
+        return this.convertors(convertors.dup);
+    }
+
+    /**
+    Add a convertor to existing list
+
+    Params:
+        convertor = convertor to be added to
+
+    Returns:
+        typeof(this)
+    **/
+    typeof(this) add(Convertor convertor) @safe nothrow;
+
+    /**
+    Remove a convertor from existing list
+
+    Params:
+        convertor = convertor to be removed
+
+    Returns:
+        typeof(this)
+    **/
+    typeof(this) remove(Convertor convertor) @safe nothrow;
+}
+
+/**
 A convertor that is delegating converting task to a set of child convertors.
 **/
-class AggregateConvertor : Convertor {
+class CombinedConvertorImpl : CombinedConvertor {
     import std.algorithm;
 
     private {
@@ -542,6 +588,44 @@ class AggregateConvertor : Convertor {
         **/
         inout(Convertor[]) convertors() @safe nothrow pure inout {
             return this.convertors_;
+        }
+
+        /**
+        Add a convertor to existing list
+
+        Params:
+            convertor = convertor to be added to
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) add(Convertor convertor) @safe {
+            this.convertors_ ~= convertor;
+
+            return this;
+        }
+
+        /**
+        Remove a convertor from existing list
+
+        Params:
+            convertor = convertor to be removed
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) remove(Convertor convertor) @trusted nothrow {
+            import std.algorithm : remove, countUntil;
+            import std.array : array;
+
+            try {
+
+                this.convertors_ = this.convertors_.remove(this.convertors.countUntil!(c => c == convertor));
+            } catch (Exception e) {
+                assert(false, text("countUntil threw an exception: ", e));
+            }
+
+            return this;
         }
 
         @property {
@@ -908,9 +992,6 @@ template AdvisedConvertor(alias Accessor, alias Setter, alias FromInspector, ali
         ) {
             alias AdvisedConvertorImplementation = () => {
                 import aermicioi.aedi_property_reader.core.mapper : CompositeMapper;
-                import aermicioi.aedi_property_reader.core.inspector : Inspector;
-                import aermicioi.aedi_property_reader.core.accessor : CompositeAccessor;
-                import aermicioi.aedi_property_reader.core.setter : CompositeSetter;
 
                 auto convertor = new CompositeConvertor!(To, From)();
                 CompositeMapper!(From, To) mapper = new CompositeMapper!(From, To)();

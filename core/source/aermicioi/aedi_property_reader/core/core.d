@@ -35,23 +35,59 @@ import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.document;
 import std.meta;
 
+/**
+Configuration context that is providing a nice api to add convertors into a container for a document.
+**/
 struct ConvertorContext(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType) {
 
+	/**
+	Configured container.
+	**/
     DocumentContainerType container;
+
+	/**
+	ditto
+	**/
     alias container this;
 
-    ref typeof(this) register(To)(string identity) {
-        container.set(AdvisedConvertor!(To, FieldType)(), identity);
+	/**
+	Associate a convertor to a field in document that has property path, to be used for conversion.
+
+	Params:
+		To = the type of destination component that convertor should yield
+		path = property path for a field in document.
+	**/
+    ref typeof(this) register(To)(string path) {
+		auto convertor = AdvisedConvertor!(To, FieldType)();
+
+		static if (is(typeof(convertor) : CombinedConvertor) && is(DocumentContainerType : Convertor)) {
+			convertor.add(container);
+		}
+
+        container.set(convertor, path);
 
         return this;
     }
 
+	/**
+	Associate a convertor to a type to be used by document when no specific convertor is provided for document field.
+
+	Params:
+		To = the type of destination component that convertor should yield
+	**/
     ref typeof(this) register(To)() {
 
         this.register!(To, To);
     }
 
-    ref typeof(this) register(Iface, To)() {
+	/**
+	Associate a convertor to a type for an interface to be used by document when no specific convertor is provided for document field.
+
+	Params:
+		Iface = interface for which the convertor is bound to.
+		To = the type of destination component that convertor should yield
+	**/
+    ref typeof(this) register(Iface, To : Iface)() {
         import std.traits : fullyQualifiedName;
 
         return this.register!To(fullyQualifiedName!Iface);
@@ -60,10 +96,22 @@ struct ConvertorContext(DocumentContainerType : DocumentContainer!(DocumentType,
     alias property = register;
 }
 
+/**
+Take a document container and create a configuration context for it.
+
+Params:
+	container = container for which configuration context is created.
+
+Returns:
+	ConvertorContext(DocumentContainerType, AdvisedConvertor, DocumentType, FieldType) a configuration context
+**/
 auto configure(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType)(DocumentContainerType container) {
     return ConvertorContext!(DocumentContainerType, AdvisedConvertor)(container);
 }
 
+/**
+ditto
+**/
 auto configure(DocumentContainerType : AdvisedDocumentContainer!(DocumentType, FieldType, AdvisedConvertor), DocumentType, FieldType, alias AdvisedConvertor)(DocumentContainerType container) {
 	return container.configure!(DocumentContainerType, AdvisedConvertor);
 }
