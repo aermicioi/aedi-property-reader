@@ -135,7 +135,7 @@ auto yaml(string pathOrData, bool returnEmpty = true) {
     }
 }
 
-private auto accessor() {
+package auto accessor() {
     import aermicioi.aedi_property_reader.core.accessor;
 
     return dsl(

@@ -56,7 +56,7 @@ License:
 Authors:
 	Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.test.convertor;
+module aermicioi.aedi_property_reader.test.sdlang.convertor;
 
 import std.exception;
 import sdlang;
@@ -68,13 +68,17 @@ import aermicioi.aedi_property_reader.sdlang.accessor : SdlangElement;
 unittest {
 	Tag root = parseSource(q{
 		valid 2 value=1
+		array "an" " " "array"
 		invalid "string" value="march"
 	});
 
 	int i;
+	string[] s;
 
 	SdlangElement(root.tags["valid"].front).convert(i);
+	SdlangElement(root.tags["array"].front).convert(s);
 	assert(i == 2);
+	assert(s == ["an", " ", "array"]);
 
 	SdlangElement(root.tags["valid"].front.attributes["value"].front).convert(i);
 	assert(i == 1);

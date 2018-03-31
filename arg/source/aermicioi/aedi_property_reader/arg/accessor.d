@@ -151,6 +151,9 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
          FieldType accessed property.
      **/
     const(string)[] access(const(string)[] component, string property) const {
+        if (property.empty) {
+            return component;
+        }
 
         return Filter(component, property).array;
     }

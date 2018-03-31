@@ -64,3 +64,16 @@ unittest {
     assertThrown!ConvertorException(convertor.convert(v.placeholder, typeid(size_t)));
 
 }
+
+unittest {
+    import taggedalgebraic;
+    union U {
+        int i;
+        string b;
+    }
+
+    alias Algebraic = TaggedAlgebraic!U;
+
+    alias T = TaggedConvertor!Algebraic;
+
+}

@@ -72,3 +72,40 @@ unittest {
 	assertNotThrown(json("unknown"));
 	assertThrown(json("unkown", false));
 }
+
+unittest {
+	auto c = json(q{
+		{
+			"p": {
+				"s": "hello",
+				"a": ["hello", " ", "world!"],
+				"f": 1.0,
+				"i": 10
+			}
+		}
+	});
+
+	import aermicioi.aedi_property_reader.core.inspector;
+	import aermicioi.aedi_property_reader.core.setter;
+	import aermicioi.aedi_property_reader.core.mapper;
+
+	struct Placeholder {
+		string s;
+		string[] a;
+		double f;
+		long i;
+	}
+
+    with (c.configure) {
+		property!Placeholder("p");
+		property!(string[])("a");
+		property!(double)("f");
+		property!(long)("i");
+		property!(string)("s");
+    }
+
+	import std.stdio;
+	writeln(c.locate!Placeholder("p"));
+
+    assert(c.locate!Placeholder("p") == Placeholder("hello", ["hello", " ", "world!"], 1.0, 10));
+}

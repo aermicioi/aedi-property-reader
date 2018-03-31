@@ -30,7 +30,10 @@ Authors:
 module aermicioi.aedi_property_reader.yaml.convertor;
 
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.yaml.accessor;
+import aermicioi.aedi_property_reader.yaml.yaml : accessor;
+import aermicioi.aedi_property_reader.yaml.inspector;
 import aermicioi.aedi.factory;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.storage.wrapper;
@@ -43,14 +46,24 @@ import std.conv;
 import std.range;
 import std.exception;
 
+public {
+    enum YamlAccessorFactory(From : Node) = () => new RuntimeFieldAccessor!Node(accessor());
+    enum YamlInspectorFactory(From : Node) = () => new YamlInspector;
+}
+
 alias YamlConvertor = ChainedAdvisedConvertor!(
     AdvisedConvertor!(convert, destruct),
-    CompositeAdvisedConvertor
+    AdvisedConvertor!(
+		YamlAccessorFactory,
+		CompositeSetterFactory,
+		CompositeInspectorFactory,
+		YamlInspectorFactory
+	)
 ).AdvisedConvertorImplementation;
 
 
 void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum)) {
+	if (!is(To == enum) && !isAggregateType!To) {
 
 	enforce!InvalidCastException(node.convertsTo!To, text("Could not convert yaml ", dumper(node), " to ", typeid(To)));
 

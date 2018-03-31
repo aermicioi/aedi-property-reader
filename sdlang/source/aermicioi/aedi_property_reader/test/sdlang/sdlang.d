@@ -47,7 +47,7 @@ unittest {
 
     with (c.configure) {
         property!(string)("string"); // Not testing it since factory takes arguments from
-        property!(string)("array");
+        property!(string[])("array");
         property!(float)("float");
         property!(double)("double");
         property!(long)("long");
@@ -55,7 +55,7 @@ unittest {
     }
 
     assert(c.locate!string == "hello");
-	assert(c.locate!string("array") == "ahoj");
+	assert(c.locate!(string[])("array") == ["ahoj", " ", "world!"]);
 	assert(c.locate!float == 1.0);
 	assert(c.locate!double == 2.0);
 	assert(c.locate!int == 10);
@@ -77,4 +77,50 @@ unittest {
 
 	assertNotThrown(sdlang(dirName(__FILE__) ~ "/config_malformed.sdl", true));
 	assertThrown(sdlang(dirName(__FILE__) ~ "/config_malformed.sdl", false));
+}
+
+unittest {
+	auto c = sdlang(q{
+		placeholder d = 2.0 {
+			f 1.0f
+			i 10
+			l 20L
+			s "hello"
+			a "ahoj" " " "world!"
+		}
+		float 1.0f
+		double 2.0
+		int 10
+		long 20L
+		string "hello"
+		array "ahoj" " " "world!"
+	}, false);
+
+	import aermicioi.aedi_property_reader.core.inspector;
+	import aermicioi.aedi_property_reader.core.setter;
+	import aermicioi.aedi_property_reader.core.mapper;
+	import aermicioi.aedi_property_reader.sdlang.convertor;
+	import aermicioi.aedi_property_reader.core.traits;
+
+	static struct Placeholder {
+		float f;
+		double d;
+		int i;
+		long l;
+		string s;
+		string[] a;
+	}
+
+	with (c.configure) {
+		property!Placeholder("placeholder");
+		property!(string[])("array");
+		property!(double)("double");
+		property!(float)("float");
+		property!(long)("long");
+		property!(int)("int");
+		property!(string)("string");
+    }
+
+    assert(c.locate!Placeholder("placeholder") == Placeholder(1.0, 2.0, 10, 20, "hello", ["ahoj", " ", "world!"]));
+    assert(c.locate!Placeholder("placeholder") == Placeholder(1.0, 2.0, 10, 20, "hello", ["ahoj", " ", "world!"]));
 }

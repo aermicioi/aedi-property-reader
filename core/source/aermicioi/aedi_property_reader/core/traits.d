@@ -85,7 +85,7 @@ void n(T)(lazy T value) nothrow {
     }
 }
 
-package {
+public {
     enum isD(T, X) = is(T : X);
 
 }

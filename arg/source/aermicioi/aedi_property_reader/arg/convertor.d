@@ -38,6 +38,11 @@ import std.getopt;
 import std.range;
 import std.experimental.allocator;
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.arg.accessor;
+import aermicioi.aedi_property_reader.core.setter;
+import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.arg.inspector;
 
 void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
     if (isScalarType!To) {
@@ -84,7 +89,17 @@ void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     to = To.init;
 }
 
+public {
+    enum ArgumentAccessorFactory(From : const(string)[]) = () => new RuntimeFieldAccessor!(const(string)[])(new ArgumentAccessor);
+    enum ArgumentInspectorFactory(From : const(string)[]) = () => new ArgumentInspector;
+}
+
 alias ArgumentAdvisedConvertor = ChainedAdvisedConvertor!(
     AdvisedConvertor!(convert, destruct),
-    CompositeAdvisedConvertor
+    AdvisedConvertor!(
+        ArgumentAccessorFactory,
+        CompositeSetterFactory,
+        CompositeInspectorFactory,
+        ArgumentInspectorFactory
+    )
 ).AdvisedConvertorImplementation;

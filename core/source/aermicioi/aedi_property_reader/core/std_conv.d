@@ -32,6 +32,9 @@ module aermicioi.aedi_property_reader.core.std_conv;
 import std.conv : to;
 import std.experimental.allocator;
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.core.setter;
+import aermicioi.aedi_property_reader.core.inspector;
 
 /**
 Convert from component to component using std.conv.to family of functions.
@@ -59,10 +62,21 @@ void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     to = To.init;
 }
 
+public {
+    enum AssociativeArrayAccessorFactory(T) = () => new AssociativeArrayAccessor!T;
+    enum AssociativeArrayInspectorFactory(T) = () => new AssociativeArrayInspector!T;
+}
+
 /**
 Advised callback convertor with std.conv.to convertor and destructor.
 **/
 alias StdConvAdvisedConvertor = ChainedAdvisedConvertor!(
     AdvisedConvertor!(convert, destruct),
-    CompositeAdvisedConvertor
+    CompositeAdvisedConvertor,
+    AdvisedConvertor!(
+        AssociativeArrayAccessorFactory,
+        CompositeSetterFactory,
+        CompositeInspectorFactory,
+        AssociativeArrayInspectorFactory
+    )
 ).AdvisedConvertorImplementation;

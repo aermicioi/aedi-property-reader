@@ -90,7 +90,7 @@ unittest {
 
     Placeholder to;
 
-    auto mapper = new CompositeMapper!(string[string], Placeholder);
+    auto mapper = new CompositeMapper!(Placeholder, string[string]);
     mapper.conversion = false;
     mapper.setter = new CompositeSetter!Placeholder;
     mapper.accessor = new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string, string));

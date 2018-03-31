@@ -69,3 +69,54 @@ unittest {
 	assertNotThrown(yaml(dirName(__FILE__) ~ "/config_malformed.yaml", true));
 	assertThrown(yaml(dirName(__FILE__) ~ "/config_malformed.yaml", false));
 }
+
+
+unittest {
+	auto c = yaml(q{
+placeholder:
+  f: 1.0
+  d: 2.0
+  i: 10
+  l: 20
+  s: "hello"
+  a: ["ahoj", " ", "world!"]
+float: 1.0
+double: 2.0
+int: 10
+long: 20
+string: "hello"
+array: ["ahoj", " ", "world!"]
+}.dup, false);
+
+	import aermicioi.aedi_property_reader.core.inspector;
+	import aermicioi.aedi_property_reader.core.setter;
+	import aermicioi.aedi_property_reader.core.mapper;
+	import aermicioi.aedi_property_reader.core.traits;
+
+	static struct Placeholder {
+		float f;
+		double d;
+		int i;
+		long l;
+		string s;
+		string[] a;
+	}
+
+	import aermicioi.aedi_property_reader.yaml.inspector;
+	import dyaml;
+
+	auto t = YamlAccessorFactory!Node();
+	auto d = new YamlInspector;
+
+	with (c.configure) {
+		property!Placeholder("placeholder");
+		property!(string[])("array");
+		property!(double)("double");
+		property!(float)("float");
+		property!(long)("long");
+		property!(int)("int");
+		property!(string)("string");
+    }
+
+	assert(c.locate!Placeholder("placeholder") == Placeholder(1.0, 2.0, 10, 20, "hello", ["ahoj", " ", "world!"]));
+}

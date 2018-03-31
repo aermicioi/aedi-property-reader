@@ -37,6 +37,7 @@ import aermicioi.util.traits : isPropertyGetter, isPropertySetter, isPublic, isF
 import aermicioi.aedi : NotFoundException;
 import aermicioi.aedi_property_reader.core.placeholder : unwrap, identify;
 import aermicioi.aedi_property_reader.core.traits : isD;
+import aermicioi.aedi_property_reader.core.type_guesser : TypeGuesser;
 import taggedalgebraic;
 
 /**
@@ -96,7 +97,7 @@ interface Inspector(ComponentType, KeyType = string) {
 /**
 Associative array inspector.
 **/
-class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspector!(ComponentType[KeyType], KeyType) {
+class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspector!(ComponentType[KeyType], KeyType), TypeGuesser!(ComponentType[KeyType]) {
 
     /**
     Identify the type of child field of component.
@@ -126,6 +127,19 @@ class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspec
     **/
     TypeInfo typeOf(ComponentType[KeyType] component) const nothrow {
         return typeid(ComponentType[KeyType]);
+    }
+
+    /**
+    Guess the D type of serialized based on information available in it.
+
+    Params:
+        serialized = the component for which guesser will attempt to guess the type.
+
+    Returns:
+        TypeInfo guessed type
+    **/
+    TypeInfo guess(ComponentType[KeyType] serialized) {
+        return this.typeOf(serialized);
     }
 
     /**
@@ -161,7 +175,7 @@ class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspec
 /**
 Array inspector
 **/
-class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t) {
+class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t), TypeGuesser!(ComponentType[]) {
 
     /**
     Identify the type of child field of component.
@@ -198,6 +212,19 @@ class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t) {
     }
 
     /**
+    Guess the D type of serialized based on information available in it.
+
+    Params:
+        serialized = the component for which guesser will attempt to guess the type.
+
+    Returns:
+        TypeInfo guessed type
+    **/
+    TypeInfo guess(ComponentType[] serialized) {
+        return this.typeOf(serialized);
+    }
+
+    /**
     Check if component has a field or a property.
 
     Params:
@@ -228,11 +255,17 @@ class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t) {
     }
 }
 
-class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : Inspector!Type, Type) : Inspector!Tagged
+class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector!Tagged, TypeGuesser!(Tagged)
     if (anySatisfy!(ApplyRight!(isD, Type), Fields!Union)) {
+    import std.experimental.logger;
+    import aermicioi.aedi_property_reader.core.traits : n;
 
     private {
         Inspector!Type inspector_;
+    }
+
+    this(Inspector!Type inspector) {
+        this.inspector = inspector;
     }
 
     @property {
@@ -281,7 +314,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : I
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
                     if (mixin("component.Kind." ~ e ~ " == component.kind")) {
 
-                        return this.inspector.typeOf(cast(const(Type)) component, property);
+                        return this.inspector.typeOf(cast(Type) component, property);
                     }
 
                     return typeid(void);
@@ -307,7 +340,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : I
     Returns:
         Type info of component, or typeid(void) if component cannot be identified by inspector
     **/
-    TypeInfo typeOf(ComponentType component) const nothrow {
+    TypeInfo typeOf(Tagged component) const nothrow {
         try {
 
             import std.meta;
@@ -317,7 +350,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : I
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
                     if (mixin("component.Kind." ~ e ~ " == component.kind")) {
 
-                        return this.inspector.typeOf(cast(const(Type)) component);
+                        return this.inspector.typeOf(cast(Type) component);
                     }
 
                     return typeid(void);
@@ -332,6 +365,25 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : I
     }
 
     /**
+    Guess the D type of serialized based on information available in it.
+
+    Params:
+        serialized = the component for which guesser will attempt to guess the type.
+
+    Returns:
+        TypeInfo guessed type
+    **/
+    TypeInfo guess(Tagged serialized) {
+        TypeInfo type = this.typeOf(serialized);
+
+        if (type is typeid(void)) {
+            return typeid(serialized);
+        }
+
+        return type;
+    }
+
+    /**
     Check if component has a field or a property.
 
     Params:
@@ -341,7 +393,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : I
     Returns:
         true if field is present either in readonly, or writeonly form (has getters and setters).
     **/
-    bool has(ComponentType component, in KeyType property) const nothrow {
+    bool has(Tagged component, in string property) const nothrow {
         try {
 
             import std.meta;
@@ -351,7 +403,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : I
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
                     if (mixin("component.Kind." ~ e ~ " == component.kind")) {
 
-                        return this.inspector.has(cast(const(Type)) component, property);
+                        return this.inspector.has(cast(Type) component, property);
                     }
 
                     return false;
@@ -374,7 +426,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : I
     Returns:
         an arary of property identities.
     **/
-    KeyType[] properties(ComponentType component) const nothrow {
+    string[] properties(Tagged component) const nothrow {
         try {
 
             import std.meta;
@@ -384,7 +436,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : I
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
                     if (mixin("component.Kind." ~ e ~ " == component.kind")) {
 
-                        return this.inspector.properties(cast(const(Type)) component);
+                        return this.inspector.properties(cast(Type) component);
                     }
 
                     return [];
@@ -402,7 +454,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Union, InspectorType : I
 /**
 Inspector for composite components (structs, objects, unions, etc.).
 **/
-class CompositeInspector(ComponentType) : Inspector!(ComponentType, string)
+class CompositeInspector(ComponentType) : Inspector!(ComponentType, string), TypeGuesser!ComponentType
     if (isAggregateType!ComponentType) {
 
     /**
@@ -450,6 +502,25 @@ class CompositeInspector(ComponentType) : Inspector!(ComponentType, string)
     **/
     TypeInfo typeOf(ComponentType component) const nothrow {
         return typeid(ComponentType);
+    }
+
+    /**
+    Guess the D type of serialized based on information available in it.
+
+    Params:
+        serialized = the component for which guesser will attempt to guess the type.
+
+    Returns:
+        TypeInfo guessed type
+    **/
+    TypeInfo guess(ComponentType serialized) {
+        TypeInfo type = this.typeOf(serialized);
+
+        if (type is typeid(void)) {
+            return typeid(serialized);
+        }
+
+        return type;
     }
 
     /**
@@ -557,7 +628,7 @@ class RuntimeInspector(Type, KeyType = string) : Inspector!(Object, KeyType) {
                 return this.inspector.typeOf(wrapped.unwrap!Type, property);
             }
 
-            return wrapped.classinfo;
+            return typeid(void);
         }
 
         /**
@@ -578,7 +649,26 @@ class RuntimeInspector(Type, KeyType = string) : Inspector!(Object, KeyType) {
                 return this.inspector.typeOf(component.unwrap!Type);
             }
 
-            return component.classinfo;
+            return typeid(void);
+        }
+
+        /**
+        Guess the D type of serialized based on information available in it.
+
+        Params:
+            serialized = the component for which guesser will attempt to guess the type.
+
+        Returns:
+            TypeInfo guessed type
+        **/
+        TypeInfo guess(Object serialized) {
+            TypeInfo type = this.typeOf(serialized);
+
+            if (type is typeid(void)) {
+                return serialized.classinfo;
+            }
+
+            return type;
         }
 
         /**
@@ -607,5 +697,135 @@ class RuntimeInspector(Type, KeyType = string) : Inspector!(Object, KeyType) {
         KeyType[] properties(Object wrapped) const nothrow {
             return this.inspector.properties(wrapped.unwrap!Type);
         }
+    }
+}
+
+/**
+Provides type and field information of a composite component at runtime.
+**/
+class CombinedInspector(ComponentType, KeyType = string) : Inspector!(ComponentType, KeyType) {
+
+    private {
+        Inspector!(ComponentType, KeyType) inspectors_;
+    }
+
+    /**
+    Set inspectors
+
+    Params:
+        inspectors = list of inspectors used to inspect the type
+
+    Returns:
+        typeof(this)
+    **/
+    typeof(this) inspectors(Inspector!(ComponentType, KeyType)[] inspectors) @safe nothrow pure {
+        this.inspectors_ = inspectors;
+
+        return this;
+    }
+
+    /**
+    Set inspectors
+
+    Params:
+        inspectors = list of inspectors used to inspect the type
+
+    Returns:
+        typeof(this)
+    **/
+    typeof(this) inspectors(Inspector!(ComponentType, KeyType) inspectors...) @safe nothrow pure {
+        this.inspectors_ = inspectors.dup;
+
+        return this;
+    }
+
+    /**
+    Get inspectors
+
+    Returns:
+        Inspector!(ComponentType, KeyType)[]
+    **/
+    inout(Inspector!(ComponentType, KeyType)) inspectors() @safe nothrow pure inout {
+        return this.inspectors_;
+    }
+
+    /**
+    Identify the type of child field of component.
+
+    Params:
+        component = a composite component (class, struct, assoc array etc.) containing some fields
+
+    Returns:
+        Type of field, or typeid(void) if field is not present in component
+    **/
+    TypeInfo typeOf(ComponentType component, in KeyType property) const nothrow {
+        foreach (inspector; this.inspectors) {
+            TypeInfo type = inspector.typeOf(component, property);
+
+            if (type !is typeid(void)) {
+                return type;
+            }
+        }
+
+        return typeid(void);
+    }
+
+    /**
+    Identify the type of component itself.
+
+    Identify the type of component itself. It will inspect the component and will return accurate
+    type info that the component represents.
+
+    Params:
+        component = component which should be identified.
+
+    Returns:
+        Type info of component, or typeid(void) if component cannot be identified by inspector
+    **/
+    TypeInfo typeOf(ComponentType component) const nothrow {
+        foreach (inspector; this.inspectors) {
+            TypeInfo type = inspector.typeOf(component);
+
+            if (type !is typeid(void)) {
+                return type;
+            }
+        }
+
+        return typeid(void);
+    }
+
+    /**
+    Check if component has a field or a property.
+
+    Params:
+        component = component with fields
+        property = component property that is tested for existence
+
+    Returns:
+        true if field is present either in readonly, or writeonly form (has getters and setters).
+    **/
+    bool has(ComponentType component, in KeyType property) const nothrow {
+        foreach (inspector; this.inspectors) {
+            bool has = inspector.has(component, property);
+
+            if (has) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+    Return a list of properties that component holds.
+
+    Params:
+        component = the component with fields
+
+    Returns:
+        an arary of property identities.
+    **/
+    KeyType[] properties(ComponentType component) const nothrow {
+        return this.inspectors.map!(i => i.properties).joiner.array;
     }
 }

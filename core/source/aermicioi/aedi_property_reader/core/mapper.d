@@ -44,7 +44,7 @@ import std.conv;
 /**
 Interface for components that are able to map from one type to another one.
 **/
-interface Mapper(From, To = From) {
+interface Mapper(To, From = To) {
 
     /**
     Map from component to component.
@@ -126,7 +126,7 @@ It will use inspectors for From and To component to get information about compon
 at runtime, and then use accessor and setter implementations to transfer data from one
 component to another, with optional conversion of data using passed convertors.
 **/
-class CompositeMapper(From, To) : Mapper!(From, To) {
+class CompositeMapper(To, From) : Mapper!(To, From) {
 
     private {
         import std.typecons : Rebindable;
@@ -340,7 +340,11 @@ class CompositeMapper(From, To) : Mapper!(From, To) {
                 if (this.toInspector.has(to, property) || this.force) {
 
                     Object value = this.accessor.access(from, property);
-                    if (this.fromInspector.typeOf(from, property) != this.toInspector.typeOf(to, property)) {
+                    import std.stdio;
+
+                    if (
+                        (this.fromInspector.typeOf(from, property) != this.toInspector.typeOf(to, property))
+                    ) {
                         if (this.conversion) {
                             trace(
                                 property,
@@ -382,7 +386,7 @@ class CompositeMapper(From, To) : Mapper!(From, To) {
                         trace("Migrated ", property, " from ", from.identify, " to ", to.identify);
                     } catch (Exception e) {
 
-                        trace("Couldn't ", this.force ? "forcefully " : "", "set property ", property, " to ", to.identify, " from ", from.identify);
+                        trace("Couldn't ", this.force ? "forcefully " : "", "set property ", property, " to ", to.identify, " from ", from.identify, " due to ", e);
                     }
                 } else {
 
@@ -397,9 +401,11 @@ class CompositeMapper(From, To) : Mapper!(From, To) {
 An implementation of convertor that is using a mapper to map from component to component.
 **/
 class CompositeConvertor(To, From) : CombinedConvertor {
+    import std.algorithm;
+    import std.array;
 
     private {
-        Mapper!(From, To) mapper_;
+        Mapper!(To, From) mapper_;
     }
 
     public {
@@ -414,6 +420,8 @@ class CompositeConvertor(To, From) : CombinedConvertor {
         **/
         typeof(this) convertors(Convertor[] convertors) @safe nothrow {
             this.mapper.convertors = convertors;
+
+            return this;
         }
 
         /**
@@ -427,6 +435,8 @@ class CompositeConvertor(To, From) : CombinedConvertor {
         **/
         typeof(this) add(Convertor convertor) @safe nothrow {
             this.mapper.convertors = this.mapper.convertors ~ convertor;
+
+            return this;
         }
 
         /**
@@ -438,8 +448,15 @@ class CompositeConvertor(To, From) : CombinedConvertor {
         Returns:
             typeof(this)
         **/
-        typeof(this) remove(Convertor convertor) @safe nothrow {
-            this.mapper.convertors = this.mapper.convertors.filter!(c => c != convertor).array;
+        typeof(this) remove(Convertor convertor) @trusted nothrow {
+            try {
+                this.mapper.convertors = this.mapper.convertors.filter!(c => c != convertor).array;
+
+            } catch (Exception e) {
+                assert(false, text("Failed to remove convertor due to ", e));
+            }
+
+            return this;
         }
 
         @property {
@@ -452,7 +469,7 @@ class CompositeConvertor(To, From) : CombinedConvertor {
             Returns:
                 typeof(this)
             **/
-            typeof(this) mapper(Mapper!(From, To) mapper) @safe nothrow pure {
+            typeof(this) mapper(Mapper!(To, From) mapper) @safe nothrow pure {
                 this.mapper_ = mapper;
 
                 return this;
@@ -462,9 +479,9 @@ class CompositeConvertor(To, From) : CombinedConvertor {
             Get mapper
 
             Returns:
-                Mapper!(From, To)
+                Mapper!(To, From)
             **/
-            inout(Mapper!(From, To)) mapper() @safe nothrow pure inout {
+            inout(Mapper!(To, From)) mapper() @safe nothrow pure inout {
                 return this.mapper_;
             }
 
@@ -589,11 +606,13 @@ class CompositeConvertor(To, From) : CombinedConvertor {
 
             static if (is(To : Object)) {
                 To placeholder = allocator.make!To;
+                this.mapper.map(from.unwrap!From, placeholder, allocator);
             } else {
-                Placeholder!To placeholder = allocator.make!(PlaceholderImpl!To)(To.init);
+                auto placeholder = allocator.make!(PlaceholderImpl!To)(To.init);
+                this.mapper.map(from.unwrap!From, placeholder.value, allocator);
             }
 
-            this.mapper.map(from.unwrap!From, to, allocator);
+            return placeholder;
         }
 
         /**

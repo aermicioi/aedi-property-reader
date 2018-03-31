@@ -332,17 +332,17 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
             }
         }
 
-    /**
-     Get a property out of component
+        /**
+        Get a property out of component
 
-     Params:
-         component = a component which has some properties identified by property.
-     Throws:
-         NotFoundException in case when no requested property is available.
-         InvalidArgumentException in case when passed arguments are somehow invalid for use.
-     Returns:
-         FieldType accessed property.
-     **/
+        Params:
+            component = a component which has some properties identified by property.
+        Throws:
+            NotFoundException in case when no requested property is available.
+            InvalidArgumentException in case when passed arguments are somehow invalid for use.
+        Returns:
+            FieldType accessed property.
+        **/
         FieldType access(ComponentType component, in KeyType path) const {
             import std.algorithm;
             import std.range;
@@ -362,7 +362,7 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
                         "Could not find ",
                         identity,
                         " in ",
-                        current,
+                        typeid(component),
                         " for property path of ",
                         path
                     ));
@@ -372,26 +372,26 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
             return current;
         }
 
-    /**
-     Check if requested property is present in component.
+        /**
+        Check if requested property is present in component.
 
-     Check if requested property is present in component.
-     The method could have allocation side effects due to the fact that
-     it is not restricted in calling access method of the accessor.
+        Check if requested property is present in component.
+        The method could have allocation side effects due to the fact that
+        it is not restricted in calling access method of the accessor.
 
-     Params:
-         component = component which is supposed to have property
-         property = speculated property that is to be tested if it is present in component
-     Returns:
-         true if property is in component
-     **/
+        Params:
+            component = component which is supposed to have property
+            property = speculated property that is to be tested if it is present in component
+        Returns:
+            true if property is in component
+        **/
         bool has(in ComponentType component, in KeyType path) const nothrow {
 
             try {
 
                 auto identities = path.splitter(this.separator);
 
-                ComponentType current = cast(ComponentType) component;
+                ComponentType current = cast() component;
 
                 foreach (identity; identities) {
                     if (!this.accessor.has(current, identity)) {
@@ -949,7 +949,7 @@ class TaggedElementPropertyAccessorWrapper(
 
             import aermicioi.aedi.exception.not_found_exception : NotFoundException;
             import std.conv : text;
-            throw new NotFoundException(text(component, " does not have ", property));
+            throw new NotFoundException(text(component.kind, " does not have ", property));
         }
 
     /**
@@ -985,7 +985,7 @@ class TaggedElementPropertyAccessorWrapper(
                 assert(false, "TaggedAlgebraic does not have " ~ fullyQualifiedName!X ~ " as member");
 
             } catch (Exception e) {
-                error("Failed to unwrap tagged component ", component, " due to ", e).n;
+                error("Failed to unwrap tagged component ", component.kind, " due to ", e).n;
             }
 
             return false;
@@ -1022,7 +1022,7 @@ class TaggedElementPropertyAccessorWrapper(
                 }
 
             } catch (Exception e) {
-                error("Failed to unwrap tagged component ", component, " due to ", e).n;
+                error("Failed to unwrap tagged component ", component.kind, " due to ", e).n;
             }
 
             assert(false, "Got stored a value that is not in tagged algebraic");

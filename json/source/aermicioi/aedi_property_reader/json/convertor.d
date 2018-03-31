@@ -30,6 +30,11 @@ Authors:
 module aermicioi.aedi_property_reader.json.convertor;
 
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.core.setter;
+import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.json.accessor;
+import aermicioi.aedi_property_reader.json.inspector;
 import aermicioi.aedi.factory;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.storage.wrapper;
@@ -40,9 +45,21 @@ import std.traits;
 import std.conv : to;
 import std.experimental.allocator;
 
+private {
+    enum JAccessor(From : JSONValue) = () => new RuntimeFieldAccessor!JSONValue(dsl(new JsonPropertyAccessor, new JsonIndexAccessor));
+    enum JInspector(From : JSONValue) = () => new JsonInspector;
+    enum CSetter(To) = () => new CompositeSetter!To();
+    enum CInspector(To) = () => new CompositeInspector!To();
+}
+
 alias JsonConvertor = ChainedAdvisedConvertor!(
     AdvisedConvertor!(convert, destruct),
-    CompositeAdvisedConvertor
+    AdvisedConvertor!(
+        JAccessor,
+        CSetter,
+        CInspector,
+        JInspector
+    )
 ).AdvisedConvertorImplementation;
 
 /**

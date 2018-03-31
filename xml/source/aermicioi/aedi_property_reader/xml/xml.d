@@ -139,7 +139,7 @@ auto xml(string pathOrData, bool returnEmpty = true) {
     throw new Exception("Could not create xml convertor container from file or content passed in pathOrData: " ~ pathOrData);
 }
 
-private auto accessor() {
+package auto accessor() {
     return dsl(
         new AggregatePropertyAccessor!XmlElement(
             new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlAttributePropertyAccessor)(new XmlAttributePropertyAccessor),

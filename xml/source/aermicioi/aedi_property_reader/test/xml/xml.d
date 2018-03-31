@@ -85,3 +85,68 @@ unittest {
 	assertNotThrown(xml(dirName(__FILE__) ~ "/config_malformed.xml", true));
 	assertThrown(xml(dirName(__FILE__) ~ "/config_malformed.xml", false));
 }
+
+unittest {
+	auto c = xml(q{
+		<root>
+			<placeholder f="1.0">
+				<d>
+					2.0
+				</d>
+				<i>
+					10
+				</i>
+				<l>
+					20
+				</l>
+				<s>hello</s>
+				<a>
+					<v>ahoj</v>
+					<v> </v>
+					<v>world!</v>
+				</a>
+			</placeholder>
+
+			<float>
+				1.0
+			</float>
+			<integer>
+				10
+			</integer>
+			<string>
+				hello
+			</string>
+			<array>
+				<v>ahoj</v>
+				<v> </v>
+				<v>world!</v>
+			</array>
+		</root>
+	});
+
+	import aermicioi.aedi_property_reader.core.inspector;
+	import aermicioi.aedi_property_reader.core.setter;
+	import aermicioi.aedi_property_reader.core.mapper;
+	import aermicioi.aedi_property_reader.core.traits;
+
+	static struct Placeholder {
+		float f;
+		double d;
+		int i;
+		long l;
+		string s;
+		string[] a;
+	}
+
+	with (c.configure) {
+		property!Placeholder("placeholder");
+		property!(string[])("array");
+		property!(double)("double");
+		property!(float)("float");
+		property!(long)("long");
+		property!(int)("int");
+		property!(string)("string");
+    }
+
+	assert(c.locate!Placeholder("placeholder") == Placeholder(1.0, 2.0, 10, 20, "hello", ["ahoj", " ", "world!"]));
+}

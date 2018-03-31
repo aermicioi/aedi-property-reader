@@ -30,7 +30,11 @@ Authors:
 module aermicioi.aedi_property_reader.xml.convertor;
 
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.core.inspector;
 import aermicioi.aedi_property_reader.xml.accessor;
+import aermicioi.aedi_property_reader.xml.xml : accessor;
+import aermicioi.aedi_property_reader.xml.inspector;
 import aermicioi.aedi.exception;
 import std.traits;
 import std.xml;
@@ -38,9 +42,19 @@ import std.string : strip;
 import std.conv : to, ConvException;
 import std.experimental.allocator;
 
+public {
+    enum XmlAccessorFactory(From : XmlElement) = () => new RuntimeFieldAccessor!XmlElement(accessor());
+    enum XmlInspectorFactory(From : XmlElement) = () => new TaggedInspector!(XmlElement, Element)(new XmlInspector);
+}
+
 alias XmlConvertor = ChainedAdvisedConvertor!(
     AdvisedConvertor!(convert, destruct),
-    CompositeAdvisedConvertor
+    AdvisedConvertor!(
+        XmlAccessorFactory,
+        CompositeSetterFactory,
+        CompositeInspectorFactory,
+        XmlInspectorFactory
+    )
 ).AdvisedConvertorImplementation;
 
 /**

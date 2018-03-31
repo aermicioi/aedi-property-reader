@@ -139,7 +139,7 @@ auto sdlang(string pathOrData, bool returnEmpty = true) {
     }
 }
 
-private auto accessor() {
+package auto accessor() {
     return dsl(
         new AggregatePropertyAccessor!SdlangElement(
             new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangAttributePropertyAccessor)(new SdlangAttributePropertyAccessor),

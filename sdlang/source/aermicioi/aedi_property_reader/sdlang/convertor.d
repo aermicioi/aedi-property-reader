@@ -30,16 +30,31 @@ Authors:
 module aermicioi.aedi_property_reader.sdlang.convertor;
 
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.sdlang.inspector;
 import aermicioi.aedi.exception.invalid_cast_exception : InvalidCastException;
 import aermicioi.aedi_property_reader.sdlang.accessor : SdlangElement;
 import sdlang.ast;
 import sdlang;
 import std.conv;
+import std.traits;
 import std.experimental.allocator;
+
+public {
+	import aermicioi.aedi_property_reader.sdlang.sdlang : accessor;
+	enum SdlangAccessorFactory(From : SdlangElement) = () => new RuntimeFieldAccessor!SdlangElement(accessor());
+	enum SdlangInspectorFactory(From : SdlangElement) = () => new TaggedInspector!(SdlangElement, Tag)(new SdlangTagInspector);
+}
 
 alias SdlangConvertor = ChainedAdvisedConvertor!(
     AdvisedConvertor!(convert, destruct),
-    CompositeAdvisedConvertor
+    AdvisedConvertor!(
+		SdlangAccessorFactory,
+		CompositeSetterFactory,
+		CompositeInspectorFactory,
+		SdlangInspectorFactory
+	)
 ).AdvisedConvertorImplementation;
 
 void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
@@ -49,6 +64,23 @@ void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = t
 	} catch (ValueNotFoundException e) {
 
 		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+	}
+}
+
+void convert(To : E[], From : Tag, E)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && !is(To : ubyte[]) && !isSomeString!To) {
+
+	import std.variant;
+	to = allocator.makeArray!E(from.values.length);
+
+	foreach (index, ref value; to) {
+		try {
+
+			value = from.values[index].get!E;
+		} catch (VariantException e) {
+
+			throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value ", e));
+		}
 	}
 }
 
