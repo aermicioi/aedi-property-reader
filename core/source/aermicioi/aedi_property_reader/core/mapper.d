@@ -115,6 +115,25 @@ interface Mapper(To, From = To) {
             bool
         **/
         inout(bool) conversion() @safe nothrow pure inout;
+
+        /**
+        Set skip
+
+        Params:
+            skip = whether to skip mapping of fields that have their type not identifiable in destination component
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) skip(bool skip) @safe nothrow pure;
+
+        /**
+        Get skip
+
+        Returns:
+            bool
+        **/
+        inout(bool) skip() @safe nothrow pure inout;
     }
 }
 
@@ -132,6 +151,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
         import std.typecons : Rebindable;
         bool conversion_;
         bool force_;
+        bool skip_;
 
         Convertor[] convertors_;
 
@@ -318,6 +338,31 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             inout(bool) force() @safe nothrow pure inout {
                 return this.force_;
             }
+
+            /**
+            Set skip
+
+            Params:
+                skip = whether to skip mapping of fields that have their type not identifiable in destination component
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) skip(bool skip) @safe nothrow pure {
+                this.skip_ = skip;
+
+                return this;
+            }
+
+            /**
+            Get skip
+
+            Returns:
+                bool
+            **/
+            inout(bool) skip() @safe nothrow pure inout {
+                return this.skip_;
+            }
         }
 
         /**
@@ -336,7 +381,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             trace("Mapping ", this.fromInspector.properties(from), " of ", from.identify, " to ", to.identify);
             foreach (property; this.fromInspector.properties(from)) {
 
-                trace("Migrating ", property, " property ");
+                trace("Migrating \"", property, "\" property ");
                 if (this.toInspector.has(to, property) || this.force) {
 
                     Object value = this.accessor.access(from, property);
@@ -346,9 +391,20 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                         (this.fromInspector.typeOf(from, property) != this.toInspector.typeOf(to, property))
                     ) {
                         if (this.conversion) {
-                            trace(
+                            if (this.toInspector.typeOf(to, property) is typeid(void)) {
+                                if (this.skip) {
+                                    trace("Skipping migration of \"", property, "\" due to missing type information in destination component");
+                                    continue;
+                                }
+
+                                throw new ConvertorException(text(
+                                        "Cannot identify type of \"", property, "\" in destination component, probably missing"
+                                ));
+                            }
+
+                            trace("\"",
                                 property,
-                                " type differs in original component and destination component, ",
+                                "\"'s type differs in original component and destination component, ",
                                 this.fromInspector.typeOf(from, property), " and ",
                                 this.toInspector.typeOf(to, property)
                             );
@@ -359,17 +415,17 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                             );
 
                             enforce!ConvertorException(!compatible.empty, text(
-                                "Could not find convertor to convert ", property, " from ", this.fromInspector.typeOf(from, property),
+                                "Could not find convertor to convert \"", property, "\" from ", this.fromInspector.typeOf(from, property),
                                 " to ", this.toInspector.typeOf(to, property)
                             ));
 
-                            trace("Found convertor for ", property, " from ", compatible.front.from, " to ", compatible.front.to);
+                            trace("Found convertor for \"", property, "\" from ", compatible.front.from, " to ", compatible.front.to);
 
                             value = compatible.front.convert(value, this.toInspector.typeOf(to, property), allocator);
                         } else {
 
                             throw new InvalidArgumentException(text(
-                                "Invalid assignment ", property, " has type of ", this.fromInspector.typeOf(from, property),
+                                "Invalid assignment \"", property, "\" has type of ", this.fromInspector.typeOf(from, property),
                                 " in from component while in to component it is ", this.toInspector.typeOf(to, property)
                             ));
                         }
@@ -383,14 +439,14 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                             property
                         );
 
-                        trace("Migrated ", property, " from ", from.identify, " to ", to.identify);
+                        trace("Migrated \"", property, "\" from ", from.identify, " to ", to.identify);
                     } catch (Exception e) {
 
-                        trace("Couldn't ", this.force ? "forcefully " : "", "set property ", property, " to ", to.identify, " from ", from.identify, " due to ", e);
+                        trace("Couldn't ", this.force ? "forcefully " : "", "set property \"", property, "\" to ", to.identify, " from ", from.identify, " due to ", e);
                     }
                 } else {
 
-                    error(to.identify, " element does not have ", property);
+                    error(to.identify, " element does not have: ", property);
                 }
             }
         }
@@ -601,7 +657,11 @@ class CompositeConvertor(To, From) : CombinedConvertor {
         **/
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) {
             enforce!InvalidArgumentException(this.convertsFrom(from), text(
-                "Cannot convert ", from.identify, " to ", typeid(To), " not supported by ", typeid(this)
+                "Cannot convert ", from.identify, " to ", typeid(To), ", ", from.identify, " is not supported by ", typeid(this)
+            ));
+
+            enforce!InvalidArgumentException(this.convertsTo(to), text(
+                "Cannot convert ", from.identify, " to ", typeid(To), ", ", to, " is not supported by ", typeid(this)
             ));
 
             static if (is(To : Object)) {
@@ -653,6 +713,7 @@ class RuntimeMapper : Mapper!(Object, Object) {
     private {
         bool conversion_;
         bool force_;
+        bool skip_;
 
         Convertor[] convertors_;
 
@@ -744,6 +805,31 @@ class RuntimeMapper : Mapper!(Object, Object) {
             **/
             inout(bool) force() @safe nothrow pure inout {
                 return this.force_;
+            }
+
+            /**
+            Set skip
+
+            Params:
+                skip = whether to skip mapping of fields that have their type not identifiable in destination component
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) skip(bool skip) @safe nothrow pure {
+                this.skip_ = skip;
+
+                return this;
+            }
+
+            /**
+            Get skip
+
+            Returns:
+                bool
+            **/
+            inout(bool) skip() @safe nothrow pure inout {
+                return this.skip_;
             }
 
             /**
@@ -917,6 +1003,7 @@ class RuntimeMapper : Mapper!(Object, Object) {
             );
             mapper.force = this.force;
             mapper.conversion = this.conversion;
+            mapper.skip = this.skip;
             mapper.convertors = this.convertors;
 
             mapper.map(from, to, allocator);

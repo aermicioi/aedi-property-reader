@@ -1,0 +1,7 @@
+first: 23
+second: 2.0
+third: "Some yaml string"
+yaml:
+    first: 9
+    second: 9.0
+    third: "Yaml string"

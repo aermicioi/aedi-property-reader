@@ -234,14 +234,18 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
 			Object element if it is available.
 		**/
         Object get(string identity) {
-            trace("Searching for ", identity);
+            trace("Searching for \"", identity, '"');
 
             Object converted;
 
             if (auto peeked = identity in this.components) {
-                trace("Found already converted ", identity);
+                trace("Found already converted \"", identity, '"');
 
                 return *peeked;
+            }
+
+            if (!this.accessor.has(this.document, identity)) {
+                throw new NotFoundException(text("Could not find \"", identity, "\" in document of type ", typeid(DocumentType)));
             }
 
             static if (is(FieldType : Object)) {
@@ -252,11 +256,11 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
                 auto document = scoped!(PlaceholderImpl!FieldType)(this.accessor.access(this.document, identity));
             }
 
-            trace("Searching for suitable convertor for ", identity, " of ", typeid(FieldType));
+            trace("Searching for suitable convertor for \"", identity, "\" of ", typeid(FieldType));
 
             if (auto convertor = identity in this.convertors) {
                 if (convertor.to !is typeid(void)) {
-                    trace("Found convertor for ", identity, " commencing conversion to ", convertor.to);
+                    trace("Found convertor for \"", identity, "\" commencing conversion to ", convertor.to);
 
                     converted = (*convertor).convert(document, convertor.to, this.allocator);
                     this.components[identity] = converted;
@@ -311,7 +315,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
                 type info of component that convertor is able to convert.
             **/
             TypeInfo from() const nothrow {
-                return typeid(void);
+                return typeid(FieldType);
             }
 
             /**

@@ -4,9 +4,7 @@
 		"Alexandru Ermicioi"
 	],
 	"dependencies": {
-		"aedi-property-reader": {
-			"path": "../../"
-		}
+		"aedi-property-reader": "~master"
 	},
 	"description": "Minimal aedi property reader example.",
 	"copyright": "Copyright © 2017, Alexandru Ermicioi",

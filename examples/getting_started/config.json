@@ -1,0 +1,10 @@
+{
+    "json": {
+        "first": 20,
+        "second": 2.3,
+        "third": "A sample string"
+    },
+    "first": 30,
+    "second": 3.3,
+    "third": "A sample string alone"
+}

@@ -27,7 +27,7 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.test.xml.convertor_configurer;
+module aermicioi.aedi_property_reader.test.xml.xml;
 
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.test.fixture;

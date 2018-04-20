@@ -317,12 +317,13 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
                         return this.inspector.typeOf(cast(Type) component, property);
                     }
 
+                    error("Could not identify tagged algebraic's ", typeid(component), " inner type, returning void.").n;
                     return typeid(void);
                 }
             }
 
         } catch (Exception e) {
-            error("Failed to unwrap tagged component ", component, " due to ", e).n;
+            error("Failed to unwrap tagged component ", component, " due to ", e, " returning void").n;
         }
 
         return typeid(void);
@@ -438,8 +439,6 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
 
                         return this.inspector.properties(cast(Type) component);
                     }
-
-                    return [];
                 }
             }
 

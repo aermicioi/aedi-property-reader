@@ -94,7 +94,7 @@ ditto
 **/
 auto xml(RCIAllocator allocator = theAllocator) {
 
-    return XmlElement("").xml(allocator);
+    return XmlElement(new Document("<root><root>")).xml(allocator);
 }
 
 
@@ -108,23 +108,37 @@ Returns:
     XmlConvertorContainer
 **/
 auto xml(string pathOrData, bool returnEmpty = true) {
+    import std.experimental.logger;
     import std.file;
+    trace("Loading xml document from ", pathOrData);
+
     try {
+        trace("Attempting to parse ", pathOrData, " as xml");
+
         check(pathOrData);
+
+        trace("Parsed as xml");
         return xml(XmlElement(new Document(pathOrData)));
     } catch (CheckException e) {
 
+        trace(pathOrData, " is does not contain valid xml due to: ", e);
     }
 
+    trace("Attempting to parse ", pathOrData, " as xml file");
     if (pathOrData.exists) {
+
         pathOrData = pathOrData.readText();
 
         try {
             check(pathOrData);
+
+            trace("Parsed as xml");
             return xml(XmlElement(new Document(pathOrData)));
         } catch(CheckException e) {
 
+            trace(pathOrData, " does not contain valid xml due to: ", e);
             if (returnEmpty) {
+                trace("Returning empty document");
                 return xml();
             }
 
@@ -142,8 +156,8 @@ auto xml(string pathOrData, bool returnEmpty = true) {
 package auto accessor() {
     return dsl(
         new AggregatePropertyAccessor!XmlElement(
+            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementPropertyAccessor)(new XmlElementPropertyAccessor),
             new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlAttributePropertyAccessor)(new XmlAttributePropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementPropertyAccessor)(new XmlElementPropertyAccessor)
         ),
         new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementIndexAccessor)(new XmlElementIndexAccessor)
     );

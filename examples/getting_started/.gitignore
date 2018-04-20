@@ -1,0 +1,14 @@
+.dub
+docs.json
+__dummy.html
+docs/
+getting_started.so
+getting_started.dylib
+getting_started.dll
+getting_started.a
+getting_started.lib
+getting_started-test-*
+*.exe
+*.o
+*.obj
+*.lst

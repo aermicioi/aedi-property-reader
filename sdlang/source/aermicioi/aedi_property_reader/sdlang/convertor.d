@@ -59,8 +59,8 @@ alias SdlangConvertor = ChainedAdvisedConvertor!(
 
 void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
 	try {
-		to = (cast() from).expectValue!To;
 
+		to = (cast() from).expectValue!To;
 	} catch (ValueNotFoundException e) {
 
 		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));

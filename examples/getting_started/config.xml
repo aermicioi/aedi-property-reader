@@ -1,0 +1,8 @@
+<component first="1">
+    <second>2.2</second>
+    <third>A sample string</third>
+
+    <xml first="22" second="23.0">
+        <third>A text member</third>
+    </xml>
+</component>

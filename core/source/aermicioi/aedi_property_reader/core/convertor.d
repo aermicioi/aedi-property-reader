@@ -40,6 +40,7 @@ import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.core.setter;
 import aermicioi.aedi_property_reader.core.inspector;
 import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.core.traits;
 import aermicioi.aedi_property_reader.core.placeholder;
 import std.algorithm;
 import std.array;
@@ -1101,8 +1102,12 @@ template AdvisedConvertor(alias convertor, alias destructor) {
             fullyQualifiedName!destructor,
             " implements destructor ",
             DestructorInfo.Yes
-            );
+        );
 
+        /// Enable it for what reason creation of convertor fails, if it is not due to type constraints.
+        debug (AdvisedConvertorDebug) {
+            alias Debug = AdvisedConvertorImplementation!(To, From);
+        }
     }
 
     template AdvisedConvertorImplementation(To, From) {
@@ -1171,20 +1176,10 @@ template AdvisedConvertor(alias Accessor, alias Setter, alias ToInspector, alias
                 ToInspectorCheck!(To, From)
             );
 
-            alias AdvisedConvertorImplementation = (bool conversion = true, bool force = true) {
-                import aermicioi.aedi_property_reader.core.mapper : CompositeMapper, CompositeConvertor;
-
-                auto convertor = new CompositeConvertor!(To, From)();
-                CompositeMapper!(To, From) mapper = new CompositeMapper!(To, From)();
-                mapper.fromInspector = FromInspector!From();
-                mapper.toInspector = ToInspector!To();
-                mapper.accessor = Accessor!From();
-                mapper.setter = Setter!To();
-                mapper.conversion = conversion;
-                mapper.force = force;
-                convertor.mapper = mapper;
-                return convertor;
-            };
+        /// Enable it for what reason creation of convertor fails, if it is not due to type constraints.
+        debug (AdvisedConvertorDebug) {
+            alias Debug = AdvisedConvertorImplementation!(To, From);
+        }
     }
 
     template AdvisedConvertorImplementation(To, From) {
@@ -1195,7 +1190,7 @@ template AdvisedConvertor(alias Accessor, alias Setter, alias ToInspector, alias
             FromInspectorCheck!(To, From) &&
             ToInspectorCheck!(To, From)
         ) {
-            alias AdvisedConvertorImplementation = (bool conversion = true, bool force = true) {
+            alias AdvisedConvertorImplementation = (bool conversion = true, bool force = true, bool skip = true) {
                 import aermicioi.aedi_property_reader.core.mapper : CompositeMapper, CompositeConvertor;
 
                 auto convertor = new CompositeConvertor!(To, From)();
@@ -1206,8 +1201,23 @@ template AdvisedConvertor(alias Accessor, alias Setter, alias ToInspector, alias
                 mapper.setter = Setter!To();
                 mapper.conversion = conversion;
                 mapper.force = force;
+                mapper.skip = skip;
                 convertor.mapper = mapper;
-                return convertor;
+
+                static if (is(From : TaggedAlgebraic!Union, Union)) {
+                    return new class(convertor) TaggedConvertor!From, CombinedConvertor {
+                        private CompositeConvertor!(To, From) cc;
+                        this(CompositeConvertor!(To, From) c) {
+                            super(c);
+                            this.cc = c;
+                        }
+                        typeof(this) convertors(Convertor[] convertors) @safe nothrow { this.cc.convertors = convertors; return this; }
+                        typeof(this) add(Convertor convertor) @safe nothrow { this.cc.add(convertor); return this; }
+                        typeof(this) remove(Convertor convertor) @safe nothrow { this.cc.remove(convertor); return this; }
+                    };
+                } else {
+                    return convertor;
+                }
             };
         } else {
 

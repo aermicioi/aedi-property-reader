@@ -1,0 +1,14 @@
+{
+	"name": "getting_started",
+	"authors": [
+		"Alexandru Ermicioi"
+	],
+	"dependencies": {
+		"aedi-property-reader": {
+			"path": "../../"
+		}
+	},
+	"description": "A minimal example of aedi property reader features",
+	"copyright": "Copyright © 2018, Alexandru Ermicioi",
+	"license": "BSL-1.0"
+}

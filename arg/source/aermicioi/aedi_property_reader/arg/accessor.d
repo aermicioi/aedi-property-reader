@@ -172,8 +172,15 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
          true if property is in component
      **/
     bool has(in const(string)[] component, string property) const nothrow {
+        import std.experimental.logger;
+        import aermicioi.aedi_property_reader.core.traits;
+        // trace(property, " ----------------------- ", component, Filter(component, property)).n;
+        if (component.length > 1) {
 
-        return !Filter(component, property).empty;
+            return !Filter(component, property).drop(1).empty;
+        }
+
+        return false;
     }
 
     /**

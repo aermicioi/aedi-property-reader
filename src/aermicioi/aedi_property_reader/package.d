@@ -30,7 +30,10 @@ Authors:
 module aermicioi.aedi_property_reader;
 
 public import aermicioi.aedi_property_reader.core;
-// public import aermicioi.aedi_property_reader.json;
-// public import aermicioi.aedi_property_reader.xml;
+public import aermicioi.aedi_property_reader.json;
+public import aermicioi.aedi_property_reader.sdlang;
+public import aermicioi.aedi_property_reader.yaml;
+public import aermicioi.aedi_property_reader.xml;
 public import aermicioi.aedi_property_reader.env;
-// public import aermicioi.aedi_property_reader.arg;
+public import aermicioi.aedi_property_reader.arg;
+public import aermicioi.aedi_property_reader.properd;

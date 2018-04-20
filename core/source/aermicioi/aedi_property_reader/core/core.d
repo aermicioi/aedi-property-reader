@@ -32,6 +32,7 @@ module aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.core.mapper;
 import aermicioi.aedi_property_reader.core.document;
 import std.meta;
 import std.experimental.logger;
@@ -39,7 +40,7 @@ import std.experimental.logger;
 /**
 Configuration context that is providing a nice api to add convertors into a container for a document.
 **/
-struct ConvertorContext(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType) {
+struct DocumentContainerBuilder(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType) {
 
 	/**
 	Configured container.
@@ -91,7 +92,7 @@ struct ConvertorContext(DocumentContainerType : DocumentContainer!(DocumentType,
 	**/
     ref typeof(this) register(To)() {
 
-        this.register!(To, To);
+        return this.register!(To, To);
     }
 
 	/**
@@ -117,10 +118,10 @@ Params:
 	container = container for which configuration context is created.
 
 Returns:
-	ConvertorContext(DocumentContainerType, AdvisedConvertor, DocumentType, FieldType) a configuration context
+	DocumentContainerBuilder(DocumentContainerType, AdvisedConvertor, DocumentType, FieldType) a configuration context
 **/
 auto configure(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType)(DocumentContainerType container) {
-    return ConvertorContext!(DocumentContainerType, AdvisedConvertor)(container);
+    return DocumentContainerBuilder!(DocumentContainerType, AdvisedConvertor)(container);
 }
 
 /**
@@ -129,3 +130,64 @@ ditto
 auto configure(DocumentContainerType : AdvisedDocumentContainer!(DocumentType, FieldType, AdvisedConvertor), DocumentType, FieldType, alias AdvisedConvertor)(DocumentContainerType container) {
 	return container.configure!(DocumentContainerType, AdvisedConvertor);
 }
+
+mixin template MapperBuilderMixin(AdvisedConvertors...) {
+
+	struct MapperBuilderImpl(MapperType : Mapper!(To, From), To, From) {
+
+		MapperType mapper;
+
+		alias mapper this;
+
+		ref auto register(To, From)() {
+			static foreach (AdvisedConvertor; AdvisedConvertors) {
+				static if (is(typeof(AdvisedConvertor.AdvisedConvertorImplementation!(To, From)))) {
+					enum converted = true;
+					mapper.convertors = mapper.convertors ~ AdvisedConvertor.AdvisedConvertorImplementation!(To, From)();
+				}
+			}
+
+			static if (is(typeof(converted)) && !converted) {
+				static assert("Could not configure mapper with a convertor");
+			}
+
+			return this;
+		}
+
+		struct WithFrom(With) {
+
+			ref auto register(To)() {
+				return register!(To, From);
+			}
+		}
+
+		struct WithTo(With) {
+
+			ref auto register(From)() {
+				return register!(To, From);
+			}
+		}
+	}
+
+	auto configure(MapperType : Mapper!(To, From), To, From)(MapperType mapper) {
+		return MapperBuilderImpl!MapperType(mapper);
+	}
+}
+
+import aermicioi.aedi_property_reader.core.std_conv;
+import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.arg.convertor;
+import aermicioi.aedi_property_reader.json.convertor;
+import aermicioi.aedi_property_reader.xml.convertor;
+import aermicioi.aedi_property_reader.yaml.convertor;
+import aermicioi.aedi_property_reader.sdlang.convertor;
+
+mixin MapperBuilderMixin!(
+	JsonConvertor,
+	XmlConvertor,
+	YamlConvertor,
+	SdlangConvertor,
+	ArgumentAdvisedConvertor,
+	StdConvAdvisedConvertor,
+	CompositeAdvisedConvertor
+);

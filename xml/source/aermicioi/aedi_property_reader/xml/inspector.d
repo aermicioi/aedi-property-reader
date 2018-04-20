@@ -102,6 +102,8 @@ class XmlInspector : Inspector!Element {
         an arary of property identities.
     **/
     string[] properties(Element component) const nothrow {
+        import std.experimental.logger;
+        import aermicioi.aedi_property_reader.core.traits;
         return chain(
             component.elements.map!(e => e.tag.name),
             component.tag.attr.byKeyValue.map!(a => a.key)

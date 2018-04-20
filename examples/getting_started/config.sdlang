@@ -1,0 +1,7 @@
+second 2.0
+third "A text string actually"
+sdlang {
+    first 22L
+    second 2.9
+    third "sdlang value as value"
+}

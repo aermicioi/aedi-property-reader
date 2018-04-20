@@ -239,7 +239,7 @@ defining more complex types than existing primitives.
 Params:
 	container = config container for which properties are defined
 **/
-void properties(T : ConvertorContainer!(FromType, ToType), FromType, ToType)(T container) {
+void properties(T : DocumentContainer!(FromType, ToType), FromType, ToType)(T container) {
 		with (container.configure) { // Create a configuration context for config container
 			property!string("server"); // Define $(D_INLINECODE protocol ) property of type $(D_INLINECODE string)
 			property!string("host");
