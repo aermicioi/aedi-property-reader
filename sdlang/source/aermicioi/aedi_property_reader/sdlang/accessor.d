@@ -89,7 +89,7 @@ class SdlangTagPropertyAccessor : PropertyAccessor!(Tag, Tag) {
             return (component !is null) && property in (cast(Tag) component).tags;
         } catch (Exception e) {
 
-            error("Failed to check property ", property, " existence due to ", e).n;
+            debug(trace) error("Failed to check property ", property, " existence due to ", e).n;
         }
 
         return false;
@@ -163,7 +163,7 @@ class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
             return (component !is null) && property.isNumeric && ((cast(Tag) component).tags.length > property.to!size_t);
         } catch (Exception e) {
 
-            error("Failed to check property ", property, " existence due to ", e).n;
+            debug(trace) error("Failed to check property ", property, " existence due to ", e).n;
         }
 
         return false;
@@ -232,7 +232,7 @@ class SdlangAttributePropertyAccessor : PropertyAccessor!(Tag, Attribute) {
             return (component !is null) && property in (cast(Tag) component).attributes;
         } catch (Exception e) {
 
-            error("Failed to check property ", property, " existence due to ", e).n;
+            debug(trace) error("Failed to check property ", property, " existence due to ", e).n;
         }
 
         return false;

@@ -156,7 +156,7 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
             return (component !is null) && property.isNumeric && (component.elements.length > property.to!size_t);
         } catch (Exception e) {
 
-            error("Failed to check property ", property, " existence due to ", e).n;
+            debug(trace) error("Failed to check property ", property, " existence due to ", e).n;
         }
 
         return false;

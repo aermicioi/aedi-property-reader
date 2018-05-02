@@ -314,16 +314,16 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
                     if (mixin("component.Kind." ~ e ~ " == component.kind")) {
 
-                        return this.inspector.typeOf(cast(Type) component, property);
+                        return typeid(Tagged);
                     }
 
-                    error("Could not identify tagged algebraic's ", typeid(component), " inner type, returning void.").n;
+                    debug(trace) error("Could not identify tagged algebraic's ", typeid(component), " inner type, returning void.").n;
                     return typeid(void);
                 }
             }
 
         } catch (Exception e) {
-            error("Failed to unwrap tagged component ", component, " due to ", e, " returning void").n;
+            debug(trace) error("Failed to unwrap tagged component ", component, " due to ", e, " returning void").n;
         }
 
         return typeid(void);
@@ -351,7 +351,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
                     if (mixin("component.Kind." ~ e ~ " == component.kind")) {
 
-                        return this.inspector.typeOf(cast(Type) component);
+                        return typeid(Tagged);
                     }
 
                     return typeid(void);
@@ -359,7 +359,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
             }
 
         } catch (Exception e) {
-            error("Failed to unwrap tagged component ", component, " due to ", e).n;
+            debug(trace) error("Failed to unwrap tagged component ", component, " due to ", e).n;
         }
 
         return typeid(void);
@@ -412,7 +412,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
             }
 
         } catch (Exception e) {
-            error("Failed to unwrap tagged component ", component, " due to ", e).n;
+            debug(trace) error("Failed to unwrap tagged component ", component, " due to ", e).n;
         }
 
         return false;
@@ -443,7 +443,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
             }
 
         } catch (Exception e) {
-            error("Failed to unwrap tagged component ", component, " due to ", e).n;
+            debug(trace) error("Failed to unwrap tagged component ", component, " due to ", e).n;
         }
 
         return [];

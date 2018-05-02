@@ -1,0 +1,16 @@
+car:
+  door:
+    back:
+      right:
+        position: "back.right"
+        locking: "manual"
+        window:
+          size:
+            width: 20
+            height: 20
+            length: 20
+          transparency: 1.0
+          color:
+            r: 255
+            g: 255
+            b: 255

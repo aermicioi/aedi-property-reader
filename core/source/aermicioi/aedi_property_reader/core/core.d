@@ -60,7 +60,7 @@ struct DocumentContainerBuilder(DocumentContainerType : DocumentContainer!(Docum
 		path = property path for a field in document.
 	**/
     ref typeof(this) register(To)(string path) {
-		trace(
+		debug(trace) trace(
 			"Injecting convertor for ",
 			path,
 			" in document container to convert to ",
@@ -72,7 +72,7 @@ struct DocumentContainerBuilder(DocumentContainerType : DocumentContainer!(Docum
 		auto convertor = AdvisedConvertor!(To, FieldType)();
 
 		static if (is(typeof(convertor) : CombinedConvertor) && is(DocumentContainerType : Convertor)) {
-			trace(
+			debug(trace) trace(
 				"Detected that document container ", typeid(DocumentContainerType), " provides converting capabilities, and injected convertor ",
 				typeid(AdvisedConvertor!(To, FieldType)()), " accepts convertors, injecting container into convertor"
 			);

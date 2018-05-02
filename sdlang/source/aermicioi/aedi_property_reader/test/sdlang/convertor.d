@@ -58,6 +58,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.test.sdlang.convertor;
 
+import std.meta;
 import std.exception;
 import sdlang;
 import aermicioi.aedi.exception.not_found_exception;
@@ -66,16 +67,28 @@ import aermicioi.aedi_property_reader.sdlang.convertor;
 import aermicioi.aedi_property_reader.sdlang.accessor : SdlangElement;
 
 unittest {
+	enum T {
+		first,
+		second
+	}
+
 	Tag root = parseSource(q{
 		valid 2 value=1
 		array "an" " " "array"
 		invalid "string" value="march"
+		enum "first"
 	});
 
-	int i;
+
+
+	int i, k;
+	ubyte u;
 	string[] s;
+	T e;
 
 	SdlangElement(root.tags["valid"].front).convert(i);
+	SdlangElement(root.tags["valid"].front).convert(u);
+	SdlangElement(root.tags["enum"].front).convert(e);
 	SdlangElement(root.tags["array"].front).convert(s);
 	assert(i == 2);
 	assert(s == ["an", " ", "array"]);
@@ -86,7 +99,9 @@ unittest {
 	assertThrown!InvalidCastException(SdlangElement(root.tags["invalid"].front).convert(i));
 
 	try {
-		SdlangElement(root.tags["invalid"].front.attributes["value"].front).convert(i);
+		SdlangElement(root.tags["invalid"].front.attributes["value"].front).convert(k);
+		import std.stdio;
+		writeln("***************", k);
 		assert(false);
 	} catch (InvalidCastException e) {
 

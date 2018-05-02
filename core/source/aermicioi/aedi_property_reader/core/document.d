@@ -234,12 +234,12 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
 			Object element if it is available.
 		**/
         Object get(string identity) {
-            trace("Searching for \"", identity, '"');
+            debug(trace) trace("Searching for \"", identity, '"');
 
             Object converted;
 
             if (auto peeked = identity in this.components) {
-                trace("Found already converted \"", identity, '"');
+                debug(trace) trace("Found already converted \"", identity, '"');
 
                 return *peeked;
             }
@@ -256,11 +256,11 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
                 auto document = scoped!(PlaceholderImpl!FieldType)(this.accessor.access(this.document, identity));
             }
 
-            trace("Searching for suitable convertor for \"", identity, "\" of ", typeid(FieldType));
+            debug(trace) trace("Searching for suitable convertor for \"", identity, "\" of ", typeid(FieldType));
 
             if (auto convertor = identity in this.convertors) {
                 if (convertor.to !is typeid(void)) {
-                    trace("Found convertor for \"", identity, "\" commencing conversion to ", convertor.to);
+                    debug(trace) trace("Found convertor for \"", identity, "\" commencing conversion to ", convertor.to);
 
                     converted = (*convertor).convert(document, convertor.to, this.allocator);
                     this.components[identity] = converted;
@@ -268,7 +268,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
                 }
             }
 
-            trace("No suitable convertor found, attempting to guess the desired type.");
+            debug(trace) trace("No suitable convertor found, attempting to guess the desired type.");
             static if (is(FieldType : Object)) {
 
                 TypeInfo guess = this.guesser.guess(document);
@@ -276,7 +276,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
 
                 TypeInfo guess = this.guesser.guess(document.value);
             }
-            trace("Guessed ", guess, " type, commencing conversion");
+            debug(trace) trace("Guessed ", guess, " type, commencing conversion");
             return this.convert(document, guess, this.allocator);
         }
 
@@ -418,18 +418,18 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
             Resulting converted component.
         **/
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) {
-            trace("Searching for convertor for ", from.identify, " to ", to);
+            debug(trace) trace("Searching for convertor for ", from.identify, " to ", to);
             auto convertors = this.convertors.byValue.filter!(
                 c => c.convertsTo(to) && c.convertsFrom(from)
             );
 
             if (!convertors.empty) {
-                trace("Found convertor ", convertors.front.classinfo, " for ", from.identify, " to ", to);
+                debug(trace) trace("Found convertor ", convertors.front.classinfo, " for ", from.identify, " to ", to);
 
                 return convertors.front.convert(from, to, allocator);
             }
 
-            trace("No suitable convertor found for ", from.identify, " to ", to);
+            debug(trace) trace("No suitable convertor found for ", from.identify, " to ", to);
             throw new ConvertorException(text("Could not convert ", from.identify));
         }
 

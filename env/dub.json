@@ -6,8 +6,20 @@
 	"description": "Evnironment locator and factory",
 	"copyright": "Copyright © 2017, Alexandru Ermicioi",
 	"license": "BSL-1.0",
-	"targetType": "sourceLibrary",
 	"dependencies": {
 		"aedi-property-reader:core": "*"
-	}
+	},
+	"configurations": [
+		{
+			"name": "library",
+			"targetType": "sourceLibrary"
+		},
+		{
+			"name": "unittest",
+			"debugVersions": [
+				"trace",
+				"AdvisedConvertorDebug"
+			]
+		}
+	]
 }

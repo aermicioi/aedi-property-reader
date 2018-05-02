@@ -79,7 +79,7 @@ class YamlNodePropertyAccessor : PropertyAccessor!(Node, Node) {
             return component.isMapping && component.containsKey(property);
         } catch (Exception e) {
 
-            error("Failed to check property ", property, " existence due to ", e).n;
+            debug(trace) error("Failed to check property ", property, " existence due to ", e).n;
         }
 
         return false;
@@ -153,7 +153,7 @@ class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
             return property.isNumeric && component.isSequence && (property.to!size_t < component.length);
         } catch (Exception e) {
 
-            error("Failed to check property ", property, " existence due to ", e).n;
+            debug(trace) error("Failed to check property ", property, " existence due to ", e).n;
         }
 
         return false;

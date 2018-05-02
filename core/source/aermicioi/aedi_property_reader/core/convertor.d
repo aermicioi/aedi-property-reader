@@ -1106,8 +1106,21 @@ template AdvisedConvertor(alias convertor, alias destructor) {
 
         /// Enable it for what reason creation of convertor fails, if it is not due to type constraints.
         debug (AdvisedConvertorDebug) {
-            alias Debug = AdvisedConvertorImplementation!(To, From);
+            alias Debug = ConvertorImpl!(ConvertorInfo, DestructorInfo);
         }
+    }
+
+    template ConvertorImpl(alias ConvertorInfo, alias DestructorInfo) {
+
+        alias ConvertorImpl = () {
+            auto convertor = new CallbackConvertor!(ConvertorInfo.Convertor, DestructorInfo.Destructor);
+
+            static if (is(From : TaggedAlgebraic!Union, Union)) {
+                return new TaggedConvertor!From(convertor);
+            } else {
+                return convertor;
+            }
+        };
     }
 
     template AdvisedConvertorImplementation(To, From) {
@@ -1116,15 +1129,7 @@ template AdvisedConvertor(alias convertor, alias destructor) {
 
         static if (ConvertorInfo.Yes && DestructorInfo.Yes) {
 
-            alias AdvisedConvertorImplementation = () {
-                auto convertor = new CallbackConvertor!(ConvertorInfo.Convertor, DestructorInfo.Destructor);
-
-                static if (is(From : TaggedAlgebraic!Union, Union)) {
-                    return new TaggedConvertor!From(convertor);
-                } else {
-                    return convertor;
-                }
-            };
+            alias AdvisedConvertorImplementation = ConvertorImpl!(ConvertorInfo, DestructorInfo);
         } else {
 
             static assert(false, CheckMessage!(To, From));

@@ -405,7 +405,7 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
 
                 return true;
             } catch (Exception e) {
-                error("Failed to access a property path ", path, " due to ", e).n;
+                debug(trace) error("Failed to access a property path ", path, " due to ", e).n;
             }
 
             return false;
@@ -674,7 +674,7 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
 
                 return true;
             } catch (Exception e) {
-                error("Failed to check existance of indexed path ", path, " due to ", e).n;
+                debug(trace) error("Failed to check existance of indexed path ", path, " due to ", e).n;
             }
 
             return false;
@@ -824,7 +824,7 @@ class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType =
                 return this.valid(path) && this.accessor.has(component, path.strip(this.tick));
             } catch (Exception e) {
 
-                error("Failed to check if ticked property exists due to: ", e).n;
+                debug(trace) error("Failed to check if ticked property exists due to: ", e).n;
             }
 
             return false;
@@ -855,7 +855,7 @@ class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType =
                 return (path.front == this.tick) && (path.back == this.tick);
             } catch (Exception e) {
 
-                error("Failed to check if path is ticked due to: ", e).n;
+                debug(trace) error("Failed to check if path is ticked due to: ", e).n;
             }
 
             return false;
@@ -985,7 +985,7 @@ class TaggedElementPropertyAccessorWrapper(
                 assert(false, "TaggedAlgebraic does not have " ~ fullyQualifiedName!X ~ " as member");
 
             } catch (Exception e) {
-                error("Failed to unwrap tagged component ", component.kind, " due to ", e).n;
+                debug(trace) error("Failed to unwrap tagged component ", component.kind, " due to ", e).n;
             }
 
             return false;
@@ -1022,7 +1022,7 @@ class TaggedElementPropertyAccessorWrapper(
                 }
 
             } catch (Exception e) {
-                error("Failed to unwrap tagged component ", component.kind, " due to ", e).n;
+                debug(trace) error("Failed to unwrap tagged component ", component.kind, " due to ", e).n;
             }
 
             assert(false, "Got stored a value that is not in tagged algebraic");
@@ -1320,7 +1320,7 @@ class VariantAccessor(
                     }
                 }}
             } catch (Exception e) {
-                error("Accessing contents of a variant failed with following exception: ", e).n;
+                debug(trace) error("Accessing contents of a variant failed with following exception: ", e).n;
             }
 
             return false;

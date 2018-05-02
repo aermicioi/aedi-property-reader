@@ -39,6 +39,7 @@ import sdlang.ast;
 import sdlang;
 import std.conv;
 import std.traits;
+import std.meta;
 import std.experimental.allocator;
 
 public {
@@ -57,13 +58,63 @@ alias SdlangConvertor = ChainedAdvisedConvertor!(
 	)
 ).AdvisedConvertorImplementation;
 
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To) {
 	try {
 
 		to = (cast() from).expectValue!To;
 	} catch (ValueNotFoundException e) {
 
 		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+	}
+}
+
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isNumeric!To && isFloatingPoint!To) {
+	try {
+
+		static if (is(typeof((cast() from).expectValue!To))) {
+
+			to = (cast() from).expectValue!To;
+		} else {
+
+			static foreach(Numeric; AliasSeq!(real, double, float)) {
+				foreach (value; (cast() from).values) {
+					if (value.type is typeid(Numeric)) {
+						to = (cast() from).expectValue!Numeric.to!To;
+						return;
+					}
+				}
+			}
+
+			throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"));
+		}
+	} catch (ValueNotFoundException e) {
+
+		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"), e);
+	}
+}
+
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isNumeric!To && !isFloatingPoint!To) {
+	try {
+
+		static if (is(typeof((cast() from).expectValue!To))) {
+
+			to = (cast() from).expectValue!To;
+		} else {
+
+			static foreach(Numeric; AliasSeq!(long, int)) {
+				foreach (value; (cast() from).values) {
+					if (value.type is typeid(Numeric)) {
+						to = (cast() from).expectValue!Numeric.to!To;
+						return;
+					}
+				}
+			}
+
+			throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"));
+		}
+	} catch (ValueNotFoundException e) {
+
+		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"), e);
 	}
 }
 
@@ -84,7 +135,7 @@ void convert(To : E[], From : Tag, E)(in From from, ref To to, RCIAllocator allo
 	}
 }
 
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To) {
 	import std.variant : VariantException;
 
 	try {
@@ -96,17 +147,55 @@ void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocat
 	}
 }
 
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isNumeric!To && isFloatingPoint!To) {
+	import std.variant : VariantException;
+
+	try {
+		static foreach (Numeric; AliasSeq!(real, double, float)) {
+			if (from.value.type is typeid(Numeric)) {
+
+				to = cast(To) from.value.get!Numeric.to!To;
+				return;
+			}
+		}
+
+		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"));
+	} catch (VariantException e) {
+
+		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+	}
+}
+
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isNumeric!To && !isFloatingPoint!To) {
+	import std.variant : VariantException;
+
+	try {
+		static foreach (Numeric; AliasSeq!(long, int)) {
+			if (from.value.type is typeid(Numeric)) {
+
+				to = cast(To) from.value.get!Numeric.to!To;
+				return;
+			}
+		}
+
+		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"));
+	} catch (VariantException e) {
+
+		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"), e);
+	}
+}
+
 void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (is(To == enum)) {
 	string temp;
     from.convert!string(temp, allocator);
-    value = temp.to!To;
+    to = temp.to!To;
 	temp.destruct(allocator);
 }
 
 void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (is(To == enum)) {
 	string temp;
     from.convert!string(temp, allocator);
-    value = temp.to!To;
+    to = temp.to!To;
 	temp.destruct(allocator);
 }
 

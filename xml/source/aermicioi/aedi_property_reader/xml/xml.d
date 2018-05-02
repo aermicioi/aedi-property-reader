@@ -110,21 +110,21 @@ Returns:
 auto xml(string pathOrData, bool returnEmpty = true) {
     import std.experimental.logger;
     import std.file;
-    trace("Loading xml document from ", pathOrData);
+    debug(trace) trace("Loading xml document from ", pathOrData);
 
     try {
-        trace("Attempting to parse ", pathOrData, " as xml");
+        debug(trace) trace("Attempting to parse ", pathOrData, " as xml");
 
         check(pathOrData);
 
-        trace("Parsed as xml");
+        debug(trace) trace("Parsed as xml");
         return xml(XmlElement(new Document(pathOrData)));
     } catch (CheckException e) {
 
-        trace(pathOrData, " is does not contain valid xml due to: ", e);
+        debug(trace) trace(pathOrData, " is does not contain valid xml due to: ", e);
     }
 
-    trace("Attempting to parse ", pathOrData, " as xml file");
+    debug(trace) trace("Attempting to parse ", pathOrData, " as xml file");
     if (pathOrData.exists) {
 
         pathOrData = pathOrData.readText();
@@ -132,13 +132,13 @@ auto xml(string pathOrData, bool returnEmpty = true) {
         try {
             check(pathOrData);
 
-            trace("Parsed as xml");
+            debug(trace) trace("Parsed as xml");
             return xml(XmlElement(new Document(pathOrData)));
         } catch(CheckException e) {
 
-            trace(pathOrData, " does not contain valid xml due to: ", e);
+            debug(trace) trace(pathOrData, " does not contain valid xml due to: ", e);
             if (returnEmpty) {
-                trace("Returning empty document");
+                debug(trace) trace("Returning empty document");
                 return xml();
             }
 

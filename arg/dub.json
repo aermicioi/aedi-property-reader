@@ -6,8 +6,20 @@
 	"dependencies": {
 		"aedi-property-reader:core" : "*"
 	},
-	"targetType": "sourceLibrary",
 	"description": "Command line argument locator and factory.",
 	"copyright": "Copyright © 2017, Alexandru Ermicioi",
-	"license": "BSL-1.0"
+	"license": "BSL-1.0",
+	"configurations": [
+		{
+			"name": "library",
+			"targetType": "sourceLibrary"
+		},
+		{
+			"name": "unittest",
+			"debugVersions": [
+				"trace",
+				"AdvisedConvertorDebug"
+			]
+		}
+	]
 }

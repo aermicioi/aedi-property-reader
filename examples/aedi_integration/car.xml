@@ -1,0 +1,14 @@
+<root>
+    <car>
+        <door>
+            <back>
+                <left position="back.left" locking="manual">
+                    <window transparency="1.0">
+                        <size width="20" height="20" length="20"/>
+                        <color r="255" g="255" b="255"/>
+                    </window>
+                </left>
+            </back>
+        </door>
+    </car>
+</root>

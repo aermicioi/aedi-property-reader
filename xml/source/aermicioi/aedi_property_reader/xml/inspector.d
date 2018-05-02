@@ -56,8 +56,12 @@ class XmlInspector : Inspector!Element {
         }
 
         auto attributes = component.tag.attr.byKeyValue.filter!(a => a.key == property);
+        if (!attributes.empty) {
 
-        return typeid(string);
+            return typeid(string);
+        }
+
+        return typeid(void);
     }
 
     /**

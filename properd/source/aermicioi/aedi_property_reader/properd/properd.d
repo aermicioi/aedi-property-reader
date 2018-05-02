@@ -118,10 +118,10 @@ auto properd(string pathOrData, bool returnEmpty = true) {
             return properd(p.parseProperties(pathOrData));
         }
     } catch (p.PropertyException e) {
-        debug(trace) trace("Error parsing properd: ", e);
+        debug(trace) debug(trace) trace("Error parsing properd: ", e);
 
         if (returnEmpty) {
-            debug(trace) trace("Providing empty container");
+            debug(trace) debug(trace) trace("Providing empty container");
             return properd();
         }
 

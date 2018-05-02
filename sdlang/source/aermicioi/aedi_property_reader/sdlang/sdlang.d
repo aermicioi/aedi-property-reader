@@ -122,9 +122,13 @@ auto sdlang(string pathOrData, bool returnEmpty = true) {
 
     try {
 
+        debug(trace) trace("Loading sdlang document from ", pathOrData);
         if (pathOrData.exists) {
+            debug(trace) trace("Detected ", pathOrData, " being a sdlang file, parsing it");
             return sdlang(SdlangElement(sdlanguage.parseFile(pathOrData)));
         } else {
+
+            debug(trace) trace("Attempting to parse ", pathOrData, " as sdlang content");
             return sdlang(SdlangElement(sdlanguage.parseSource(pathOrData)));
         }
     } catch (sdlanguage.SDLangException e) {

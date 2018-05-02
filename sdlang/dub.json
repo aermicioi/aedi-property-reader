@@ -8,8 +8,20 @@
 		"sdlang-d": "~>0.10.1",
 		"taggedalgebraic": "~>0.10.9"
 	},
-	"targetType": "sourceLibrary",
 	"description": "sdlang document loader and factory",
 	"copyright": "Copyright © 2017, Alexandru Ermicioi",
-	"license": "BSL-1.0"
+	"license": "BSL-1.0",
+	"configurations": [
+		{
+			"name": "library",
+			"targetType": "sourceLibrary"
+		},
+		{
+			"name": "unittest",
+			"debugVersions": [
+				"trace",
+				"AdvisedConvertorDebug"
+			]
+		}
+	]
 }

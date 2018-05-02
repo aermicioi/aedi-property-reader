@@ -41,6 +41,7 @@ import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
 import std.json;
 import std.experimental.allocator;
+import std.experimental.logger;
 
 alias JsonDocumentContainer = AdvisedDocumentContainer!(JSONValue, JSONValue, JsonConvertor);
 
@@ -101,16 +102,24 @@ Returns:
 auto json(string pathOrData, bool returnEmpty = true) {
     import std.file;
 
+    debug(trace) trace("Loading json document from ", pathOrData);
+    debug(trace) trace("Checking if ", pathOrData, " is a json file");
     if (pathOrData.exists) {
+
+        debug(trace) trace("Loading json from ", pathOrData);
         pathOrData = pathOrData.readText();
     }
 
     try {
 
+        debug(trace) trace("Attempting to parse ", pathOrData, " as json");
         return json(parseJSON(pathOrData));
     } catch (Exception e) {
 
+        debug(trace) trace("Failed to parse json");
         if (returnEmpty) {
+
+            debug(trace) trace("Returning empty container");
             return json();
         }
 

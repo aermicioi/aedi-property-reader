@@ -378,10 +378,10 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
         **/
         void map(From from, ref To to, RCIAllocator allocator = theAllocator) {
 
-            trace("Mapping ", this.fromInspector.properties(from), " of ", from.identify, " to ", to.identify);
+            debug(trace) trace("Mapping ", this.fromInspector.properties(from), " of ", from.identify, " to ", to.identify);
             foreach (property; this.fromInspector.properties(from)) {
 
-                trace("Migrating \"", property, "\" property ");
+                debug(trace) trace("Migrating \"", property, "\" property ");
                 if (this.toInspector.has(to, property) || this.force) {
 
                     Object value = this.accessor.access(from, property);
@@ -393,7 +393,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                         if (this.conversion) {
                             if (this.toInspector.typeOf(to, property) is typeid(void)) {
                                 if (this.skip) {
-                                    trace("Skipping migration of \"", property, "\" due to missing type information in destination component");
+                                    debug(trace) trace("Skipping migration of \"", property, "\" due to missing type information in destination component");
                                     continue;
                                 }
 
@@ -402,7 +402,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                                 ));
                             }
 
-                            trace("\"",
+                            debug(trace) trace("\"",
                                 property,
                                 "\"'s type differs in original component and destination component, ",
                                 this.fromInspector.typeOf(from, property), " and ",
@@ -419,7 +419,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                                 " to ", this.toInspector.typeOf(to, property)
                             ));
 
-                            trace("Found convertor for \"", property, "\" from ", compatible.front.from, " to ", compatible.front.to);
+                            debug(trace) trace("Found convertor for \"", property, "\" from ", compatible.front.from, " to ", compatible.front.to);
 
                             value = compatible.front.convert(value, this.toInspector.typeOf(to, property), allocator);
                         } else {
@@ -439,14 +439,14 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                             property
                         );
 
-                        trace("Migrated \"", property, "\" from ", from.identify, " to ", to.identify);
+                        debug(trace) trace("Migrated \"", property, "\" from ", from.identify, " to ", to.identify);
                     } catch (Exception e) {
 
-                        trace("Couldn't ", this.force ? "forcefully " : "", "set property \"", property, "\" to ", to.identify, " from ", from.identify, " due to ", e);
+                        debug(trace) trace("Couldn't ", this.force ? "forcefully " : "", "set property \"", property, "\" to ", to.identify, " from ", from.identify, " due to ", e);
                     }
                 } else {
 
-                    error(to.identify, " element does not have: ", property);
+                    debug(trace) error(to.identify, " element does not have: ", property);
                 }
             }
         }

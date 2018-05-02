@@ -82,7 +82,7 @@ class JsonPropertyAccessor : PropertyAccessor!JSONValue {
             return (component.type == JSON_TYPE.OBJECT) && ((property in component.object) !is null);
         } catch (Exception e) {
 
-            error("Failed to check property ", property, " existence in json ", component).n;
+            debug(trace) error("Failed to check property ", property, " existence in json ", component).n;
         }
 
         return false;
@@ -158,7 +158,7 @@ class JsonIndexAccessor : PropertyAccessor!JSONValue {
             return (component.type == JSON_TYPE.ARRAY) && property.isNumeric && (component.array.length > property.to!size_t);
         } catch (Exception e) {
 
-            error("Failed to check indexed property ", property, " existence in json ", component).n;
+            debug(trace) error("Failed to check indexed property ", property, " existence in json ", component).n;
         }
 
         return false;

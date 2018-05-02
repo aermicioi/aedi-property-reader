@@ -7,8 +7,20 @@
 		"aedi-property-reader:core": "*",
 		"taggedalgebraic": "~>0.10.9"
 	},
-	"targetType": "sourceLibrary",
 	"description": "Xml document locator and factory",
 	"copyright": "Copyright © 2017, Alexandru Ermicioi",
-	"license": "BSL-1.0"
+	"license": "BSL-1.0",
+	"configurations": [
+		{
+			"name": "library",
+			"targetType": "sourceLibrary"
+		},
+		{
+			"name": "unittest",
+			"debugVersions": [
+				"trace",
+				"AdvisedConvertorDebug"
+			]
+		}
+	]
 }
