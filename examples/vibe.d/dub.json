@@ -14,5 +14,8 @@
 	"license": "BSL-1.0",
 	"dflags": [
 		"-J./source/views/"
+	],
+	"debugVersions": [
+		"trace"
 	]
 }

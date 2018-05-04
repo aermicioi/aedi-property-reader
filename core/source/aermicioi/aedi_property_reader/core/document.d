@@ -199,7 +199,9 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
         **/
         Container instantiate() {
             foreach (identity, convertor; this.convertors) {
-                this.get(identity);
+                if (this.accessor.has(this.document, identity)) {
+                    this.get(identity);
+                }
             }
 
             return this;

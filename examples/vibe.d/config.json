@@ -1,6 +1,9 @@
 {
-    "http_bind": 
-    [
-        "127.0.0.2"
-    ]    
+    "log": {
+        "access": {
+            "format": "Access with status %s",
+            "file": "./access.log",
+            "console": true
+        }
+    }
 }

@@ -1,5 +1,7 @@
 <root>
-    <http_port>
-        8081
-    </http_port>
+    <http port="8090" compression="true" host="localhost">
+        <listen>
+            <host>127.0.0.1</host>
+        </listen>
+    </http>
 </root>
