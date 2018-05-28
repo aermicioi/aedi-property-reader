@@ -22,13 +22,13 @@ Add Aedi property reader as a dependency to a dub project:
 Json configuration:
 
 ```json
-"aedi-property-reader": "~master"
+"aedi-property-reader": "~>0.2.0"
 ```
 
 SDL configuration:
 
 ```sdl
-dependency "aedi-property-reader" version="~master"
+dependency "aedi-property-reader" version="~>0.2.0"
 ```
 
 ## Quickstart
@@ -46,10 +46,9 @@ a multitude of sources. It is able to read configuration out of following source
 
 To use aedi property reader to load configuration following steps are required:
 
-1. Create a config container
-2. Pass config file, or any required data to it
+1. Create a property container out of a string or a file in specified format
 3. Define config properties to be read from source
-4. Use properties out of config container
+4. Use properties from config container
 
 The example below shows the simplest use case presented in steps above:
 
@@ -104,6 +103,3 @@ nope-an-array: [6, 5, 4, 3, 2, 1]
 ## Documentation
 
 All public api documentation is available on [aermicioi.github.io/aedi-property-reader/](https://aermicioi.github.io/aedi-property-reader/).
-
-For a more comprehensive understanding of how library should be used, a set of tutorials are available on
-github [wiki](https://github.com/aermicioi/aedi-property-reader/wiki).
