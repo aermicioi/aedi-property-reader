@@ -63,7 +63,7 @@ alias YamlConvertor = ChainedAdvisedConvertor!(
 
 
 void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && !isAggregateType!To) {
+	if (!is(To == enum) && !isAggregateType!To && !isSomeChar!To) {
 
 	enforce!InvalidCastException(node.convertsTo!To, text("Could not convert yaml ", dumper(node), " to ", typeid(To)));
 
@@ -71,11 +71,19 @@ void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = 
 }
 
 void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator allocator = theAllocator)
-	if (isSomeString!To && !is(To == enum)) {
+	if (isSomeChar!Z && !is(To == enum)) {
 
 	enforce!InvalidCastException(node.isString, text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a string"));
 
-	to = cast(string) (cast() node).as!(string);
+	to = std.conv.to!To((cast() node).as!(string));
+}
+
+void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
+	if (isSomeChar!To && !is(To == enum)) {
+
+	enforce!InvalidCastException(node.isString, text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a string"));
+
+	to = (cast() node).as!string.to!char;
 }
 
 void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator allocator = theAllocator)

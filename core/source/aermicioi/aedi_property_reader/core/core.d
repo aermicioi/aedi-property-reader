@@ -36,16 +36,33 @@ import aermicioi.aedi_property_reader.core.mapper;
 import aermicioi.aedi_property_reader.core.document;
 import std.meta;
 import std.experimental.logger;
+import std.exception;
 
 /**
 Configuration context that is providing a nice api to add convertors into a container for a document.
 **/
-struct DocumentContainerBuilder(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType) {
+struct DocumentContainerBuilder(DocumentContainerType : Storage!(Convertor, string), alias AdvisedConvertor, F) {
+
+	alias FromType = F;
 
 	/**
 	Configured container.
 	**/
     DocumentContainerType container;
+
+	bool containerAsConvertor = true;
+
+	this(DocumentContainerType container, bool containerAsConvertor = true) {
+		this.container = container;
+		this.containerAsConvertor = containerAsConvertor;
+
+		static foreach (Type; AliasSeq!(
+			ubyte, byte, ushort, short, uint, int, ulong, long, float, double, real, char, wchar, dchar,
+			ubyte[], byte[], ushort[], short[], uint[], int[], ulong[], long[], float[], double[], real[], char[], wchar[], dchar[], string, wstring, dstring
+		)) {
+			this.register!(Type, Type);
+		}
+	}
 
 	/**
 	ditto
@@ -66,22 +83,12 @@ struct DocumentContainerBuilder(DocumentContainerType : DocumentContainer!(Docum
 			" in document container to convert to ",
 			typeid(To),
 			" using ",
-			typeid(AdvisedConvertor!(To, FieldType)())
+			typeid(AdvisedConvertor!(To, FromType)())
 		);
 
-		auto convertor = AdvisedConvertor!(To, FieldType)();
+		auto convertor = AdvisedConvertor!(To, FromType)();
 
-		static if (is(typeof(convertor) : CombinedConvertor) && is(DocumentContainerType : Convertor)) {
-			debug(trace) trace(
-				"Detected that document container ", typeid(DocumentContainerType), " provides converting capabilities, and injected convertor ",
-				typeid(AdvisedConvertor!(To, FieldType)()), " accepts convertors, injecting container into convertor"
-			);
-			convertor.add(container);
-		}
-
-        container.set(convertor, path);
-
-        return this;
+        return this.register(convertor, path);
     }
 
 	/**
@@ -108,6 +115,27 @@ struct DocumentContainerBuilder(DocumentContainerType : DocumentContainer!(Docum
         return this.register!To(fullyQualifiedName!Iface);
     }
 
+	ref typeof(this) register(Convertor convertor, string path) {
+		static if (is(DocumentContainerType : Convertor)) {
+			if (this.containerAsConvertor && (cast(CombinedConvertor) convertor !is null)) {
+
+				debug(trace) trace(
+					"Detected that document container ", typeid(DocumentContainerType), " provides converting capabilities, and injected convertor ",
+					convertor.classinfo, " accepts convertors, injecting container into convertor"
+				);
+				(cast(CombinedConvertor) convertor).add(container);
+			}
+		}
+
+		this.container.set(convertor, path);
+
+		return this;
+	}
+
+	ref typeof(this) register(Convertor convertor) {
+		return this.register(convertor, convertor.to.toString);
+	}
+
     alias property = register;
 }
 
@@ -118,16 +146,16 @@ Params:
 	container = container for which configuration context is created.
 
 Returns:
-	DocumentContainerBuilder(DocumentContainerType, AdvisedConvertor, DocumentType, FieldType) a configuration context
+	DocumentContainerBuilder(DocumentContainerType, AdvisedConvertor, DocumentType, FromType) a configuration context
 **/
-auto configure(DocumentContainerType : DocumentContainer!(DocumentType, FieldType), alias AdvisedConvertor, DocumentType, FieldType)(DocumentContainerType container) {
-    return DocumentContainerBuilder!(DocumentContainerType, AdvisedConvertor)(container);
+auto configure(DocumentContainerType : DocumentContainer!(DocumentType, FromType), alias AdvisedConvertor, DocumentType, FromType)(DocumentContainerType container) {
+    return DocumentContainerBuilder!(DocumentContainerType, AdvisedConvertor, FromType)(container);
 }
 
 /**
 ditto
 **/
-auto configure(DocumentContainerType : AdvisedDocumentContainer!(DocumentType, FieldType, AdvisedConvertor), DocumentType, FieldType, alias AdvisedConvertor)(DocumentContainerType container) {
+auto configure(DocumentContainerType : AdvisedDocumentContainer!(DocumentType, FromType, AdvisedConvertor), DocumentType, FromType, alias AdvisedConvertor)(DocumentContainerType container) {
 	return container.configure!(DocumentContainerType, AdvisedConvertor);
 }
 

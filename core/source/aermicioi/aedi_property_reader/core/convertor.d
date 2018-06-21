@@ -72,10 +72,13 @@ Params:
 Returns:
     Symbols: Yes -> whether it is or not, From -> type of original component that function is accepting, To -> destination type that function is converting.
 **/
-template isConvertor(alias T) {
+template isConvertor(alias T)
+    if (isSomeFunction!T) {
     static if (
-        is(typeof(&T) : void function(in Y, ref X, RCIAllocator), Y, X) ||
-        is(typeof(&T) : void delegate(in Y, ref X, RCIAllocator), Y, X)
+        is(typeof(&T) : R function(in Y, ref X, RCIAllocator), Y, X, R) ||
+        is(typeof(&T) : R delegate(in Y, ref X, RCIAllocator), Y, X, R) ||
+        is(typeof(T) : R function(in Y, ref X, RCIAllocator), Y, X, R) ||
+        is(typeof(T) : R delegate(in Y, ref X, RCIAllocator), Y, X, R)
     ) {
         enum bool Yes = true;
 
@@ -154,7 +157,12 @@ Returns:
     To = the type of accepted components to be destructed
 **/
 template isDestructor(alias T) {
-    static if (is(typeof(&T) : void function (ref X, RCIAllocator = theAllocator), X) || is(typeof(&T) : void delegate (ref X, RCIAllocator = theAllocator), X)) {
+    static if (
+        is(typeof(&T) : R function (ref X, RCIAllocator = theAllocator), X, R) ||
+        is(typeof(&T) : R delegate (ref X, RCIAllocator = theAllocator), X, R) ||
+        is(typeof(T) : R function (ref X, RCIAllocator = theAllocator), X, R) ||
+        is(typeof(T) : R delegate (ref X, RCIAllocator = theAllocator), X, R)
+    ) {
         enum bool Yes = true;
 
         alias To = X;
@@ -495,7 +503,7 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
             } else {
                 auto container = cast(Placeholder!(Info.To)) converted;
 
-                destructor(container.value);
+                destructor(container.value, allocator);
                 allocator.dispose(converted);
             }
         }
@@ -1113,7 +1121,7 @@ template AdvisedConvertor(alias convertor, alias destructor) {
     template ConvertorImpl(alias ConvertorInfo, alias DestructorInfo) {
 
         alias ConvertorImpl = () {
-            auto convertor = new CallbackConvertor!(ConvertorInfo.Convertor, DestructorInfo.Destructor);
+            auto convertor = new CallbackConvertor!(ConvertorInfo.Convertor, DestructorInfo.Destructor)();
 
             static if (is(From : TaggedAlgebraic!Union, Union)) {
                 return new TaggedConvertor!From(convertor);

@@ -57,12 +57,17 @@ void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator a
 
 void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
     if (isSomeString!To) {
+    import std.conv : conv = to;
     string[] args = cast(string[]) from;
 
     if (from.length == 2) {
+
         string identity = args.back.splitter("=").front.strip('-');
 
-        getopt(args, identity, &to);
+        string temp;
+        getopt(args, identity, &temp);
+
+        to = temp.conv!To;
     }
 }
 

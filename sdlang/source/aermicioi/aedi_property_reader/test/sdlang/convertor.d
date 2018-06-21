@@ -75,6 +75,7 @@ unittest {
 	Tag root = parseSource(q{
 		valid 2 value=1
 		array "an" " " "array"
+		char "a"
 		invalid "string" value="march"
 		enum "first"
 	});
@@ -83,17 +84,25 @@ unittest {
 
 	int i, k;
 	ubyte u;
+	char ch;
+	string str;
+	char[] charr;
 	string[] s;
 	T e;
 
 	SdlangElement(root.tags["valid"].front).convert(i);
 	SdlangElement(root.tags["valid"].front).convert(u);
+	SdlangElement(root.tags["invalid"].front).convert(charr);
+	SdlangElement(root.tags["invalid"].front.attributes["value"].front).convert(charr);
+	SdlangElement(root.tags["invalid"].front.attributes["value"].front).convert(str);
+	SdlangElement(root.tags["invalid"].front).convert(str);
 	SdlangElement(root.tags["enum"].front).convert(e);
 	SdlangElement(root.tags["array"].front).convert(s);
 	assert(i == 2);
 	assert(s == ["an", " ", "array"]);
 
 	SdlangElement(root.tags["valid"].front.attributes["value"].front).convert(i);
+	SdlangElement(root.tags["char"].front).convert(ch);
 	assert(i == 1);
 
 	assertThrown!InvalidCastException(SdlangElement(root.tags["invalid"].front).convert(i));

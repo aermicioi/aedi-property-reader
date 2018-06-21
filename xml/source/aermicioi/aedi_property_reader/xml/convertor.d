@@ -109,7 +109,7 @@ void convert(To, From : Element)(in From from, ref To value, RCIAllocator alloca
 ditto
 **/
 void convert(To, From : Element)(in From from, ref To value, RCIAllocator allocator = theAllocator)
-    if (isSomeString!To && !is(To == enum)) {
+    if ((isSomeString!To || isSomeChar!To) && !is(To == enum)) {
 
     try {
 

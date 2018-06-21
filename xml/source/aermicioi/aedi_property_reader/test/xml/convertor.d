@@ -45,6 +45,7 @@ unittest {
     double d;
     bool b;
     Colorful c;
+    char ch;
     string[string] as;
     string s;
     string t;
@@ -54,6 +55,7 @@ unittest {
     new Document("<root>1.0</root>").convert!double(d);
     new Document("<root>true</root>").convert!bool(b);
     new Document("<root>yes</root>").convert!Colorful(c);
+    new Document("<root>a</root>").convert!char(ch);
     new Document("<root><test>t</test><pest>p</pest></root>").convert!(string[string])(as);
     new Document("<root><v>second one</v><v>third one</v></root>").convert!(string[])(sd);
 

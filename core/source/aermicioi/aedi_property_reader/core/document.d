@@ -432,7 +432,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
             }
 
             debug(trace) trace("No suitable convertor found for ", from.identify, " to ", to);
-            throw new ConvertorException(text("Could not convert ", from.identify));
+            throw new ConvertorException(text("Could not convert ", from.identify, " to ", to));
         }
 
         /**

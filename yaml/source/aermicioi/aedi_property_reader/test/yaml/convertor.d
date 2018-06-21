@@ -45,17 +45,22 @@ unittest {
     double d;
     bool b;
     Colorful c;
+	char ch;
+	char[] charr;
     string[string] as;
     string s;
     string t;
     string[] sd;
 
     Loader.fromString((cast(char[]) "29192").dup).load.convert!int(i);
+    Loader.fromString((cast(char[]) "\'a\'").dup).load.convert!char(ch);
     Loader.fromString((cast(char[]) "1.0").dup).load.convert!double(d);
     Loader.fromString((cast(char[]) "true").dup).load.convert!bool(b);
     Loader.fromString((cast(char[]) "affirmative").dup).load.convert!Colorful(c);
     Loader.fromString((cast(char[]) "test: \"t\"\npest: \"p\"").dup).load.convert!(string[string])(as);
     Loader.fromString((cast(char[]) "[\"second one\", \"third one\"]").dup).load.convert!(string[])(sd);
+    Loader.fromString((cast(char[]) "\"second one\"").dup).load.convert(s);
+    Loader.fromString((cast(char[]) "\"second one\"").dup).load.convert(charr);
 
     assert(i == 29192);
     assert(d == 1.0);

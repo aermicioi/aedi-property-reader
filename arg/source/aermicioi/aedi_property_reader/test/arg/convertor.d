@@ -46,6 +46,7 @@ unittest {
         "--enum=yes",
         "--assoc-array=beta=0.5",
         "--assoc-array",
+        "--string=\"str\"",
         "theta=0.95",
         "--array",
         "first one",
@@ -60,10 +61,21 @@ unittest {
     string s;
     string t;
     string[] sd;
+    wstring w;
+    dstring ds;
+    char[] charr;
+    wchar[] wcharr;
+    dchar[] dcharr;
 
     ["", "--integer=29192"].convert!int(i);
     ["", "--double=1.0"].convert!double(d);
     ["", "--boolean=true"].convert!bool(b);
+    ["", "--string=\"str\""].convert!string(s);
+    ["", "--string=\"str\""].convert!wstring(w);
+    ["", "--string=\"str\""].convert!dstring(ds);
+    ["", "--string=\"str\""].convert(charr);
+    ["", "--string=\"str\""].convert(wcharr);
+    ["", "--string=\"str\""].convert(dcharr);
     ["", "--enum=yes"].convert!Colorful(c);
     ["", "--assoc-array=test=t", "--assoc-array=pest=p"].convert!(string[string])(as);
     ["", "--array=second one", "--array=third one"].convert!(string[])(sd);

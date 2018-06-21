@@ -42,8 +42,9 @@ import aermicioi.aedi.storage.decorator;
 import aermicioi.aedi.exception;
 import std.json;
 import std.traits;
-import std.conv : to;
+import std.conv : to, text;
 import std.experimental.allocator;
+import std.exception : enforce;
 
 private {
     enum JAccessor(From : JSONValue) = () => new RuntimeFieldAccessor!JSONValue(dsl(new JsonPropertyAccessor, new JsonIndexAccessor));
@@ -125,12 +126,20 @@ ditto
 **/
 void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (!isUnsigned!To && isIntegral!To && !is(To == enum)) {
-
-    if (json.type != JSON_TYPE.INTEGER) {
-        throw new InvalidCastException("Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To);
-    }
+    enforce!InvalidCastException(json.type == JSON_TYPE.INTEGER,
+            text("Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To));
 
     value = json.integer.to!To;
+}
+
+/**
+ditto
+**/
+void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
+    if (isSomeChar!To && !is(To == enum)) {
+    enforce!InvalidCastException(json.type == JSON_TYPE.STRING, text("Could not convert json ", json, " value to type ", fullyQualifiedName!To));
+
+    value = json.str.to!To;
 }
 
 /**

@@ -45,6 +45,9 @@ unittest {
     double d;
     bool b;
     Colorful c;
+    char ch;
+    dchar dch;
+    wchar wch;
     string[string] as;
     string s;
     string t;
@@ -53,6 +56,9 @@ unittest {
     JSONValue(29192).convert!int(i);
     JSONValue(1.0).convert!double(d);
     JSONValue(true).convert!bool(b);
+    JSONValue("a").convert!char(ch);
+    JSONValue("a").convert!wchar(wch);
+    JSONValue("a").convert!dchar(dch);
     JSONValue("yes").convert!Colorful(c);
     JSONValue(["pest" : "p", "test" : "t"]).convert!(string[string])(as);
     JSONValue(["second one", "third one"]).convert!(string[])(sd);

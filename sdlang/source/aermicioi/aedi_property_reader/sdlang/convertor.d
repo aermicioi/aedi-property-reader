@@ -58,7 +58,7 @@ alias SdlangConvertor = ChainedAdvisedConvertor!(
 	)
 ).AdvisedConvertorImplementation;
 
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To) {
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To && !isSomeChar!To && !isSomeString!To) {
 	try {
 
 		to = (cast() from).expectValue!To;
@@ -135,11 +135,57 @@ void convert(To : E[], From : Tag, E)(in From from, ref To to, RCIAllocator allo
 	}
 }
 
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To) {
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isSomeChar!To) {
+
+	try {
+
+		to = (cast() from).expectValue!string.to!To;
+	} catch (ValueNotFoundException e) {
+
+		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+	}
+}
+
+void convert(To : T[], From : Tag, T)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isSomeChar!T) {
+
+	try {
+
+		to = (cast() from).expectValue!string.to!To;
+	} catch (ValueNotFoundException e) {
+
+		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+	}
+}
+
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To && !isSomeChar!To) {
 	import std.variant : VariantException;
 
 	try {
 		to = cast(To) from.value.get!To;
+
+	} catch (VariantException e) {
+
+		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+	}
+}
+
+void convert(To : T[], From : Attribute, T)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isSomeChar!T) {
+	import std.variant : VariantException;
+
+	try {
+		to = cast(To) from.value.get!string.to!To;
+
+	} catch (VariantException e) {
+
+		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+	}
+}
+
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To && isSomeChar!To) {
+	import std.variant : VariantException;
+
+	try {
+		to = cast(To) from.value.get!string.to!To;
 
 	} catch (VariantException e) {
 
