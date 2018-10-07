@@ -35,6 +35,7 @@ import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.core.setter;
 import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.core.core;
 
 /**
 Convert from component to component using std.conv.to family of functions.
@@ -65,18 +66,33 @@ void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
 public {
     enum AssociativeArrayAccessorFactory(T) = () => new AssociativeArrayAccessor!T;
     enum AssociativeArrayInspectorFactory(T) = () => new AssociativeArrayInspector!T;
+    enum AssociativeArraySetterFactory(T) = () => new AssociativeArraySetter!T;
 }
 
 /**
 Advised callback convertor with std.conv.to convertor and destructor.
 **/
-alias StdConvAdvisedConvertor = ChainedAdvisedConvertor!(
-    AdvisedConvertor!(convert, destruct),
-    CompositeAdvisedConvertor,
-    AdvisedConvertor!(
-        AssociativeArrayAccessorFactory,
-        CompositeSetterFactory,
-        CompositeInspectorFactory,
-        AssociativeArrayInspectorFactory
-    )
-).AdvisedConvertorImplementation;
+alias StdConvAdvisedConvertorBuilderFactory = (Convertor[] convertors = []) {
+    return factoryAnyConvertorBuilder(
+        new CallbackConvertorBuilder!(convert, destruct),
+        MappingConvertorBuilderFactory(convertors),
+        new MappingConvertorBuilder!(
+            AssociativeArrayAccessorFactory,
+            CompositeSetterFactory,
+            CompositeInspectorFactory,
+            AssociativeArrayInspectorFactory
+        )(convertors, true, true, true, true)
+    );
+};
+
+alias StdConvStringPrebuiltConvertorsFactory = () {
+    auto factory = new CallbackConvertorBuilder!(convert, destruct);
+    Convertor[] convertors;
+
+    foreach (Type; DefaultConvertibleTypes) {
+        convertors ~= factory.make!(Type, string);
+        convertors ~= factory.make!(string, Type);
+    }
+
+    return convertors;
+};

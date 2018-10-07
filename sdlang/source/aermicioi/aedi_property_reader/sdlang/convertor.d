@@ -48,15 +48,17 @@ public {
 	enum SdlangInspectorFactory(From : SdlangElement) = () => new TaggedInspector!(SdlangElement, Tag)(new SdlangTagInspector);
 }
 
-alias SdlangConvertor = ChainedAdvisedConvertor!(
-    AdvisedConvertor!(convert, destruct),
-    AdvisedConvertor!(
-		SdlangAccessorFactory,
-		CompositeSetterFactory,
-		CompositeInspectorFactory,
-		SdlangInspectorFactory
-	)
-).AdvisedConvertorImplementation;
+alias SdlangConvertorBuilderFactory = (Convertor[] convertors) {
+	return factoryAnyConvertorBuilder(
+		new CallbackConvertorBuilder!(convert, destruct),
+		new MappingConvertorBuilder!(
+			SdlangAccessorFactory,
+			CompositeSetterFactory,
+			CompositeInspectorFactory,
+			SdlangInspectorFactory
+		)(convertors, true, true, true, true)
+	);
+};
 
 void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To && !isSomeChar!To && !isSomeString!To) {
 	try {

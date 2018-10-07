@@ -34,10 +34,16 @@ import aermicioi.aedi_property_reader.arg.convertor;
 import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.arg.arg;
 import std.experimental.allocator;
 
-alias ArgumentAdvisedDocumentContainer = AdvisedDocumentContainer!(const(string)[], const(string)[], ArgumentAdvisedConvertor);
+alias ArgumentAdvisedDocumentContainer = AdvisedDocumentContainer!(
+	const(string)[],
+	const(string)[],
+	WithConvertorBuilder!ArgumentAdvisedConvertorFactory,
+	WithConvertorsFor!DefaultConvertibleTypes
+);
 
 auto argument() {
 	import core.runtime;

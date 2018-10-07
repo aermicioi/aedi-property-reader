@@ -37,12 +37,26 @@ import aermicioi.aedi_property_reader.sdlang.convertor;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
+import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.sdlang.type_guesser;
 import sdlanguage = sdlang;
+import sdlang.token : DateTimeFrac, DateTimeFracUnknownZone;
+import core.time : Duration;
+import std.datetime : Date, SysTime;
 import std.experimental.logger;
 import std.experimental.allocator;
 
-alias SdlangDocumentContainer = AdvisedDocumentContainer!(SdlangElement, SdlangElement, SdlangConvertor);
+alias SdlangDocumentContainer = AdvisedDocumentContainer!(
+    SdlangElement,
+    SdlangElement,
+    WithConvertorBuilder!SdlangConvertorBuilderFactory,
+	WithConvertorsFor!(bool,
+        string, dchar,
+        int, long,
+        float, double, real,
+        Date, DateTimeFrac, SysTime, DateTimeFracUnknownZone, Duration,
+        ubyte[])
+);
 
 /**
 Create a convertor container with data source being sdlang document.
@@ -78,25 +92,7 @@ ditto
 **/
 auto sdlang(SdlangElement value, RCIAllocator allocator = theAllocator) {
 
-    auto container = value.sdlang(accessor, new SdlangTypeGuesser(), allocator);
-    import std.traits : fullyQualifiedName;
-    import std.meta : AliasSeq;
-    import std.datetime;
-    import sdlang.token;
-
-    static foreach (T; AliasSeq!(
-        bool,
-        string, dchar,
-        int, long,
-        float, double, real,
-        Date, DateTimeFrac, SysTime, DateTimeFracUnknownZone, Duration,
-        ubyte[]
-    )) {
-
-        container.set(SdlangConvertor!(T, SdlangElement)(), fullyQualifiedName!T);
-    }
-
-    return container;
+    return value.sdlang(accessor, new SdlangTypeGuesser(), allocator);
 }
 
 /**

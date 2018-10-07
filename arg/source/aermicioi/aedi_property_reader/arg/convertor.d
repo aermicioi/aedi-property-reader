@@ -99,12 +99,14 @@ public {
     enum ArgumentInspectorFactory(From : const(string)[]) = () => new ArgumentInspector;
 }
 
-alias ArgumentAdvisedConvertor = ChainedAdvisedConvertor!(
-    AdvisedConvertor!(convert, destruct),
-    AdvisedConvertor!(
-        ArgumentAccessorFactory,
-        CompositeSetterFactory,
-        CompositeInspectorFactory,
-        ArgumentInspectorFactory
-    )
-).AdvisedConvertorImplementation;
+alias ArgumentAdvisedConvertorFactory = (Convertor[] convertors) {
+    return factoryAnyConvertorBuilder(
+        new CallbackConvertorBuilder!(convert, destruct),
+        new MappingConvertorBuilder!(
+            ArgumentAccessorFactory,
+            CompositeSetterFactory,
+            CompositeInspectorFactory,
+            ArgumentInspectorFactory
+        )(convertors, true, true, true, true)
+    );
+};

@@ -5,7 +5,7 @@
 	],
 	"dependencies": {
 		"aedi-property-reader:core": "*",
-		"sdlang-d": "~>0.10.1",
+		"sdlang-d": "~>0.10.4",
 		"taggedalgebraic": "~>0.10.9"
 	},
 	"description": "sdlang document loader and factory",
@@ -19,8 +19,7 @@
 		{
 			"name": "unittest",
 			"debugVersions": [
-				"trace",
-				"AdvisedConvertorDebug"
+				"trace"
 			]
 		}
 	]

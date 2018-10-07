@@ -37,6 +37,7 @@ import aermicioi.aedi_property_reader.core.setter;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.placeholder;
 import aermicioi.aedi_property_reader.core.std_conv;
+import aermicioi.aedi_property_reader.core.std_conv : stdConvert = convert, stdDestruct = destruct;
 import std.experimental.allocator;
 import std.exception;
 import std.conv;
@@ -81,6 +82,8 @@ unittest {
 }
 
 unittest {
+    auto builder = new CallbackConvertorBuilder!(stdConvert, stdDestruct);
+
     string[string] from = [
         "i": "10",
         "p": "sample string",
@@ -102,10 +105,10 @@ unittest {
     assertThrown!ConvertorException(mapper.map(from, to));
 
     mapper.convertors = cast(Convertor[]) [
-        StdConvAdvisedConvertor!(int, string)(),
-        StdConvAdvisedConvertor!(string, string)(),
-        StdConvAdvisedConvertor!(double, string)(),
-        StdConvAdvisedConvertor!(long, string)(),
+        builder.make!(int, string)(),
+        builder.make!(string, string)(),
+        builder.make!(double, string)(),
+        builder.make!(long, string)(),
     ];
     mapper.map(from, to);
 
@@ -116,6 +119,7 @@ unittest {
 }
 
 unittest {
+    auto builder = new CallbackConvertorBuilder!(stdConvert, stdDestruct);
     auto from = cast(Object) [
         "i": "10",
         "p": "sample string",
@@ -137,10 +141,10 @@ unittest {
     assertThrown!ConvertorException(mapper.map(from, to));
 
     mapper.convertors = cast(Convertor[]) [
-        StdConvAdvisedConvertor!(int, string)(),
-        StdConvAdvisedConvertor!(string, string)(),
-        StdConvAdvisedConvertor!(double, string)(),
-        StdConvAdvisedConvertor!(long, string)(),
+        builder.make!(int, string)(),
+        builder.make!(string, string)(),
+        builder.make!(double, string)(),
+        builder.make!(long, string)(),
     ];
     mapper.map(from, to);
 
@@ -151,6 +155,7 @@ unittest {
 }
 
 unittest {
+    auto builder = new CallbackConvertorBuilder!(stdConvert, stdDestruct);
     auto from = cast(Object) [
         "i": "10",
         "p": "sample string",
@@ -164,13 +169,13 @@ unittest {
     mapper.conversion = true;
     mapper.force = true;
     mapper.convertors = cast(Convertor[]) [
-                StdConvAdvisedConvertor!(int, string)(),
-                StdConvAdvisedConvertor!(string, string)(),
-                StdConvAdvisedConvertor!(double, string)(),
-                StdConvAdvisedConvertor!(long, string)(),
-                StdConvAdvisedConvertor!(string, int)(),
-                StdConvAdvisedConvertor!(string, double)(),
-                StdConvAdvisedConvertor!(string, long)(),
+                builder.make!(int, string)(),
+                builder.make!(string, string)(),
+                builder.make!(double, string)(),
+                builder.make!(long, string)(),
+                builder.make!(string, int)(),
+                builder.make!(string, double)(),
+                builder.make!(string, long)(),
             ];
     mapper.factory = (
         in PropertyAccessor!Object accessor,

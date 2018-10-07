@@ -32,22 +32,19 @@ module aermicioi.aedi_property_reader.env.env;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.std_conv;
 
-alias EnvironmentDocumentContainer = AdvisedDocumentContainer!(string[string], string, StdConvAdvisedConvertor);
+alias EnvironmentDocumentContainer = AdvisedDocumentContainer!(
+    string[string],
+    string,
+    WithConvertorBuilder!StdConvAdvisedConvertorBuilderFactory,
+	WithConvertorsFor!DefaultConvertibleTypes
+);
 
 auto env() {
-    auto container = env(new StringToScalarConvTypeGuesser);
-    import std.traits;
-
-    static if (is(StringToScalarConvTypeGuesser: StdConvTypeGuesser!(S, ToTypes), S, ToTypes...)) {
-        static foreach (To; ToTypes) {
-            container.set(StdConvAdvisedConvertor!(To, S)(), fullyQualifiedName!To);
-        }
-    }
-
-    return container;
+    return env(new StringToScalarConvTypeGuesser);
 }
 
 auto env(TypeGuesser!string guesser) {

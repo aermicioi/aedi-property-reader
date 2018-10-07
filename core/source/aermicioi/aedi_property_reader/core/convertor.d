@@ -230,7 +230,7 @@ interface Convertor {
         Returns:
             type info of component that convertor is able to convert.
         **/
-        TypeInfo from() const nothrow;
+        TypeInfo from() @safe const nothrow pure;
 
         /**
         Get the type info of component that convertor is able to convert to.
@@ -243,7 +243,7 @@ interface Convertor {
         Returns:
             type info of component that can be converted to.
         **/
-        TypeInfo to() const nothrow;
+        TypeInfo to() @safe const nothrow pure;
     }
 
     /**
@@ -258,7 +258,7 @@ interface Convertor {
     Returns:
         true if it is able to convert from, or false otherwise.
     **/
-    bool convertsFrom(TypeInfo from) const nothrow;
+    bool convertsFrom(TypeInfo from) @safe const nothrow pure ;
 
     /**
     Check whether convertor is able to convert from.
@@ -274,7 +274,7 @@ interface Convertor {
     Returns:
         true if it is able to convert from, or false otherwise.
     **/
-    bool convertsFrom(in Object from) const nothrow;
+    bool convertsFrom(in Object from) @safe const nothrow pure ;
 
     /**
     Check whether convertor is able to convert to.
@@ -289,7 +289,7 @@ interface Convertor {
     Returns:
         true if it is able to convert to, false otherwise.
     **/
-    bool convertsTo(TypeInfo to) const nothrow;
+    bool convertsTo(TypeInfo to) @safe const nothrow pure ;
 
     /**
     Check whether convertor is able to convert to.
@@ -306,7 +306,7 @@ interface Convertor {
     Returns:
         true if it is able to convert to, false otherwise.
     **/
-    bool convertsTo(in Object to) const nothrow;
+    bool convertsTo(in Object to) @safe const nothrow pure ;
 
     /**
     Convert from component to component.
@@ -321,7 +321,7 @@ interface Convertor {
     Returns:
         Resulting converted component.
     **/
-    Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator);
+    Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const;
 
     /**
     Destroy component created using this convertor.
@@ -336,7 +336,7 @@ interface Convertor {
         converted = component that should be destroyed.
         allocator = allocator used to allocate converted component.
     **/
-    void destruct(ref Object converted, RCIAllocator allocator = theAllocator);
+    void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const;
 }
 
 /**
@@ -391,14 +391,14 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
         Returns:
             true if it is able to convert from, or false otherwise.
         **/
-        bool convertsFrom(TypeInfo from) const nothrow {
+        bool convertsFrom(TypeInfo from) @safe const nothrow pure {
             return typeid(Info.From) is from;
         }
 
         /**
         ditto
         **/
-        bool convertsFrom(in Object from) const nothrow {
+        bool convertsFrom(in Object from) @safe const nothrow pure {
             return this.convertsFrom(from.identify);
         }
 
@@ -411,14 +411,14 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
         Returns:
             true if it is able to convert to, false otherwise.
         **/
-        bool convertsTo(TypeInfo to) const nothrow {
+        bool convertsTo(TypeInfo to) @safe const nothrow pure {
             return typeid(Info.To) is to;
         }
 
         /**
         ditto
         **/
-        bool convertsTo(in Object to) const nothrow {
+        bool convertsTo(in Object to) @safe const nothrow pure {
             return this.convertsTo(to.identify);
         }
 
@@ -444,15 +444,13 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const
         {
-            enforce!ConvertorException(this.convertsTo(to), text(to, " is not supported by convertor expected ", typeid(Info.To)));
-            enforce!ConvertorException(this.convertsFrom(from), text(from.identify, " is not supported by convertor expected ", typeid(Info.From)));
-
-            Info.From naked;
+            enforce!ConvertorException(this.convertsTo(to), text(to, " is not supported destination by convertor expected ", typeid(Info.To)));
+            enforce!ConvertorException(this.convertsFrom(from), text(from.identify, " is not supported source by convertor expected ", typeid(Info.From)));
 
             static if (is(From : Object)) {
-                naked = cast(From) from;
+                Info.From naked = cast(From) from;
 
                 if (naked is null) {
                     throw new ConvertorException(text("Cannot convert ", from.classinfo, " only supported ", this.from));
@@ -465,7 +463,7 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
                     throw new ConvertorException(text("Cannot convert ", from.identify, " only supported ", this.from));
                 }
 
-                naked = wrapper.value;
+                Info.From naked = wrapper.value;
             }
 
 
@@ -496,7 +494,7 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
             static if (is(Info.To : Object)) {
 
                 destructor(converted, allocator);
@@ -593,7 +591,7 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
         Returns:
             true if it is able to convert from, or false otherwise.
         **/
-        bool convertsFrom(TypeInfo from) const nothrow {
+        bool convertsFrom(TypeInfo from) @safe const nothrow pure  {
             if (from is typeid(void)) {
                 return false;
             }
@@ -614,7 +612,7 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
         /**
         ditto
         **/
-        bool convertsFrom(in Object from) const nothrow {
+        bool convertsFrom(in Object from) @safe const nothrow pure  {
             return this.convertsFrom(from.identify);
         }
 
@@ -627,14 +625,14 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
         Returns:
             true if it is able to convert to, false otherwise.
         **/
-        bool convertsTo(TypeInfo to) const nothrow {
+        bool convertsTo(TypeInfo to) @safe const nothrow pure  {
             return this.convertor.convertsTo(to);
         }
 
         /**
         ditto
         **/
-        bool convertsTo(in Object to) const nothrow {
+        bool convertsTo(in Object to) @safe const nothrow pure  {
             return this.convertsTo(to.identify);
         }
 
@@ -660,7 +658,7 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const
         {
             return this.convertor.convert(from, to, allocator);
         }
@@ -679,7 +677,7 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
             return this.convertor.destruct(converted, allocator);
         }
     }
@@ -899,7 +897,7 @@ class CombinedConvertorImpl : CombinedConvertor {
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const
         {
             auto convertors = this.convertors.find!(c => c.convertsFrom(from) && c.convertsTo(to));
 
@@ -919,7 +917,7 @@ class CombinedConvertorImpl : CombinedConvertor {
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
             auto convertors = this.convertors.find!(c => c.convertsTo(converted));
 
             if (convertors.empty) {
@@ -1025,7 +1023,7 @@ class NoOpConvertor : Convertor {
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator)
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const
         {
             enforce!ConvertorException(
                 from.identify is to,
@@ -1042,7 +1040,7 @@ class NoOpConvertor : Convertor {
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
 
         }
     }
@@ -1079,6 +1077,11 @@ To convert(To, From)(Convertor convertor, From from, RCIAllocator allocator = th
     }
 }
 
+enum isConvertorBuilder(T) =
+    hasMember!(T, "make") &&
+    hasMember!(T, "isAble") &&
+    hasMember!(T, "cause");
+
 /**
 A callback convertor factory advised with functional convertor and destructor.
 
@@ -1089,58 +1092,55 @@ Params:
 Returns:
     AdvisedConvertor(To, From) template ready to instantiate a callback convertor for To, and From types using convertor and destructor.
 **/
-template AdvisedConvertor(alias convertor, alias destructor) {
-    import std.traits;
+template CallbackConvertorBuilder(alias convertor, alias destructor) {
+    class CallbackConvertorBuilder {
+        bool throwOnFailure = true;
 
-    template CheckMessage(To, From) {
-        alias ConvertorInfo = maybeConvertor!(convertor, To, From);
-        alias DestructorInfo = maybeDestructor!(destructor, To);
+        this() {
 
-        import std.traits : fullyQualifiedName;
-        enum CheckMessage = text(
-            "Cannot convert type ",
-            fullyQualifiedName!From,
-            " to ",
-            fullyQualifiedName!To,
-            " when:\n ",
-            fullyQualifiedName!convertor,
-            " implements convertor ",
-            ConvertorInfo.Yes,
-            "\n ",
-            fullyQualifiedName!destructor,
-            " implements destructor ",
-            DestructorInfo.Yes
-        );
-
-        /// Enable it for what reason creation of convertor fails, if it is not due to type constraints.
-        debug (AdvisedConvertorDebug) {
-            alias Debug = ConvertorImpl!(ConvertorInfo, DestructorInfo);
         }
-    }
 
-    template ConvertorImpl(alias ConvertorInfo, alias DestructorInfo) {
+        this(bool throwOnFailure) {
+            this.throwOnFailure = throwOnFailure;
+        }
 
-        alias ConvertorImpl = () {
-            auto convertor = new CallbackConvertor!(ConvertorInfo.Convertor, DestructorInfo.Destructor)();
+        Convertor make(To, From)() {
+            static if (is(CallbackConvertor!(convertor!(To, From), destructor!To))) {
 
-            static if (is(From : TaggedAlgebraic!Union, Union)) {
-                return new TaggedConvertor!From(convertor);
+                return new CallbackConvertor!(convertor!(To, From), destructor!To);
             } else {
-                return convertor;
+
+                if (this.throwOnFailure) {
+                    throw new Exception(this.cause!(To, From));
+                } else {
+                    error(this.cause!(To, From));
+                }
+
+                return null;
             }
-        };
-    }
+        }
 
-    template AdvisedConvertorImplementation(To, From) {
-        alias ConvertorInfo = maybeConvertor!(convertor, To, From);
-        alias DestructorInfo = maybeDestructor!(destructor, To);
+        bool isAble(To, From)() {
+            return is(CallbackConvertor!(convertor!(To, From), destructor!To));
+        }
 
-        static if (ConvertorInfo.Yes && DestructorInfo.Yes) {
-
-            alias AdvisedConvertorImplementation = ConvertorImpl!(ConvertorInfo, DestructorInfo);
-        } else {
-
-            static assert(false, CheckMessage!(To, From));
+        string cause(To, From)() {
+            alias ConvertorInfo = maybeConvertor!(convertor, To, From);
+            alias DestructorInfo = maybeDestructor!(destructor, To);
+            return text(
+                    "Cannot convert type ",
+                    typeid(From),
+                    " to ",
+                    typeid(To),
+                    " when:\n ",
+                    fullyQualifiedName!convertor,
+                    " implements convertor ",
+                    ConvertorInfo.Yes,
+                    "\n ",
+                    fullyQualifiedName!destructor,
+                    " implements destructor ",
+                    DestructorInfo.Yes
+                );
         }
     }
 }
@@ -1156,55 +1156,73 @@ Params:
 Returns:
     AdvisedConvertor(To, From) template ready to instantiate a composite convertor for To, and From types using advised accessor, setter, and inspectors.
 **/
-template AdvisedConvertor(alias Accessor, alias Setter, alias ToInspector, alias FromInspector) {
-
+template MappingConvertorBuilder(alias Accessor, alias Setter, alias ToInspector, alias FromInspector) {
     enum AccessorCheck(To, From) = (is(typeof(Accessor!From()) : PropertyAccessor!(From, Object)));
     enum SetterCheck(To, From) = (is (typeof(Setter!To()) : PropertySetter!(To, Object)));
     enum FromInspectorCheck(To, From) = (is (typeof(FromInspector!From()) : Inspector!From));
     enum ToInspectorCheck(To, From) = (is (typeof(ToInspector!To()) : Inspector!To));
 
-    template CheckMessage(To, From) {
-        import std.traits : fullyQualifiedName;
-
-        enum CheckMessage = text(
-                "Cannot convert type ",
-                fullyQualifiedName!From,
-                " to ",
-                fullyQualifiedName!To,
-                " when:\n ",
-                fullyQualifiedName!Accessor,
-                " is able to access ", fullyQualifiedName!From, " ",
-                AccessorCheck!(To, From),
-                ",\n ",
-                fullyQualifiedName!Setter,
-                " is able to set ", fullyQualifiedName!To, " ",
-                SetterCheck!(To, From),
-                ",\n ",
-                fullyQualifiedName!FromInspector,
-                " is able to inspect ", fullyQualifiedName!From, " ",
-                FromInspectorCheck!(To, From),
-                ",\n ",
-                fullyQualifiedName!ToInspector,
-                " is able to inspect ", fullyQualifiedName!To, " ",
-                ToInspectorCheck!(To, From)
-            );
-
-        /// Enable it for what reason creation of convertor fails, if it is not due to type constraints.
-        debug (AdvisedConvertorDebug) {
-            alias Debug = AdvisedConvertorImplementation!(To, From);
+    class MappingConvertorBuilder {
+        private {
+            Convertor[] convertors_ = [];
         }
-    }
 
-    template AdvisedConvertorImplementation(To, From) {
+        bool conversion = true;
+        bool force = true;
+        bool skip = true;
+        bool throwOnFailure = true;
 
-        static if (
-            AccessorCheck!(To, From) &&
-            SetterCheck!(To, From) &&
-            FromInspectorCheck!(To, From) &&
-            ToInspectorCheck!(To, From)
-        ) {
-            alias AdvisedConvertorImplementation = (bool conversion = true, bool force = true, bool skip = true) {
-                import aermicioi.aedi_property_reader.core.mapper : CompositeMapper, CompositeConvertor;
+        this(Convertor[] convertors, bool conversion, bool force, bool skip, bool throwOnFailure) {
+            this.convertors = convertors;
+            this.conversion = conversion;
+            this.force = force;
+            this.skip = skip;
+            this.throwOnFailure = throwOnFailure;
+        }
+
+        this() {
+
+        }
+
+        /**
+        Set convertors
+
+        Params:
+            convertors = list of convertors used to inject into mapping convertor
+        Throws:
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) convertors(Convertor[] convertors) @safe nothrow pure
+        in {
+            assert(convertors !is null, "Cannot build mapping convertor with no convertors");
+            assert(convertors.length > 0, "Cannot build mapping convertor with no convertors");
+        }
+        body {
+            this.convertors_ = convertors;
+
+            return this;
+        }
+
+        /**
+        Get convertors
+
+        Returns:
+            Convertor[]
+        **/
+        inout(Convertor[]) convertors() @safe nothrow pure inout {
+            return this.convertors_;
+        }
+
+        Convertor make(To, From)() {
+            import aermicioi.aedi_property_reader.core.mapper : CompositeMapper, CompositeConvertor;
+            static if (
+                FromInspectorCheck!(To, From) &&
+                ToInspectorCheck!(To, From) &&
+                AccessorCheck!(To, From) &&
+                SetterCheck!(To, From)
+            ) {
 
                 auto convertor = new CompositeConvertor!(To, From)();
                 CompositeMapper!(To, From) mapper = new CompositeMapper!(To, From)();
@@ -1216,67 +1234,188 @@ template AdvisedConvertor(alias Accessor, alias Setter, alias ToInspector, alias
                 mapper.force = force;
                 mapper.skip = skip;
                 convertor.mapper = mapper;
+                convertor.convertors = convertors;
 
-                static if (is(From : TaggedAlgebraic!Union, Union)) {
-                    return new class(convertor) TaggedConvertor!From, CombinedConvertor {
-                        private CompositeConvertor!(To, From) cc;
-                        this(CompositeConvertor!(To, From) c) {
-                            super(c);
-                            this.cc = c;
-                        }
-                        typeof(this) convertors(Convertor[] convertors) @safe nothrow { this.cc.convertors = convertors; return this; }
-                        typeof(this) add(Convertor convertor) @safe nothrow { this.cc.add(convertor); return this; }
-                        typeof(this) remove(Convertor convertor) @safe nothrow { this.cc.remove(convertor); return this; }
-                    };
+                return convertor;
+            } else {
+
+                if (this.throwOnFailure) {
+                    throw new Exception(this.cause!(To, From));
                 } else {
-                    return convertor;
+                    error(this.cause!(To, From));
                 }
-            };
-        } else {
 
-            static assert(false, CheckMessage!(To, From));
+                return null;
+            }
+        }
+
+        bool isAble(To, From)() {
+            return
+                FromInspectorCheck!(To, From) &&
+                ToInspectorCheck!(To, From) &&
+                AccessorCheck!(To, From) &&
+                SetterCheck!(To, From);
+        }
+
+        string cause(To, From)() {
+            return text(
+                    "Cannot convert type ",
+                    typeid(From),
+                    " to ",
+                    typeid(To),
+                    " when:\n ",
+                    fullyQualifiedName!Accessor,
+                    " is able to access ", typeid(From), " ",
+                    AccessorCheck!(To, From),
+                    ",\n ",
+                    fullyQualifiedName!Setter,
+                    " is able to set ", typeid(To), " ",
+                    SetterCheck!(To, From),
+                    ",\n ",
+                    fullyQualifiedName!FromInspector,
+                    " is able to inspect ", typeid(From), " ",
+                    FromInspectorCheck!(To, From),
+                    ",\n ",
+                    fullyQualifiedName!ToInspector,
+                    " is able to inspect ", typeid(To), " ",
+                    ToInspectorCheck!(To, From)
+                );
         }
     }
 }
 
-template ChainedAdvisedConvertor(AdvisedConvertors...) {
+template CombinedConvertorBuilder(Builders...)
+    if (allSatisfy!(isConvertorBuilder, Builders)) {
 
-    template CheckMessage(To, From) {
-        import std.traits : fullyQualifiedName;
-        import aermicioi.util.traits : getMember;
-        enum CheckMessage = text(
-            "None of advised convertors are able to convert ",
-            fullyQualifiedName!From,
-            " to ",
-            fullyQualifiedName!To,
-            " where advised convertors are failing with:\n ",
-            staticMap!(
-                ApplyRight!(AliasSeq, "\n"),
-                staticMap!(
-                    ApplyRight!(Instantiate, To, From),
-                    staticMap!(
-                        ApplyRight!(getMember, "CheckMessage"),
-                        AdvisedConvertors
-                    )
-                )
-            )
-        );
-    }
+    class CombinedConvertorBuilder {
+        bool throwOnFailure = true;
+        Builders builders;
 
-    template AdvisedConvertorImplementation(To, From) {
+        this(Builders builders, bool throwOnFailure = true) {
+            this.builders = builders;
+            this.throwOnFailure = throwOnFailure;
+        }
 
-        static foreach (AdvisedConvertor; AdvisedConvertors) {
-            import std.traits;
-            static if (!is(typeof(Yes)) && is(typeof(AdvisedConvertor.AdvisedConvertorImplementation!(To, From)))) {
-                enum Yes = true;
-                alias AdvisedConvertorImplementation = AdvisedConvertor.AdvisedConvertorImplementation!(To, From);
+        Convertor make(To, From)() {
+            if (!this.isAble!(To, From)) {
+                if (this.throwOnFailure) {
+                    throw new Exception(this.cause!(To, From));
+                } else {
+                    error(this.cause!(To, From));
+                }
+
+                return null;
             }
+
+            CombinedConvertor convertor = new CombinedConvertor;
+
+            foreach (builder; builders) {
+                convertor.add(builder.make!(To, From));
+            }
+
+            return convertor;
         }
 
-        static if (!is(typeof(Yes))) {
-            static assert(false, CheckMessage!(To, From));
+        bool isAble(To, From)() {
+            foreach (builder; builders) {
+                if (!builder.isAble!(To, From)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        string cause(To, From)() {
+            if (!this.isAble!(To, From)) {
+                string[] messages;
+
+                foreach (builder; builders) {
+                    messages ~= text(builder, " failed with: ", builder.cause!(To, From));
+                }
+
+                return text(
+                    "None of convertor builders were able to convert from ",
+                    typeid(From),
+                    " to ",
+                    typeid(To),
+                    " where all of them failed with following errors: ",
+                    messages.joiner(", ")
+                );
+            }
+
+            return null;
         }
     }
+}
+
+template AnyConvertorBuilder(Builders...)
+    if (allSatisfy!(isConvertorBuilder, Builders)) {
+
+    class AnyConvertorBuilder {
+        bool throwOnFailure = true;
+        Builders builders;
+
+        this(Builders builders, bool throwOnFailure = true) {
+            this.builders = builders;
+            this.throwOnFailure = throwOnFailure;
+        }
+
+        Convertor make(To, From)() {
+            if (!this.isAble!(To, From)) {
+                if (this.throwOnFailure) {
+                    throw new Exception(this.cause!(To, From));
+                } else {
+                    error(this.cause!(To, From));
+                }
+
+                return null;
+            }
+
+            foreach (builder; builders) {
+                if (builder.isAble!(To, From)) {
+                    return builder.make!(To, From);
+                }
+            }
+
+            throw new Exception(this.cause!(To, From));
+        }
+
+        bool isAble(To, From)() {
+            foreach (builder; builders) {
+                if (builder.isAble!(To, From)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        string cause(To, From)() {
+            if (!this.isAble!(To, From)) {
+                string[] messages;
+
+                foreach (builder; builders) {
+                    messages ~= text(builder, " failed with: ", builder.cause!(To, From));
+                }
+
+                return text(
+                    "None of convertor builders were able to convert from ",
+                    typeid(From),
+                    " to ",
+                    typeid(To),
+                    " where all of them failed with following errors: ",
+                    messages.joiner(", ")
+                );
+            }
+
+            return null;
+        }
+    }
+}
+
+auto factoryAnyConvertorBuilder(Builders...)(Builders builders) {
+    return new AnyConvertorBuilder!Builders(builders);
 }
 
 public {
@@ -1285,9 +1424,11 @@ public {
     enum CompositeInspectorFactory(T) = () => new CompositeInspector!T;
 }
 
-alias CompositeAdvisedConvertor = AdvisedConvertor!(
-    CompositeAccessorFactory,
-    CompositeSetterFactory,
-    CompositeInspectorFactory,
-    CompositeInspectorFactory
-);
+alias MappingConvertorBuilderFactory = (Convertor[] convertors) {
+    return new MappingConvertorBuilder!(
+        CompositeAccessorFactory,
+        CompositeSetterFactory,
+        CompositeInspectorFactory,
+        CompositeInspectorFactory
+    )(convertors, true, true, true, true);
+};

@@ -51,15 +51,17 @@ public {
     enum YamlInspectorFactory(From : Node) = () => new YamlInspector;
 }
 
-alias YamlConvertor = ChainedAdvisedConvertor!(
-    AdvisedConvertor!(convert, destruct),
-    AdvisedConvertor!(
-		YamlAccessorFactory,
-		CompositeSetterFactory,
-		CompositeInspectorFactory,
-		YamlInspectorFactory
-	)
-).AdvisedConvertorImplementation;
+alias YamlConvertorBuilderFactory = (Convertor[] convertors) {
+    return factoryAnyConvertorBuilder(
+		new CallbackConvertorBuilder!(convert, destruct),
+    	new MappingConvertorBuilder!(
+			YamlAccessorFactory,
+			CompositeSetterFactory,
+			CompositeInspectorFactory,
+			YamlInspectorFactory
+		)(convertors, true, true, true, true)
+	);
+};
 
 
 void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)

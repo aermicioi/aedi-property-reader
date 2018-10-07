@@ -53,15 +53,17 @@ private {
     enum CInspector(To) = () => new CompositeInspector!To();
 }
 
-alias JsonConvertor = ChainedAdvisedConvertor!(
-    AdvisedConvertor!(convert, destruct),
-    AdvisedConvertor!(
-        JAccessor,
-        CSetter,
-        CInspector,
-        JInspector
-    )
-).AdvisedConvertorImplementation;
+alias JsonConvertorBuilderFactory = (Convertor[] convertors) {
+    return factoryAnyConvertorBuilder(
+        new CallbackConvertorBuilder!(convert, destruct),
+        new MappingConvertorBuilder!(
+            JAccessor,
+            CSetter,
+            CInspector,
+            JInspector
+        )(convertors, true, true, true, true)
+    );
+};
 
 /**
 Convert JSONValue into T scalar/array/assocarray value.

@@ -55,7 +55,8 @@ document will be converted according to convertor associated to property
 path from document.
 **/
 class DocumentContainer(DocumentType, FieldType = DocumentType) :
-    Container, Storage!(Convertor, string),
+    Container,
+    Storage!(Convertor, string),
     AllocatorAware!(),
     Convertor
 {
@@ -316,7 +317,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
             Returns:
                 type info of component that convertor is able to convert.
             **/
-            TypeInfo from() const nothrow {
+            TypeInfo from() @safe const nothrow pure {
                 return typeid(FieldType);
             }
 
@@ -331,7 +332,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
             Returns:
                 type info of component that can be converted to.
             **/
-            TypeInfo to() const nothrow {
+            TypeInfo to() @safe const nothrow pure {
                 return typeid(void);
             }
         }
@@ -348,7 +349,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
         Returns:
             true if it is able to convert from, or false otherwise.
         **/
-        bool convertsFrom(TypeInfo from) const nothrow {
+        bool convertsFrom(TypeInfo from) @safe const nothrow pure  {
             return this.convertors.byValue.canFind!(convertor => convertor.convertsFrom(from));
         }
 
@@ -366,7 +367,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
         Returns:
             true if it is able to convert from, or false otherwise.
         **/
-        bool convertsFrom(in Object from) const nothrow {
+        bool convertsFrom(in Object from) @safe const nothrow pure  {
             return this.convertors.byValue.canFind!(convertor => convertor.convertsFrom(from));
         }
 
@@ -383,7 +384,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
         Returns:
             true if it is able to convert to, false otherwise.
         **/
-        bool convertsTo(TypeInfo to) const nothrow {
+        bool convertsTo(TypeInfo to) @safe const nothrow pure  {
             return this.convertors.byValue.canFind!(convertor => convertor.convertsTo(to));
         }
 
@@ -402,7 +403,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
         Returns:
             true if it is able to convert to, false otherwise.
         **/
-        bool convertsTo(in Object to) const nothrow {
+        bool convertsTo(in Object to) @safe const nothrow pure  {
             return this.convertors.byValue.canFind!(convertor => convertor.convertsTo(to));
         }
 
@@ -419,7 +420,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) {
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const {
             debug(trace) trace("Searching for convertor for ", from.identify, " to ", to);
             auto convertors = this.convertors.byValue.filter!(
                 c => c.convertsTo(to) && c.convertsFrom(from)
@@ -448,7 +449,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
             auto destructors = this.convertors.byValue.filter!(convertor => convertor.convertsTo(converted));
 
             enforce!ConvertorException(!destructors.empty, text("Could not destroy ", converted.identify, ", no suitable convertor found."));
@@ -459,11 +460,31 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
 }
 
 /**
+Marker interface that holds up an implementation of a convertor builder.
+**/
+interface WithConvertorBuilder(alias ConvertorBuilderFactory) {
+
+}
+
+/**
+Marker interface that adds information of types to which document container should already have convertors.
+**/
+interface WithConvertorsFor(ConvertibleTypes...) {
+
+}
+
+/**
+Marker interface that adds prebuilt convertors into document container.
+**/
+interface WithConvertors(alias ConvertorsFactory) {
+
+}
+
+/**
 An implementation of document container that holds an advised convertor along the document for usage as default constructor for convertors
 in configuration api.
 **/
-class AdvisedDocumentContainer(DocumentType, FieldType, alias AdvisedConvertor) : DocumentContainer!(DocumentType, FieldType) {
-
+class AdvisedDocumentContainer(DocumentType, FieldType, Interfaces...) : DocumentContainer!(DocumentType, FieldType), AliasSeq!(Interfaces) {
     public {
 
         this(DocumentType document) {

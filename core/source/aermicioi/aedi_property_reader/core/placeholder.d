@@ -45,7 +45,7 @@ interface TypeAware {
     Returns:
         TypeInfo stored in component.
     **/
-    TypeInfo type() const nothrow @property @nogc;
+    TypeInfo type() const nothrow @property @nogc pure;
 }
 
 /**
@@ -104,7 +104,14 @@ class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
         value = value that will be stored in.
     **/
     this(ref T value) {
-        this.value = value;
+        this.payload = value;
+    }
+
+    /**
+    ditto
+    **/
+    this(ref const T value) const {
+        this.payload = value;
     }
 
     /**
@@ -115,27 +122,37 @@ class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
     }
 
     /**
+    ditto
+    **/
+    this(const T value) const {
+        this(value);
+    }
+
+    /**
     Get the type of component that is stored in.
 
     Returns:
         TypeInfo of stored component.
     **/
-    TypeInfo type() const {
+    TypeInfo type() const nothrow @property @nogc pure {
         return typeid(T);
     }
 
     @property {
         /**
-        Set value
+        Store value in component.
 
         Params:
-            value = value to be stored
+            value = value that will be stored in.
 
         Returns:
-            value
+            Reference to stored value.
         **/
-        ref T value(ref T value) @safe nothrow {
-            this.payload = value;
+        ref T value(ref T value) nothrow @safe {
+            static if (!is(typeof(this.payload) == const)) {
+
+                this.payload = value;
+            }
 
             return this.payload;
         }
@@ -162,7 +179,7 @@ Params:
 Returns:
     Placeholder!T with value as content.
 **/
-auto placeholder(T)(auto ref T value, RCIAllocator allocator = theAllocator) {
+auto placeholder(T)(auto ref T value, RCIAllocator allocator = theAllocator) @trusted {
     static if (is(T : Object)) {
         return value;
     } else {
@@ -183,7 +200,7 @@ Params:
 Returns:
     T if it is rooted in Object, or Placeholder!T if it is not.
 **/
-auto unwrap(T)(inout(Object) object) nothrow {
+auto unwrap(T)(inout(Object) object) @trusted nothrow pure {
     import aermicioi.aedi_property_reader.core.traits : n;
     static if (is(T : Object)) {
 
@@ -212,7 +229,7 @@ Params:
 Returns:
     TypeInfo of stored type of object implements TypeAware, or classinfo of object itself.
 **/
-TypeInfo identify(T : Object)(in T object) nothrow @nogc {
+TypeInfo identify(T : Object)(in T object) @trusted nothrow @nogc pure {
     if (object is null) {
         return typeid(null);
     }

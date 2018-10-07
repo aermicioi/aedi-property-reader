@@ -17,8 +17,7 @@
 		{
 			"name": "unittest",
 			"debugVersions": [
-				"trace",
-				"AdvisedConvertorDebug"
+				"trace"
 			]
 		}
 	]

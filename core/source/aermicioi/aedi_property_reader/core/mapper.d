@@ -57,7 +57,7 @@ interface Mapper(To, From = To) {
         to = destination component that receives transferred data
         allocator = optional allocator that could be used by convertors when doing field conversion
     **/
-    void map(From from, ref To to, RCIAllocator allocator = theAllocator);
+    void map(From from, ref To to, RCIAllocator allocator = theAllocator) const;
 
     @property {
         /**
@@ -68,7 +68,7 @@ interface Mapper(To, From = To) {
         Returns:
             typeof(this)
         **/
-        typeof(this) convertors(Convertor[] convertors) @safe nothrow pure;
+        typeof(this) convertors(const(Convertor)[] convertors) @safe nothrow pure;
 
         /**
         Get convertors
@@ -76,7 +76,7 @@ interface Mapper(To, From = To) {
         Returns:
             Convertor[]
         **/
-        inout(Convertor[]) convertors() @safe nothrow pure inout;
+        inout(const(Convertor)[]) convertors() @safe nothrow pure inout;
 
         /**
         Set force
@@ -153,7 +153,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
         bool force_;
         bool skip_;
 
-        Convertor[] convertors_;
+        const(Convertor)[] convertors_;
 
         Rebindable!(const PropertySetter!(To, Object)) setter_;
         Rebindable!(const PropertyAccessor!(From, Object)) accessor_;
@@ -173,7 +173,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             Returns:
                 typeof(this)
             **/
-            typeof(this) convertors(Convertor[] convertors) @safe nothrow pure {
+            typeof(this) convertors(const(Convertor)[] convertors) @safe nothrow pure {
                 this.convertors_ = convertors;
 
                 return this;
@@ -185,7 +185,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             Returns:
                 Convertor[]
             **/
-            inout(Convertor[]) convertors() @safe nothrow pure inout {
+            inout(const(Convertor)[]) convertors() @safe nothrow pure inout {
                 return this.convertors_;
             }
 
@@ -376,7 +376,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             to = destination component that receives transferred data
             allocator = optional allocator that could be used by convertors when doing field conversion
         **/
-        void map(From from, ref To to, RCIAllocator allocator = theAllocator) {
+        void map(From from, ref To to, RCIAllocator allocator = theAllocator) const {
 
             debug(trace) trace("Mapping ", this.fromInspector.properties(from), " of ", from.identify, " to ", to.identify);
             foreach (property; this.fromInspector.properties(from)) {
@@ -419,7 +419,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                                 " to ", this.toInspector.typeOf(to, property)
                             ));
 
-                            debug(trace) trace("Found convertor for \"", property, "\" from ", compatible.front.from, " to ", compatible.front.to);
+                            debug(trace) trace("Found convertor for \"", property, "\" from ", this.fromInspector.typeOf(from, property), " to ", this.toInspector.typeOf(to, property));
 
                             value = compatible.front.convert(value, this.toInspector.typeOf(to, property), allocator);
                         } else {
@@ -619,7 +619,7 @@ class CompositeConvertor(To, From) : CombinedConvertor {
         Returns:
             true if it is able to convert to, false otherwise.
         **/
-        bool convertsTo(TypeInfo to) const nothrow {
+        bool convertsTo(TypeInfo to) @safe const nothrow pure  {
             return this.to is to;
         }
 
@@ -638,7 +638,7 @@ class CompositeConvertor(To, From) : CombinedConvertor {
         Returns:
             true if it is able to convert to, false otherwise.
         **/
-        bool convertsTo(in Object to) const nothrow {
+        bool convertsTo(in Object to) @safe const nothrow pure  {
             return this.convertsTo(to.identify);
         }
 
@@ -655,7 +655,7 @@ class CompositeConvertor(To, From) : CombinedConvertor {
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) {
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const {
             enforce!InvalidArgumentException(this.convertsFrom(from), text(
                 "Cannot convert ", from.identify, " to ", typeid(To), ", ", from.identify, " is not supported by ", typeid(this)
             ));
@@ -688,7 +688,7 @@ class CompositeConvertor(To, From) : CombinedConvertor {
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) {
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
             enforce!InvalidArgumentException(this.convertsFrom(from), text(
                 "Cannot destruct ", from.identify, " to ", typeid(To), " not supported by ", typeid(this)
             ));
@@ -715,7 +715,7 @@ class RuntimeMapper : Mapper!(Object, Object) {
         bool force_;
         bool skip_;
 
-        Convertor[] convertors_;
+        const(Convertor)[] convertors_;
 
         PropertyAccessor!Object[] accessors_;
         PropertySetter!Object[] setters_;
@@ -741,7 +741,7 @@ class RuntimeMapper : Mapper!(Object, Object) {
             Returns:
                 typeof(this)
             **/
-            typeof(this) convertors(Convertor[] convertors) @safe nothrow pure {
+            typeof(this) convertors(const(Convertor)[] convertors) @safe nothrow pure {
                 this.convertors_ = convertors;
 
                 return this;
@@ -753,7 +753,7 @@ class RuntimeMapper : Mapper!(Object, Object) {
             Returns:
                 Convertor[]
             **/
-            inout(Convertor[]) convertors() @safe nothrow pure inout {
+            inout(const(Convertor)[]) convertors() @safe nothrow pure inout {
                 return this.convertors_;
             }
 
@@ -982,7 +982,7 @@ class RuntimeMapper : Mapper!(Object, Object) {
         Throws:
             InvalidArgumentException when no either accessor, setter, or inspector is found.
         **/
-        void map(Object from, ref Object to, RCIAllocator allocator = theAllocator) {
+        void map(Object from, ref Object to, RCIAllocator allocator = theAllocator) const {
             auto accessors = this.accessors.filter!(accessor => accessor.componentType(from) is from.identify);
             auto setters = this.setters.filter!(setter => setter.componentType(to) is to.identify);
             auto fromInspectors = this.inspectors.filter!(inspector => inspector.typeOf(from) is from.identify);

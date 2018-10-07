@@ -1699,6 +1699,148 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
     }
 }
 
+class KeyConvertingAccessor(ComponentType, FieldType = ComponentType, InputKeyType = string, ConvertedKeyType = InputKeyType) : PropertyAccessor!(ComponentType, FieldType, InputKeyType) {
+    import aermicioi.aedi_property_reader.core.convertor;
+
+    private {
+        Convertor convertor_;
+        PropertyAccessor!(ComponentType, FieldType, ConvertedKeyType) accessor_;
+    }
+
+    public {
+        this(PropertyAccessor!(ComponentType, FieldType, ConvertedKeyType) accessor, Convertor convertor) {
+            this.accessor = accessor;
+            this.convertor = convertor;
+        }
+
+        /**
+        Set convertor
+
+        Params:
+            convertor = convertor used to convert input keytype to underlying keytype understood by decorated accessor
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) convertor(Convertor convertor) @safe pure {
+            enforce!ConvertorException(
+                convertor.convertsTo(typeid(ConvertedKeyType)) &&
+                convertor.convertsFrom(typeid(InputKeyType)),
+                text(
+                    "Invalid convertor provided for converting accessor key. Convertor capable converting from ",
+                    typeid(InputKeyType), " to ",
+                    typeid(ConvertedKeyType), " is required. Got convertor capable to convert from ",
+                    convertor.from, " to ",
+                    convertor.to
+                )
+            );
+            this.convertor_ = convertor;
+
+            return this;
+        }
+
+        /**
+        Get convertor
+
+        Returns:
+            Convertor
+        **/
+        inout(Convertor) convertor() @safe nothrow pure inout {
+            return this.convertor_;
+        }
+
+        /**
+        Set accessor
+
+        Params:
+            accessor = underlying accessor doing all heavy lifting
+
+        Returns:
+            typeof(this)
+        **/
+        typeof(this) accessor(PropertyAccessor!(ComponentType, FieldType, ConvertedKeyType) accessor) @safe nothrow pure {
+            this.accessor_ = accessor;
+
+            return this;
+        }
+
+        /**
+        Get accessor
+
+        Returns:
+            PropertyAccessor!(ComponentType, FieldType, ConvertedKeyType)
+        **/
+        inout(PropertyAccessor!(ComponentType, FieldType, ConvertedKeyType)) accessor() @safe nothrow pure inout {
+            return this.accessor_;
+        }
+
+        /**
+        Get a property out of component
+
+        Params:
+            component = a component which has some properties identified by property.
+        Throws:
+            NotFoundException in case when no requested property is available.
+            InvalidArgumentException in case when passed arguments are somehow invalid for use.
+        Returns:
+            FieldType accessed property.
+        **/
+        FieldType access(ComponentType component, in InputKeyType property) const {
+            auto wrapped = (cast() property).placeholder;
+            Object key = convertor.convert(wrapped, typeid(ConvertedKeyType));
+            scope(exit) (cast() convertor).destruct(key); // TODO find a proper way to retain constness while extracting type info from methods
+
+            return this.accessor.access(component, key.unwrap!ConvertedKeyType);
+        }
+
+        /**
+        Check if requested property is present in component.
+
+        Check if requested property is present in component.
+        The method could have allocation side effects due to the fact that
+        it is not restricted in calling access method of the accessor.
+
+        Params:
+            component = component which is supposed to have property
+            property = speculated property that is to be tested if it is present in component
+        Returns:
+            true if property is in component
+        **/
+        bool has(in ComponentType component, in InputKeyType property) const nothrow {
+            try {
+                Object key = convertor.convert((cast() property).placeholder, typeid(ConvertedKeyType)); // TODO find a proper way to retain constness while extracting type info from methods
+                scope(exit) convertor.destruct(key);
+
+                return this.accessor.has(component, key.unwrap!ConvertedKeyType);
+
+            } catch (Exception e) {
+
+                error(text("Failed to check for existence of property due to ", e)).n;
+                return false;
+            }
+        }
+
+        /**
+        Identify the type of supported component.
+
+        Identify the type of supported component. It returns type info of component
+        if it is supported by accessor, otherwise it will return typeid(void) denoting that
+        the type isn't supported by accessor. The accessor is not limited to returning the type
+        info of passed component, it can actually return type info of super type or any type
+        given the returned type is implicitly convertible or castable to ComponentType.
+
+        Params:
+            component = the component for which accessor should identify the underlying type
+
+        Returns:
+            TypeInfo type information about passed component, or typeid(void) if component is not supported.
+        **/
+        TypeInfo componentType(ComponentType component) const nothrow {
+            return this.accessor.componentType(component);
+        }
+    }
+}
+
 /**
 Creates a dlang dsl language for accessing properties out of a ComponentType.
 

@@ -37,12 +37,18 @@ import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
+import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.xml.type_guesser;
 import std.experimental.allocator;
 import std.xml;
 import std.traits;
 
-alias XmlDocumentContainer = AdvisedDocumentContainer!(XmlElement, XmlElement, XmlConvertor);
+alias XmlDocumentContainer = AdvisedDocumentContainer!(
+    XmlElement,
+    XmlElement,
+    WithConvertorBuilder!XmlConvertorBuilderFactory,
+    WithConvertorsFor!DefaultConvertibleTypes
+);
 
 /**
 Create a convertor container with data source being xml document.
@@ -78,15 +84,7 @@ ditto
 **/
 auto xml(XmlElement value, RCIAllocator allocator = theAllocator) {
 
-    auto container = value.xml(accessor, new XmlTypeGuesser(new StringToScalarConvTypeGuesser), allocator);
-
-    static if (is(StringToScalarConvTypeGuesser : StdConvTypeGuesser!(S, Types), S, Types...)) {
-        static foreach (T; Types) {
-            container.set(XmlConvertor!(T, S)(), fullyQualifiedName!T);
-        }
-    }
-
-    return container;
+    return value.xml(accessor, new XmlTypeGuesser(new StringToScalarConvTypeGuesser), allocator);
 }
 
 /**

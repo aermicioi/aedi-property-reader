@@ -33,34 +33,48 @@ import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.mapper;
-import aermicioi.aedi_property_reader.core.document;
+import aermicioi.aedi_property_reader.core.document :
+	DocumentContainerImpl = DocumentContainer,
+	WithConvertorBuilder,
+	WithConvertorsFor,
+	WithConvertors;
 import std.meta;
+import std.traits;
 import std.experimental.logger;
 import std.exception;
+
+alias DefaultConvertibleTypes = AliasSeq!(
+	ubyte, byte, ushort, short, uint, int, ulong, long, float, double, real, char, wchar, dchar,
+	ubyte[], byte[], ushort[], short[], uint[], int[], ulong[], long[], float[], double[], real[], char[], wchar[], dchar[], string, wstring, dstring, string[]
+);
 
 /**
 Configuration context that is providing a nice api to add convertors into a container for a document.
 **/
-struct DocumentContainerBuilder(DocumentContainerType : Storage!(Convertor, string), alias AdvisedConvertor, F) {
+struct DocumentContainerBuilder(DocumentContainer : DocumentContainerImpl!(DocumentType, FieldType), ConvertorBuilder, DocumentType, FieldType)
+	if (is(DocumentContainer : Storage!(Convertor, string))) {
 
-	alias FromType = F;
+	ConvertorBuilder builder;
 
 	/**
 	Configured container.
 	**/
-    DocumentContainerType container;
+    DocumentContainer container;
 
-	bool containerAsConvertor = true;
-
-	this(DocumentContainerType container, bool containerAsConvertor = true) {
+	this(DocumentContainer container, ConvertorBuilder builder) {
 		this.container = container;
-		this.containerAsConvertor = containerAsConvertor;
+		this.builder = builder;
 
-		static foreach (Type; AliasSeq!(
-			ubyte, byte, ushort, short, uint, int, ulong, long, float, double, real, char, wchar, dchar,
-			ubyte[], byte[], ushort[], short[], uint[], int[], ulong[], long[], float[], double[], real[], char[], wchar[], dchar[], string, wstring, dstring
-		)) {
-			this.register!(Type, Type);
+		static if (is(DocumentContainer : WithConvertorsFor!Types, Types...)) {
+			static foreach (Type; Types) {
+				this.register!(Type, Type);
+			}
+		}
+
+		static if (is(DocumentContainer : WithConvertors!ConvertorsFactory, alias ConvertorsFactory)) {
+			foreach (convertor; ConvertorsFactory()) {
+				this.register(convertor, convertor.to.toString);
+			}
 		}
 	}
 
@@ -77,18 +91,19 @@ struct DocumentContainerBuilder(DocumentContainerType : Storage!(Convertor, stri
 		path = property path for a field in document.
 	**/
     ref typeof(this) register(To)(string path) {
+
 		debug(trace) trace(
 			"Injecting convertor for ",
 			path,
 			" in document container to convert to ",
 			typeid(To),
 			" using ",
-			typeid(AdvisedConvertor!(To, FromType)())
+			builder
 		);
 
-		auto convertor = AdvisedConvertor!(To, FromType)();
+		this.register(builder.make!(To, FieldType), path);
 
-        return this.register(convertor, path);
+		return this;
     }
 
 	/**
@@ -116,17 +131,6 @@ struct DocumentContainerBuilder(DocumentContainerType : Storage!(Convertor, stri
     }
 
 	ref typeof(this) register(Convertor convertor, string path) {
-		static if (is(DocumentContainerType : Convertor)) {
-			if (this.containerAsConvertor && (cast(CombinedConvertor) convertor !is null)) {
-
-				debug(trace) trace(
-					"Detected that document container ", typeid(DocumentContainerType), " provides converting capabilities, and injected convertor ",
-					convertor.classinfo, " accepts convertors, injecting container into convertor"
-				);
-				(cast(CombinedConvertor) convertor).add(container);
-			}
-		}
-
 		this.container.set(convertor, path);
 
 		return this;
@@ -144,19 +148,20 @@ Take a document container and create a configuration context for it.
 
 Params:
 	container = container for which configuration context is created.
+	builder = builder used to construct convertors used by container.
 
 Returns:
-	DocumentContainerBuilder(DocumentContainerType, AdvisedConvertor, DocumentType, FromType) a configuration context
+	DocumentContainerBuilder(DocumentContainer, AdvisedConvertor, DocumentType, FieldType) a configuration context
 **/
-auto configure(DocumentContainerType : DocumentContainer!(DocumentType, FromType), alias AdvisedConvertor, DocumentType, FromType)(DocumentContainerType container) {
-    return DocumentContainerBuilder!(DocumentContainerType, AdvisedConvertor, FromType)(container);
+auto configure(DocumentContainer, ConvertorBuilder)(DocumentContainer container, ConvertorBuilder builder) {
+    return DocumentContainerBuilder!(DocumentContainer, ConvertorBuilder)(container, builder);
 }
 
 /**
 ditto
 **/
-auto configure(DocumentContainerType : AdvisedDocumentContainer!(DocumentType, FromType, AdvisedConvertor), DocumentType, FromType, alias AdvisedConvertor)(DocumentContainerType container) {
-	return container.configure!(DocumentContainerType, AdvisedConvertor);
+auto configure(DocumentContainer : WithConvertorBuilder!ConvertorBuilderFactory, alias ConvertorBuilderFactory)(DocumentContainer container) {
+	return DocumentContainerBuilder!(DocumentContainer, ReturnType!ConvertorBuilderFactory)(container, ConvertorBuilderFactory([container]));
 }
 
 mixin template MapperBuilderMixin(AdvisedConvertors...) {
@@ -201,21 +206,3 @@ mixin template MapperBuilderMixin(AdvisedConvertors...) {
 		return MapperBuilderImpl!MapperType(mapper);
 	}
 }
-
-import aermicioi.aedi_property_reader.core.std_conv;
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.arg.convertor;
-import aermicioi.aedi_property_reader.json.convertor;
-import aermicioi.aedi_property_reader.xml.convertor;
-import aermicioi.aedi_property_reader.yaml.convertor;
-import aermicioi.aedi_property_reader.sdlang.convertor;
-
-mixin MapperBuilderMixin!(
-	JsonConvertor,
-	XmlConvertor,
-	YamlConvertor,
-	SdlangConvertor,
-	ArgumentAdvisedConvertor,
-	StdConvAdvisedConvertor,
-	CompositeAdvisedConvertor
-);

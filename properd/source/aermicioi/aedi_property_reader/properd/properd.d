@@ -34,13 +34,19 @@ import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.core.accessor;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.std_conv;
+import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import lproperd = properd;
 import std.experimental.logger;
 import std.experimental.allocator;
 
-alias ProperdDocumentContainer = AdvisedDocumentContainer!(string[string], string, StdConvAdvisedConvertor);
+alias ProperdDocumentContainer = AdvisedDocumentContainer!(
+    string[string],
+    string,
+    WithConvertorBuilder!StdConvAdvisedConvertorBuilderFactory,
+	WithConvertorsFor!DefaultConvertibleTypes
+);
 
 /**
 Create a convertor container with data source being properd document.
@@ -75,18 +81,7 @@ auto properd(string[string] value, TypeGuesser!string guesser, RCIAllocator allo
 ditto
 **/
 auto properd(string[string] value, RCIAllocator allocator = theAllocator) {
-    import std.meta : AliasSeq;
-    auto container = value.properd(accessor, new StringToScalarConvTypeGuesser, allocator);
-    import std.datetime;
-    import std.traits;
-
-    static if (is(StringToScalarConvTypeGuesser: StdConvTypeGuesser!(S, ToTypes), S, ToTypes...)) {
-        static foreach (To; ToTypes) {
-            container.set(StdConvAdvisedConvertor!(To, S)(), fullyQualifiedName!To);
-        }
-    }
-
-    return container;
+    return value.properd(accessor, new StringToScalarConvTypeGuesser, allocator);
 }
 
 /**

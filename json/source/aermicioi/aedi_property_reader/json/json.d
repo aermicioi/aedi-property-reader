@@ -33,17 +33,24 @@ import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.json.accessor;
 import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.json.convertor;
 import aermicioi.aedi_property_reader.json.inspector;
 import aermicioi.aedi_property_reader.json.type_guesser;
 import aermicioi.aedi_property_reader.core.convertor;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
+import aermicioi.aedi_property_reader.core.std_conv;
 import std.json;
 import std.experimental.allocator;
 import std.experimental.logger;
 
-alias JsonDocumentContainer = AdvisedDocumentContainer!(JSONValue, JSONValue, JsonConvertor);
+alias JsonDocumentContainer = AdvisedDocumentContainer!(
+    JSONValue,
+    JSONValue,
+    WithConvertorBuilder!JsonConvertorBuilderFactory,
+	WithConvertorsFor!DefaultConvertibleTypes
+);
 
 /**
 Create a convertor container with data source being json document.

@@ -33,12 +33,13 @@ import aermicioi.aedi : locate, NotFoundException;
 import aermicioi.aedi_property_reader.core.document : DocumentContainer;
 import aermicioi.aedi_property_reader.core.type_guesser : StringToScalarConvTypeGuesser;
 import aermicioi.aedi_property_reader.core.accessor : AssociativeArrayAccessor;
-import aermicioi.aedi_property_reader.core.convertor : CallbackConvertor;
-import aermicioi.aedi_property_reader.core.std_conv : StdConvAdvisedConvertor;
+import aermicioi.aedi_property_reader.core.convertor : CallbackConvertorBuilder;
+import aermicioi.aedi_property_reader.core.std_conv : convert, destruct;
 import std.experimental.allocator;
 import std.exception;
 
 unittest {
+    auto builder = new CallbackConvertorBuilder!(convert, destruct);
 
     DocumentContainer!(string[string], string) document = new DocumentContainer!(string[string], string)([
         "foo": "foofoo",
@@ -49,8 +50,8 @@ unittest {
     document.accessor = new AssociativeArrayAccessor!string;
     document.allocator = theAllocator;
 
-    document.set(StdConvAdvisedConvertor!(long, string)(), "long");
-    document.set(StdConvAdvisedConvertor!(string, string)(), "string");
+    document.set(builder.make!(long, string)(), "long");
+    document.set(builder.make!(string, string)(), "string");
 
     assert(document.has("foo"));
     assert(!document.has("coo"));

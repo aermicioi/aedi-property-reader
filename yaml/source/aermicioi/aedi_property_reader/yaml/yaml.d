@@ -38,11 +38,25 @@ import aermicioi.aedi_property_reader.yaml.accessor;
 import aermicioi.aedi_property_reader.yaml.convertor;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.yaml.type_guesser;
+import aermicioi.aedi_property_reader.core.core;
 import dyaml;
+import std.datetime : SysTime;
 import std.experimental.logger;
 import std.experimental.allocator;
 
-alias YamlDocumentContainer = AdvisedDocumentContainer!(Node, Node, YamlConvertor);
+alias YamlDocumentContainer = AdvisedDocumentContainer!(
+    Node,
+    Node,
+    WithConvertorBuilder!YamlConvertorBuilderFactory,
+    WithConvertorsFor!(
+        long,
+        real,
+        ubyte[],
+        bool,
+        string,
+        SysTime
+)
+);
 
 /**
 Create a convertor container with data source being yaml document.
@@ -77,23 +91,7 @@ auto yaml(Node value, TypeGuesser!Node guesser, RCIAllocator allocator = theAllo
 ditto
 **/
 auto yaml(Node value, RCIAllocator allocator = theAllocator) {
-    import std.meta : AliasSeq;
-    auto container = value.yaml(accessor, new YamlTypeGuesser, allocator);
-    import std.datetime;
-    import std.traits;
-
-    static foreach (T; AliasSeq!(
-        long,
-        real,
-        ubyte[],
-        bool,
-        string,
-        SysTime
-    )) {
-        container.set(YamlConvertor!(T, Node)(), fullyQualifiedName!T);
-    }
-
-    return container;
+    return value.yaml(accessor, new YamlTypeGuesser, allocator);
 }
 
 /**

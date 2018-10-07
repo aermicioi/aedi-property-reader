@@ -47,15 +47,17 @@ public {
     enum XmlInspectorFactory(From : XmlElement) = () => new TaggedInspector!(XmlElement, Element)(new XmlInspector);
 }
 
-alias XmlConvertor = ChainedAdvisedConvertor!(
-    AdvisedConvertor!(convert, destruct),
-    AdvisedConvertor!(
-        XmlAccessorFactory,
-        CompositeSetterFactory,
-        CompositeInspectorFactory,
-        XmlInspectorFactory
-    )
-).AdvisedConvertorImplementation;
+alias XmlConvertorBuilderFactory = (Convertor[] convertors) {
+    return factoryAnyConvertorBuilder(
+        new CallbackConvertorBuilder!(convert, destruct),
+        new MappingConvertorBuilder!(
+            XmlAccessorFactory,
+            CompositeSetterFactory,
+            CompositeInspectorFactory,
+            XmlInspectorFactory
+        )(convertors, true, true, true, true)
+    );
+};
 
 /**
 Convert from Element into To scalar/array/assocarray value.

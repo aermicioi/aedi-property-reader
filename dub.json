@@ -9,7 +9,8 @@
 		"aedi-property-reader:sdlang": "*",
 		"aedi-property-reader:yaml": "*",
 		"aedi-property-reader:xml": "*",
-		"aedi-property-reader:properd": "*"
+		"aedi-property-reader:properd": "*",
+		"aedi-property-reader:csv": "*"
 	},
 	"subPackages": [
 		"./core",
@@ -19,7 +20,8 @@
 		"./sdlang",
 		"./yaml",
 		"./xml",
-		"./properd"
+		"./properd",
+		"./csv"
 	],
 	"configurations": [
 		{
