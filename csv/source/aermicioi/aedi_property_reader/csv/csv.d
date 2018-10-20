@@ -32,14 +32,14 @@ module aermicioi.aedi_property_reader.csv.csv;
 import std.experimental.allocator;
 import std.experimental.logger;
 import std.range : array;
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.setter;
-import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.setter;
+import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.core;
-import aermicioi.aedi_property_reader.core.std_conv :
+import aermicioi.aedi_property_reader.convertor.std_conv :
         AssociativeArrayAccessorFactory,
         AssociativeArraySetterFactory,
         AssociativeArrayInspectorFactory,
@@ -48,13 +48,16 @@ import aermicioi.aedi_property_reader.core.std_conv :
         stdDestruct = destruct;
 
 public {
-    enum CsvAccessorFactory(From : string[string]) = () => new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!string);
-    enum CsvSetterFactory(To : string[string]) = () => new RuntimeFieldSetter!(string[string], string)(new AssociativeArraySetter!string);
-    enum CsvInspector(Type : string[string]) = () => new AssociativeArrayInspector!string;
+    enum CsvAccessorFactory(From : string[string]) =
+        () => new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!string);
+    enum CsvSetterFactory(To : string[string]) =
+        () => new RuntimeFieldSetter!(string[string], string)(new AssociativeArraySetter!string);
+    enum CsvInspector(Type : string[string]) =
+        () => new AssociativeArrayInspector!string;
 }
 
 /**
-Advised callback convertor with std.conv.to convertor and destructor.
+Advised convertor builder for csv.
 **/
 alias CsvAdvisedConvertorBuilderFactory = (Convertor[] convertors) {
     return factoryAnyConvertorBuilder(
@@ -73,6 +76,9 @@ alias CsvAdvisedConvertorBuilderFactory = (Convertor[] convertors) {
     );
 };
 
+/**
+Csv document container
+**/
 alias CsvDocumentContainer = AdvisedDocumentContainer!(
     string[string][],
     string[string],
@@ -80,7 +86,22 @@ alias CsvDocumentContainer = AdvisedDocumentContainer!(
     WithConvertors!(StdConvStringPrebuiltConvertorsFactory)
 );
 
-auto csv(string[string][] data, PropertyAccessor!(string[string][], string[string]) accessor, RCIAllocator allocator = theAllocator) {
+/**
+Create a csv document container
+
+Params:
+    data = associative array with parsed csv content
+    accessor = accessor used for accessing data
+    allocator = allocator used to convert types
+
+Returns:
+    DocumentContainer!(string[string][], string[string])
+**/
+auto csv(
+    string[string][] data,
+    PropertyAccessor!(string[string][], string[string]) accessor,
+    RCIAllocator allocator = theAllocator
+) {
 
     CsvDocumentContainer container = new CsvDocumentContainer(data);
 
@@ -90,10 +111,43 @@ auto csv(string[string][] data, PropertyAccessor!(string[string][], string[strin
     return container;
 }
 
-auto csv(string fileOrData, PropertyAccessor!(string[string][], string[string]) accessor, RCIAllocator allocator = theAllocator, bool returnEmpty = true) {
+/**
+ditto
+**/
+auto csv(string[string][] data) {
+    return data.csv(
+        defaultAccessor,
+    );
+}
 
-    import std.file;
-    import std.csv;
+/**
+ditto
+**/
+auto csv() {
+    return csv(cast(string[string][]) []);
+}
+
+/**
+Create a csv document container from a csv file or text.
+
+Params:
+    fileOrData = file path or csv text
+    accessor = accessor used for accessing data
+    allocator = allocator used to convert types
+    returnEmpty = either to return an empty document container if csv file or text is invalid.
+
+Returns:
+    DocumentContainer!(string[string][], string[string])
+**/
+auto csv(
+    string fileOrData,
+    PropertyAccessor!(string[string][], string[string]) accessor,
+    RCIAllocator allocator = theAllocator,
+    bool returnEmpty = true
+) {
+
+    import std.file : exists, readText;
+    import std.csv : csvReader, CSVException;
 
     try {
         if (fileOrData.exists) {
@@ -109,27 +163,22 @@ auto csv(string fileOrData, PropertyAccessor!(string[string][], string[string]) 
             return csv();
         }
 
-        throw new Exception("Could not create csv convertor container from file or content passed in pathOrData: " ~ fileOrData, e);
+        throw new Exception(
+            "Could not create csv convertor container from file or content passed in pathOrData: " ~ fileOrData,
+            e
+        );
     }
 }
 
-auto csv(string[string][] data) {
-    return data.csv(
-        defaultAccessor,
-    );
-}
-
+/**
+ditto
+**/
 auto csv(string fileOrPath, bool returnEmpty = true) {
     return fileOrPath.csv(
         defaultAccessor,
         theAllocator,
         returnEmpty
     );
-}
-
-
-auto csv() {
-    return csv(cast(string[string][]) []);
 }
 
 private auto defaultAccessor() {

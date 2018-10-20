@@ -29,9 +29,9 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.xml.convertor;
 
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.xml.accessor;
 import aermicioi.aedi_property_reader.xml.xml : accessor;
 import aermicioi.aedi_property_reader.xml.inspector;
@@ -44,7 +44,14 @@ import std.experimental.allocator;
 
 public {
     enum XmlAccessorFactory(From : XmlElement) = () => new RuntimeFieldAccessor!XmlElement(accessor());
+    enum XmlAccessorFactory(From : Element) = () => new RuntimeFieldAccessor!Element(
+        dsl(
+            new XmlElementPropertyAccessor(),
+            new XmlElementIndexAccessor()
+        )
+    );
     enum XmlInspectorFactory(From : XmlElement) = () => new TaggedInspector!(XmlElement, Element)(new XmlInspector);
+    enum XmlInspectorFactory(From : Element) = () => new XmlInspector;
 }
 
 alias XmlConvertorBuilderFactory = (Convertor[] convertors) {
@@ -89,6 +96,9 @@ void convert(To, From : Element)(in From from, ref To value, RCIAllocator alloca
     }
 }
 
+/**
+ditto
+**/
 void convert(To, From : Element)(in From from, ref To value, RCIAllocator allocator = theAllocator)
     if (is(To : bool) && !is(To == enum)) {
     import std.string : strip;
@@ -143,7 +153,8 @@ void convert(To : Z[], From : Element, Z)(in From from, ref To value, RCIAllocat
 /**
 ditto
 **/
-void convert(To : Z[string], From : Element, Z)(in From from, ref To value, RCIAllocator allocator = theAllocator) if (!is(To == enum)){
+void convert(To : Z[string], From : Element, Z)(in From from, ref To value, RCIAllocator allocator = theAllocator)
+    if (!is(To == enum)) {
 
     foreach (ref el; from.elements) {
 
@@ -164,11 +175,17 @@ void convert(To, From : Element)(in From from, ref To value, RCIAllocator alloca
 	temp.destruct(allocator);
 }
 
+/**
+ditto
+**/
 void convert(To, From : string)(in From from, ref To value, RCIAllocator allocator = theAllocator) {
 
     value = from.to!To;
 }
 
+/**
+ditto
+**/
 void convert(To, From : XmlElement)(in From from, ref To value, RCIAllocator allocator = theAllocator) {
 
     final switch(from.kind) {
@@ -183,11 +200,21 @@ void convert(To, From : XmlElement)(in From from, ref To value, RCIAllocator all
     }
 }
 
+/**
+Destroy component constructed from xml element
+
+Params:
+    to = component constructed out of xml element or attribute
+    allocator = allocator used to create component
+**/
 void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     destroy(to);
     to = To.init;
 }
 
+/**
+ditto
+**/
 void destruct(To : Z[], Z)(ref To to, RCIAllocator allocator = theAllocator)
     if (!isSomeString!To) {
     allocator.dispose(to);

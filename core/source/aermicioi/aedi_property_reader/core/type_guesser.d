@@ -69,7 +69,7 @@ class StdConvTypeGuesser(SerializedType, ConvertableTypes...) : TypeGuesser!Seri
             TypeInfo guessed type for which std.conv.to didn't fail.
         **/
         TypeInfo guess(SerializedType serialized) {
-            import std.conv;
+            import std.conv : to, ConvException;
 
             foreach (ConvertableType; ConvertableTypes) {
                 try {

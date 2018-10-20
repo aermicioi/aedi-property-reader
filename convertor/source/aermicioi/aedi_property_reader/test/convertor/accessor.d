@@ -27,13 +27,13 @@ License:
 Authors:
 	aermicioi
 **/
-module aermicioi.aedi_property_reader.test.core.core;
+module aermicioi.aedi_property_reader.test.convertor.core;
 
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.placeholder : unwrap;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.placeholder : unwrap;
 import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi_property_reader.core.placeholder;
-import aermicioi.aedi_property_reader.core.exception;
+import aermicioi.aedi_property_reader.convertor.placeholder;
+import aermicioi.aedi_property_reader.convertor.exception;
 import std.exception;
 import std.experimental.allocator;
 
@@ -101,7 +101,7 @@ unittest {
 }
 
 unittest {
-	import std.variant;
+	import std.variant : Algebraic;
     auto variant = Algebraic!(string[string], string)(
 		[
 			"foo": "foofoo",
@@ -121,7 +121,7 @@ unittest {
 }
 
 unittest {
-	import std.variant;
+	import std.variant : Algebraic;
     auto variant = Algebraic!(string[], string, size_t, immutable char)(
 		[
 			"foofoo", "moomoo"
@@ -183,7 +183,6 @@ unittest {
 }
 
 unittest {
-	import aermicioi.aedi_property_reader.core.convertor;
     string[string] elems = [
 		"foo": "foofoo",
 		"moo": "moomoo"

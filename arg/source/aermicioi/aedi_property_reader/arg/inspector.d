@@ -29,7 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.arg.inspector;
 
-import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.convertor.inspector;
 import std.algorithm;
 import std.range;
 import std.string;
@@ -133,7 +133,9 @@ class ArgumentInspector : Inspector!(const(string)[]) {
                         }
                         case "-": {
                             import std.conv : to;
-                            return [ arg[1 .. $].splitter('=').front ] ~ arg[1 .. $].splitter('=').front.map!(to!string).array;
+                            return
+                                [ arg[1 .. $].splitter('=').front ] ~
+                                arg[1 .. $].splitter('=').front.map!(to!string).array;
                         }
 
                         default: {

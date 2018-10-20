@@ -29,9 +29,10 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.sdlang.convertor;
 
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.inspector;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.inspector;
+import aermicioi.aedi_property_reader.sdlang.accessor;
 import aermicioi.aedi_property_reader.sdlang.inspector;
 import aermicioi.aedi.exception.invalid_cast_exception : InvalidCastException;
 import aermicioi.aedi_property_reader.sdlang.accessor : SdlangElement;
@@ -45,7 +46,13 @@ import std.experimental.allocator;
 public {
 	import aermicioi.aedi_property_reader.sdlang.sdlang : accessor;
 	enum SdlangAccessorFactory(From : SdlangElement) = () => new RuntimeFieldAccessor!SdlangElement(accessor());
-	enum SdlangInspectorFactory(From : SdlangElement) = () => new TaggedInspector!(SdlangElement, Tag)(new SdlangTagInspector);
+	enum SdlangAccessorFactory(From : Tag) = () => new RuntimeFieldAccessor!Tag(dsl(
+		new SdlangTagPropertyAccessor, new SdlangTagPropertyAccessor
+	));
+
+	enum SdlangInspectorFactory(From : SdlangElement) =
+		() => new TaggedInspector!(SdlangElement, Tag)(new SdlangTagInspector);
+	enum SdlangInspectorFactory(From : Tag) = () => new SdlangTagInspector;
 }
 
 alias SdlangConvertorBuilderFactory = (Convertor[] convertors) {
@@ -56,11 +63,24 @@ alias SdlangConvertorBuilderFactory = (Convertor[] convertors) {
 			CompositeSetterFactory,
 			CompositeInspectorFactory,
 			SdlangInspectorFactory
-		)(convertors, true, true, true, true)
+		)(convertors, true, true, true, true),
 	);
 };
 
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To && !isSomeChar!To && !isSomeString!To) {
+/**
+Convert from sdlang element to destination type.
+
+Params:
+	from = sdlang element to convert from
+	to = storage for destination type
+	allocator = optional allocator used to allocate required memory
+
+Throws:
+	InvalidCastException if not possible
+**/
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && !isNumeric!To && !isSomeChar!To && !isSomeString!To) {
+
 	try {
 
 		to = (cast() from).expectValue!To;
@@ -70,7 +90,12 @@ void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = t
 	}
 }
 
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isNumeric!To && isFloatingPoint!To) {
+/**
+ditto
+**/
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && isNumeric!To && isFloatingPoint!To) {
+
 	try {
 
 		static if (is(typeof((cast() from).expectValue!To))) {
@@ -95,7 +120,12 @@ void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = t
 	}
 }
 
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isNumeric!To && !isFloatingPoint!To) {
+/**
+ditto
+**/
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && isNumeric!To && !isFloatingPoint!To) {
+
 	try {
 
 		static if (is(typeof((cast() from).expectValue!To))) {
@@ -120,10 +150,13 @@ void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = t
 	}
 }
 
+/**
+ditto
+**/
 void convert(To : E[], From : Tag, E)(in From from, ref To to, RCIAllocator allocator = theAllocator)
 	if (!is(To == enum) && !is(To : ubyte[]) && !isSomeString!To) {
 
-	import std.variant;
+	import std.variant : VariantException;
 	to = allocator.makeArray!E(from.values.length);
 
 	foreach (index, ref value; to) {
@@ -137,7 +170,11 @@ void convert(To : E[], From : Tag, E)(in From from, ref To to, RCIAllocator allo
 	}
 }
 
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isSomeChar!To) {
+/**
+ditto
+**/
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && isSomeChar!To) {
 
 	try {
 
@@ -148,7 +185,11 @@ void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = t
 	}
 }
 
-void convert(To : T[], From : Tag, T)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isSomeChar!T) {
+/**
+ditto
+**/
+void convert(To : T[], From : Tag, T)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && isSomeChar!T) {
 
 	try {
 
@@ -159,7 +200,11 @@ void convert(To : T[], From : Tag, T)(in From from, ref To to, RCIAllocator allo
 	}
 }
 
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To && !isSomeChar!To) {
+/**
+ditto
+**/
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && !isNumeric!To && !isSomeChar!To) {
 	import std.variant : VariantException;
 
 	try {
@@ -171,7 +216,11 @@ void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocat
 	}
 }
 
-void convert(To : T[], From : Attribute, T)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isSomeChar!T) {
+/**
+ditto
+**/
+void convert(To : T[], From : Attribute, T)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && isSomeChar!T) {
 	import std.variant : VariantException;
 
 	try {
@@ -183,7 +232,11 @@ void convert(To : T[], From : Attribute, T)(in From from, ref To to, RCIAllocato
 	}
 }
 
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && !isNumeric!To && isSomeChar!To) {
+/**
+ditto
+**/
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && !isNumeric!To && isSomeChar!To) {
 	import std.variant : VariantException;
 
 	try {
@@ -195,7 +248,11 @@ void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocat
 	}
 }
 
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isNumeric!To && isFloatingPoint!To) {
+/**
+ditto
+**/
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && isNumeric!To && isFloatingPoint!To) {
 	import std.variant : VariantException;
 
 	try {
@@ -214,7 +271,11 @@ void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocat
 	}
 }
 
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum) && isNumeric!To && !isFloatingPoint!To) {
+/**
+ditto
+**/
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum) && isNumeric!To && !isFloatingPoint!To) {
 	import std.variant : VariantException;
 
 	try {
@@ -233,21 +294,33 @@ void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocat
 	}
 }
 
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (is(To == enum)) {
+/**
+ditto
+**/
+void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (is(To == enum)) {
 	string temp;
     from.convert!string(temp, allocator);
     to = temp.to!To;
 	temp.destruct(allocator);
 }
 
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator) if (is(To == enum)) {
+/**
+ditto
+**/
+void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator)
+	if (is(To == enum)) {
 	string temp;
     from.convert!string(temp, allocator);
     to = temp.to!To;
 	temp.destruct(allocator);
 }
 
-void convert(To, From : SdlangElement)(in From from, ref To to, RCIAllocator allocator = theAllocator) {
+/**
+ditto
+**/
+void convert(To, From : SdlangElement)
+	(in From from, ref To to, RCIAllocator allocator = theAllocator) {
 
 	final switch (from.kind) {
 		case SdlangElement.Kind.tag: {
@@ -262,6 +335,13 @@ void convert(To, From : SdlangElement)(in From from, ref To to, RCIAllocator all
 	}
 }
 
+/**
+Destroy components that are allocated from sdlang elements
+
+Params:
+	to = component to be destroyed
+	allocator = used to allocate component
+**/
 void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
 
 	destroy(to);

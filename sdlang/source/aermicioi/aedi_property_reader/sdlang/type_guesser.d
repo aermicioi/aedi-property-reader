@@ -33,10 +33,22 @@ import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.sdlang.accessor;
 import sdlang.ast;
 
+/**
+Sdlang data type guesser
+**/
 class SdlangTypeGuesser : TypeGuesser!SdlangElement {
 
     public {
 
+        /**
+        Guess type of underlying sdlang element
+
+        Params:
+            serialized = sdlang element for which to find desired type
+
+        Returns:
+            TypeInfo of contained data
+        **/
         TypeInfo guess(SdlangElement serialized) {
 
             final switch (serialized.kind) {

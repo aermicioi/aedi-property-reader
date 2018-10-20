@@ -30,7 +30,7 @@ Authors:
 module aermicioi.aedi_property_reader.yaml.accessor;
 
 import dyaml;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi.exception.not_found_exception : NotFoundException;
 import std.exception;
 import std.experimental.logger;
@@ -147,8 +147,8 @@ class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
      **/
     bool has(in Node component, in string property) const nothrow {
         try {
-            import std.string;
-            import std.conv;
+            import std.string : isNumeric;
+            import std.conv : to;
 
             return property.isNumeric && component.isSequence && (property.to!size_t < component.length);
         } catch (Exception e) {

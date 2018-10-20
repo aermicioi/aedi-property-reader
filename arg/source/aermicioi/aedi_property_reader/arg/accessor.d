@@ -30,7 +30,7 @@ Authors:
 module aermicioi.aedi_property_reader.arg.accessor;
 
 import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import std.algorithm;
 import std.array;
 import std.string;
@@ -99,31 +99,40 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
                                 return;
                             }
 
-                            if ((component.length > 1) && (splitted.front.strip('-') == property) && splitted.drop(1).front.commonPrefix("--").empty) {
+                            if (
+                                (component.length > 1) && (splitted.front.strip('-') == property) &&
+                                splitted.drop(1).front.commonPrefix("--").empty
+                            ) {
                                 take(2);
                                 return;
                             }
                         }
 
                         if (component.front.commonPrefix("--").equal("-")) {
-                            import std.stdio;
 
-                            if ((component.front.strip('-').equal(property)) || ((property.length == 1) && component.front.strip('-').canFind(property))) {
+                            if (
+                                (component.front.strip('-').equal(property)) || ((property.length == 1) &&
+                                component.front.strip('-').canFind(property))
+                            ) {
                                 take(1);
                                 return;
                             }
                         }
 
-                        if (!component.front.splitter("=").drop(1).empty && component.front.splitter("=").front.equal(property)) {
+                        if (
+                            !component.front.splitter("=").drop(1).empty &&
+                            component.front.splitter("=").front.equal(property)
+                        ) {
                             take(1);
                             return;
                         }
 
                         if (property.isNumeric) {
-                            auto up = property.to!size_t;
+                            immutable auto up = property.to!size_t;
                             size_t current;
 
-                            auto count = component.countUntil!(c => c.commonPrefix("--").empty && c.splitter("=").drop(1).empty && (current++ == up));
+                            auto count = component.countUntil!(c => c.commonPrefix("--").empty &&
+                                c.splitter("=").drop(1).empty && (current++ == up));
                             component = component.drop(count);
                             take(1);
                             component = null;
@@ -172,9 +181,7 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
          true if property is in component
      **/
     bool has(in const(string)[] component, string property) const nothrow {
-        import std.experimental.logger;
-        import aermicioi.aedi_property_reader.core.traits;
-        // debug(trace) trace(property, " ----------------------- ", component, Filter(component, property)).n;
+
         if (component.length > 1) {
 
             return !Filter(component, property).drop(1).empty;

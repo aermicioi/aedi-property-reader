@@ -27,17 +27,17 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.test.mapper;
+module aermicioi.aedi_property_reader.convertor.test.mapper;
 
-import aermicioi.aedi_property_reader.core.mapper;
-import aermicioi.aedi_property_reader.core.exception;
-import aermicioi.aedi_property_reader.core.inspector;
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.setter;
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.placeholder;
-import aermicioi.aedi_property_reader.core.std_conv;
-import aermicioi.aedi_property_reader.core.std_conv : stdConvert = convert, stdDestruct = destruct;
+import aermicioi.aedi_property_reader.convertor.mapper;
+import aermicioi.aedi_property_reader.convertor.exception;
+import aermicioi.aedi_property_reader.convertor.inspector;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.setter;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.placeholder;
+import aermicioi.aedi_property_reader.convertor.std_conv;
+import aermicioi.aedi_property_reader.convertor.std_conv : stdConvert = convert, stdDestruct = destruct;
 import std.experimental.allocator;
 import std.exception;
 import std.conv;
@@ -131,9 +131,17 @@ unittest {
 
     auto mapper = new CompositeMapper!(Object, Object);
     mapper.conversion = false;
-    mapper.setter = new RuntimeCompositeSetter!(Placeholder, Object)(new CompositeSetter!Placeholder);
-    mapper.accessor = new RuntimeCompositeAccessor!(string[string], Object)(new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string, string)));
-    mapper.fromInspector = new RuntimeInspector!(string[string])(new AssociativeArrayInspector!string);
+    mapper.setter =
+        new RuntimeCompositeSetter!(Placeholder, Object)(new CompositeSetter!Placeholder);
+
+    mapper.accessor =
+        new RuntimeCompositeAccessor!(string[string], Object)
+            (new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string, string)));
+
+    mapper.fromInspector =
+        new RuntimeInspector!(string[string])
+            (new AssociativeArrayInspector!string);
+
     mapper.toInspector = new RuntimeInspector!Placeholder(new CompositeInspector!Placeholder);
 
     assertThrown!InvalidArgumentException(mapper.map(from, to));
@@ -192,11 +200,13 @@ unittest {
 
     mapper.setters = cast(PropertySetter!Object[]) [
         new RuntimeCompositeSetter!(Placeholder, Object)(new CompositeSetter!Placeholder),
-        new RuntimeCompositeSetter!(string[string], Object)(new RuntimeFieldSetter!(string[string], string)(new AssociativeArraySetter!string))
+        new RuntimeCompositeSetter!(string[string], Object)
+            (new RuntimeFieldSetter!(string[string], string)(new AssociativeArraySetter!string))
     ];
 
     mapper.accessors = cast(PropertyAccessor!Object[]) [
-        new RuntimeCompositeAccessor!(string[string], Object)(new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string, string))),
+        new RuntimeCompositeAccessor!(string[string], Object)(new RuntimeFieldAccessor!(string[string], string)
+            (new AssociativeArrayAccessor!(string, string))),
         new RuntimeCompositeAccessor!(Placeholder, Object)(new CompositeAccessor!Placeholder)
     ];
 

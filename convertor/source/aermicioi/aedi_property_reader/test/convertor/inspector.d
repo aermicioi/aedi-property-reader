@@ -27,11 +27,11 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.test.inspector;
+module aermicioi.aedi_property_reader.convertor.test.inspector;
 
 import aermicioi.aedi : NotFoundException
 ;
-import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.convertor.inspector;
 import std.exception;
 import std.algorithm : sort, equal;
 

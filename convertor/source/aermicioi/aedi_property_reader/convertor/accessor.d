@@ -27,15 +27,15 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.accessor;
+module aermicioi.aedi_property_reader.convertor.accessor;
 
 import aermicioi.aedi.storage.allocator_aware;
 import aermicioi.aedi.exception.not_found_exception;
 import aermicioi.aedi.exception.invalid_cast_exception;
-import aermicioi.aedi_property_reader.core.exception;
+import aermicioi.aedi_property_reader.convertor.exception;
 import aermicioi.util.traits;
-import aermicioi.aedi_property_reader.core.traits : isD, n;
-import aermicioi.aedi_property_reader.core.placeholder;
+import aermicioi.aedi_property_reader.convertor.traits : isD, n;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import taggedalgebraic;
 import std.array;
 import std.conv;
@@ -154,7 +154,9 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
             Returns:
                 typeof(this)
             **/
-            typeof(this) accessors(PropertyAccessor!(ComponentType, FieldType, KeyType)[] accessors) @safe nothrow pure {
+            typeof(this) accessors(
+                PropertyAccessor!(ComponentType, FieldType, KeyType)[] accessors
+            ) @safe nothrow pure {
                 this.accessors_ = accessors;
 
                 return this;
@@ -344,8 +346,7 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
             FieldType accessed property.
         **/
         FieldType access(ComponentType component, in KeyType path) const {
-            import std.algorithm;
-            import std.range;
+            import std.algorithm : splitter;
 
             auto identities = path.splitter(this.separator);
 
@@ -449,7 +450,8 @@ ImplSpec:
     for accessing an indexed property of a component, and the second one is used for subsequent
     access of child components recursively.
 **/
-class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(ComponentType, FieldType, KeyType)
+class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
+    PropertyAccessor!(ComponentType, FieldType, KeyType)
     if (isBidirectionalRange!KeyType) {
 
     private {
@@ -704,8 +706,10 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
 /**
 ditto
 **/
-auto arrayIndexedPropertyAccessor(T : PropertyAccessor!(ComponentType, FieldType, KeyType), ComponentType, FieldType, KeyType)
-    (ElementType!KeyType beggining, ElementType!KeyType ending, T accessor, T indexer) {
+auto arrayIndexedPropertyAccessor
+    (T : PropertyAccessor!(ComponentType, FieldType, KeyType), ComponentType, FieldType, KeyType)
+    (ElementType!KeyType beggining, ElementType!KeyType ending, T accessor, T indexer)
+{
     return new ArrayIndexedPropertyAccessor!(ComponentType, FieldType, KeyType)(beggining, ending, accessor, indexer);
 }
 
@@ -866,7 +870,10 @@ class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType =
 /**
 ditto
 **/
-auto tickedAccessor(T : PropertyAccessor!(ComponentType, FieldType, KeyType), ComponentType, FieldType, KeyType)(ElementType!KeyType tick, T accessor) {
+auto tickedAccessor
+    (T : PropertyAccessor!(ComponentType, FieldType, KeyType), ComponentType, FieldType, KeyType)
+    (ElementType!KeyType tick, T accessor)
+{
     return new TickedPropertyAccessor!(ComponentType, FieldType, KeyType)(tick, accessor);
 }
 
@@ -968,8 +975,7 @@ class TaggedElementPropertyAccessorWrapper(
         bool has(in Tagged component, in KeyType property) const nothrow {
             try {
 
-                import std.meta;
-                import aermicioi.util.traits;
+                import std.meta : staticMap;
 
                 static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
                     static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
@@ -1009,8 +1015,7 @@ class TaggedElementPropertyAccessorWrapper(
         TypeInfo componentType(Tagged component) const nothrow {
             try {
 
-                import std.meta;
-                import aermicioi.util.traits;
+                import std.meta : staticMap;
 
                 static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
                     static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
@@ -1119,7 +1124,10 @@ class ArrayAccessor(Type) : PropertyAccessor!(Type[], Type, size_t) {
          FieldType accessed property.
      **/
         Type access(Type[] component, in size_t property) const {
-            enforce!NotFoundException(this.has(component, property), text("Could not find property ", property, " in array ", component));
+            enforce!NotFoundException(
+                this.has(component, property),
+                text("Could not find property ", property, " in array ", component)
+            );
 
             return component[property];
         }
@@ -1356,8 +1364,10 @@ ImplSpec:
     rooted in Object, otherwise the object will be downcasted to Placeholder!ComponentType. Failing to do so will result in
     an exception
 **/
-class RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyType = string) : PropertyAccessor!(Object, FieldType, KeyType) {
-    import aermicioi.aedi_property_reader.core.placeholder : identify, unwrap;
+class RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
+    PropertyAccessor!(Object, FieldType, KeyType) {
+
+    import aermicioi.aedi_property_reader.convertor.placeholder : identify, unwrap;
     private {
         PropertyAccessor!(ComponentType, FieldType, KeyType) accessor_;
     }
@@ -1478,9 +1488,7 @@ ImplSpec:
 **/
 class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
     AllocatingPropertyAccessor!(ComponentType, Object, KeyType) {
-    import aermicioi.aedi_property_reader.core.placeholder : identify, unwrap;
-    import std.experimental.allocator;
-
+    import aermicioi.aedi_property_reader.convertor.placeholder : identify, unwrap;
     mixin AllocatorAwareMixin!(typeof(this));
 
     private {
@@ -1537,7 +1545,7 @@ class RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = s
          FieldType accessed property.
      **/
         Object access(ComponentType component, in KeyType path) const {
-            import aermicioi.aedi_property_reader.core.placeholder : placeholder;
+            import aermicioi.aedi_property_reader.convertor.placeholder : placeholder;
             enforce!NotFoundException(this.has(component, path), text("Could not find property ", path));
 
             return this.accessor.access(component, path).placeholder(cast() this.allocator);
@@ -1596,7 +1604,7 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
     import std.traits;
     import std.meta;
     import aermicioi.util.traits;
-    import aermicioi.aedi_property_reader.core.convertor;
+    import aermicioi.aedi_property_reader.convertor.convertor;
 
     mixin AllocatorAwareMixin!(typeof(this));
 
@@ -1699,8 +1707,14 @@ class CompositeAccessor(Type) : AllocatingPropertyAccessor!(Type, Object, string
     }
 }
 
-class KeyConvertingAccessor(ComponentType, FieldType = ComponentType, InputKeyType = string, ConvertedKeyType = InputKeyType) : PropertyAccessor!(ComponentType, FieldType, InputKeyType) {
-    import aermicioi.aedi_property_reader.core.convertor;
+/**
+Accessor that converts input property identity of InputKeyType converts to ConvertedKeyType, and then uses it to access the ComponentType using decorated convertor
+**/
+class KeyConvertingAccessor
+    (ComponentType, FieldType = ComponentType, InputKeyType = string, ConvertedKeyType = InputKeyType) :
+    PropertyAccessor!(ComponentType, FieldType, InputKeyType) {
+
+    import aermicioi.aedi_property_reader.convertor.convertor;
 
     private {
         Convertor convertor_;
@@ -1708,6 +1722,14 @@ class KeyConvertingAccessor(ComponentType, FieldType = ComponentType, InputKeyTy
     }
 
     public {
+
+        /**
+        Constructor for KeyConvertingAccessor
+
+        Params:
+            accessor = accessor that understands ConvertedKeyType only
+            convertor = convertor used to convert property path of InputKeyType to ConvertedKeyType
+        **/
         this(PropertyAccessor!(ComponentType, FieldType, ConvertedKeyType) accessor, Convertor convertor) {
             this.accessor = accessor;
             this.convertor = convertor;
@@ -1758,7 +1780,9 @@ class KeyConvertingAccessor(ComponentType, FieldType = ComponentType, InputKeyTy
         Returns:
             typeof(this)
         **/
-        typeof(this) accessor(PropertyAccessor!(ComponentType, FieldType, ConvertedKeyType) accessor) @safe nothrow pure {
+        typeof(this) accessor(
+            PropertyAccessor!(ComponentType, FieldType, ConvertedKeyType) accessor
+        ) @safe nothrow pure {
             this.accessor_ = accessor;
 
             return this;
@@ -1851,7 +1875,13 @@ Params:
 Returns:
     PropertyPathAccessor!(ComponentType, FieldType, KeyType) with dsl like configuration.
 **/
-auto dsl(ComponentType, FieldType, KeyType)(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor, PropertyAccessor!(ComponentType, FieldType, KeyType) indexer) {
+auto dsl
+    (ComponentType, FieldType, KeyType)
+    (
+        PropertyAccessor!(ComponentType, FieldType, KeyType) accessor,
+        PropertyAccessor!(ComponentType, FieldType, KeyType) indexer
+    )
+{
     return new PropertyPathAccessor!(ComponentType, FieldType, KeyType)(
         '.',
         new AggregatePropertyAccessor!(ComponentType, FieldType, KeyType)(

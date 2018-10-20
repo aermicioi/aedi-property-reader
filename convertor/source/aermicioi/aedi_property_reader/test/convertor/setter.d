@@ -27,11 +27,11 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.test.setter;
+module aermicioi.aedi_property_reader.convertor.test.setter;
 
 import aermicioi.aedi : NotFoundException;
-import aermicioi.aedi_property_reader.core.setter;
-import aermicioi.aedi_property_reader.core.exception;
+import aermicioi.aedi_property_reader.convertor.setter;
+import aermicioi.aedi_property_reader.convertor.exception;
 import std.exception;
 
 unittest {

@@ -30,7 +30,7 @@ Authors:
 module aermicioi.aedi_property_reader.xml.accessor;
 
 import std.xml;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi.exception.not_found_exception : NotFoundException;
 import taggedalgebraic : TaggedAlgebraic;
 import std.exception;
@@ -39,10 +39,10 @@ import std.array;
 import std.experimental.logger;
 import aermicioi.aedi_property_reader.core.traits : n;
 
-union XmlElementUnion {
+private union XmlElementUnion {
     string attribute;
     Element element;
-};
+}
 
 alias XmlElement = TaggedAlgebraic!XmlElementUnion;
 
@@ -150,8 +150,8 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
      **/
     bool has(in Element component, string property) const nothrow {
         try {
-            import std.string;
-            import std.conv;
+            import std.string : isNumeric;
+            import std.conv : to;
 
             return (component !is null) && property.isNumeric && (component.elements.length > property.to!size_t);
         } catch (Exception e) {
@@ -180,12 +180,11 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
     TypeInfo componentType(Element component) const {
         return typeid(Element);
     }
-
-    TypeInfo fieldType(Element component, in string property) const {
-        return typeid(Element);
-    }
 }
 
+/**
+Xml element attribute property accessor
+**/
 class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
     /**
      Get a property out of component

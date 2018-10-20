@@ -27,14 +27,14 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.setter;
+module aermicioi.aedi_property_reader.convertor.setter;
 
 import aermicioi.aedi : NotFoundException;
-import aermicioi.aedi_property_reader.core.exception;
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.placeholder;
+import aermicioi.aedi_property_reader.convertor.exception;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import aermicioi.util.traits : isPublic, isField;
-import aermicioi.aedi_property_reader.core.traits;
+import aermicioi.aedi_property_reader.convertor.traits;
 import std.conv;
 import std.traits;
 import std.meta;

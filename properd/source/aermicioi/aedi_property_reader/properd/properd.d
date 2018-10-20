@@ -31,9 +31,9 @@ module aermicioi.aedi_property_reader.properd.properd;
 
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.std_conv;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.std_conv;
 import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.type_guesser;
@@ -45,7 +45,10 @@ alias ProperdDocumentContainer = AdvisedDocumentContainer!(
     string[string],
     string,
     WithConvertorBuilder!StdConvAdvisedConvertorBuilderFactory,
-	WithConvertorsFor!DefaultConvertibleTypes
+	WithConvertorsFor!DefaultConvertibleTypes,
+    WithConvertors!(
+        StdConvStringPrebuiltConvertorsFactory
+    )
 );
 
 /**
@@ -59,7 +62,12 @@ Params:
 Returns:
     JsonConvertorContainer
 **/
-auto properd(string[string] value, PropertyAccessor!(string[string], string) accessor, TypeGuesser!string guesser, RCIAllocator allocator = theAllocator) {
+auto properd(
+    string[string] value,
+    PropertyAccessor!(string[string], string) accessor,
+    TypeGuesser!string guesser,
+    RCIAllocator allocator = theAllocator
+) {
 
     ProperdDocumentContainer container = new ProperdDocumentContainer(value);
     container.guesser = guesser;
@@ -102,7 +110,7 @@ Returns:
     properdConvertorContainer
 **/
 auto properd(string pathOrData, bool returnEmpty = true) {
-    import std.file;
+    import std.file : exists, readText;
     import p = properd;
 
     try {
@@ -120,12 +128,14 @@ auto properd(string pathOrData, bool returnEmpty = true) {
             return properd();
         }
 
-        throw new Exception("Could not create properd convertor container from file or content passed in pathOrData: " ~ pathOrData, e);
+        throw new Exception(
+            "Could not create properd convertor container from file or content passed in pathOrData: " ~ pathOrData, e
+        );
     }
 }
 
 private auto accessor() {
-    import aermicioi.aedi_property_reader.core.accessor;
+    import aermicioi.aedi_property_reader.convertor.accessor : AssociativeArrayAccessor;
 
     return new AssociativeArrayAccessor!string;
 }

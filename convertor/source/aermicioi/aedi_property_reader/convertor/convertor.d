@@ -27,26 +27,31 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.convertor;
+module aermicioi.aedi_property_reader.convertor.convertor;
 
 import aermicioi.aedi;
-import aermicioi.aedi_property_reader.core.exception : ConvertorException;
+import aermicioi.aedi_property_reader.convertor.exception : ConvertorException;
 import aermicioi.aedi.storage.wrapper;
 import std.meta;
 import std.conv;
 import std.experimental.allocator;
 import std.exception : enforce;
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.setter;
-import aermicioi.aedi_property_reader.core.inspector;
-import aermicioi.aedi_property_reader.core.type_guesser;
-import aermicioi.aedi_property_reader.core.traits;
-import aermicioi.aedi_property_reader.core.placeholder;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.setter;
+import aermicioi.aedi_property_reader.convertor.inspector;
+import aermicioi.aedi_property_reader.convertor.traits;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import std.algorithm;
 import std.array;
 import std.traits;
 import std.experimental.logger;
 import taggedalgebraic : TaggedAlgebraic;
+
+alias DefaultConvertibleTypes = AliasSeq!(
+	ubyte, byte, ushort, short, uint, int, ulong, long, float, double, real, char, wchar, dchar,
+	ubyte[], byte[], ushort[], short[], uint[], int[], ulong[], long[], float[], double[], real[],
+    char[], wchar[], dchar[], string, wstring, dstring, string[]
+);
 
 /**
 Functional convertor that is taking a component of type From and converts it into a component of type To.
@@ -70,7 +75,7 @@ Params:
     T = symbol to be tested.
 
 Returns:
-    Symbols: Yes -> whether it is or not, From -> type of original component that function is accepting, To -> destination type that function is converting.
+    Symbols: yes -> whether it is or not, From -> type of original component that function is accepting, To -> destination type that function is converting.
 **/
 template isConvertor(alias T)
     if (isSomeFunction!T) {
@@ -80,13 +85,13 @@ template isConvertor(alias T)
         is(typeof(T) : R function(in Y, ref X, RCIAllocator), Y, X, R) ||
         is(typeof(T) : R delegate(in Y, ref X, RCIAllocator), Y, X, R)
     ) {
-        enum bool Yes = true;
+        enum bool yes = true;
 
         alias To = X;
         alias From = Y;
     } else {
 
-        enum bool Yes = false;
+        enum bool yes = false;
     }
 }
 
@@ -99,15 +104,15 @@ Params:
     From = original type
 
 Returns:
-    Yes -> whether it is or not,
+    yes -> whether it is or not,
     From -> type of original component that function is accepting,
     To -> destination type that function is converting.
 **/
 template isConvertor(alias T, To, From) {
-    static if (isConvertor!T.Yes && is(isConvertor!T.To == To) && is(isConvertor!T.From == From)) {
+    static if (isConvertor!T.yes && is(isConvertor!T.To == To) && is(isConvertor!T.From == From)) {
         alias isConvertor = isConvertor!T;
     } else {
-        enum Yes = false;
+        enum yes = false;
     }
 }
 
@@ -119,17 +124,17 @@ Params:
     To = destination type
     From = original type
 Returns:
-    Yes -> whether it is possible to instantiate template as functional convertor
+    yes -> whether it is possible to instantiate template as functional convertor
     Convertor -> resulting functional convertor
     Info -> data returned by isConvertor
 **/
 template maybeConvertor(alias T, To, From) {
-    static if (is(typeof(isConvertor!(T!(To, From)))) && isConvertor!(T!(To, From)).Yes) {
-        enum Yes = true;
+    static if (is(typeof(isConvertor!(T!(To, From)))) && isConvertor!(T!(To, From)).yes) {
+        enum yes = true;
         alias Convertor = T!(To, From);
         alias Info = isConvertor!Convertor;
     } else {
-        enum Yes = false;
+        enum yes = false;
     }
 }
 
@@ -153,7 +158,7 @@ Check whether symbol T is a functional destructor.
 Params:
     T = symbol to be tested.
 Returns:
-    Yes = whether it is functional destructor or not
+    yes = whether it is functional destructor or not
     To = the type of accepted components to be destructed
 **/
 template isDestructor(alias T) {
@@ -163,12 +168,12 @@ template isDestructor(alias T) {
         is(typeof(T) : R function (ref X, RCIAllocator = theAllocator), X, R) ||
         is(typeof(T) : R delegate (ref X, RCIAllocator = theAllocator), X, R)
     ) {
-        enum bool Yes = true;
+        enum bool yes = true;
 
         alias To = X;
     } else {
 
-        enum bool Yes = false;
+        enum bool yes = false;
     }
 }
 
@@ -180,14 +185,14 @@ Params:
     To = the component that functional destructor may accept
 
 Returns:
-    Yes = whether it is functional destructor or not
+    yes = whether it is functional destructor or not
     To = the type of accepted components to be destructed
 **/
 template isDestructor(T, To) {
-    static if (isDestructor!T.Yes && is(isDestructor!T.To == To)) {
+    static if (isDestructor!T.yes && is(isDestructor!T.To == To)) {
         alias isDestructor = isDestructor!T;
     } else {
-        enum Yes = false;
+        enum yes = false;
     }
 }
 
@@ -199,17 +204,17 @@ Params:
     To = the type of component that T instantiation should manage destruction.
 
 Returns:
-    Yes -> whether it is possible to instantiate a functional destructor for To or not
+    yes -> whether it is possible to instantiate a functional destructor for To or not
     Destructor -> the instantiated functional destructor
     Info -> information from isDestructor check
 **/
 template maybeDestructor(alias T, To) {
-    static if (isDestructor!(T!To).Yes) {
-        enum Yes = true;
+    static if (isDestructor!(T!To).yes) {
+        enum yes = true;
         alias Destructor = T!(To);
         alias Info = isDestructor!Destructor;
     } else {
-        enum Yes = false;
+        enum yes = false;
     }
 }
 
@@ -340,10 +345,76 @@ interface Convertor {
 }
 
 /**
+Mixin that provides default implementation of equality comparison for convertors
+**/
+mixin template EqualMixin() {
+
+    override bool opEquals(Object o) {
+        return super.opEquals(o) || this.opEquals(cast(Convertor) o);
+    }
+
+    bool opEquals(Convertor convertor) {
+        return (convertor !is null) && ((this.from is convertor.from) || (this.to is convertor.to));
+    }
+}
+
+/**
+Mixin that provides default implementation of hashing algorithm
+**/
+mixin template ToHashMixin() {
+
+    override size_t toHash() {
+        import std.digest.murmurhash : MurmurHash3;
+        import std.digest : digest;
+
+        size_t[8] buffer;
+        buffer[0] = this.from.toHash;
+        buffer[1] = this.to.toHash;
+
+        return cast(size_t) *(&digest!(MurmurHash3!128)(buffer[])[0]);
+    }
+}
+
+/**
+Mixin that provides default implementation of toString method
+**/
+mixin template ToStringMixin() {
+
+    override string toString() {
+        import std.conv : text;
+        return text(
+            typeid(this),
+            " [", this.from, ", ", this.to, "]"
+        );
+    }
+}
+
+/**
+Default implementation of comparison between two or more convertors.
+**/
+mixin template OpCmpMixin() {
+
+    override int opCmp(Object o) {
+
+        return cast(int)cast(void*)this - cast(int)cast(void*)o;
+    }
+}
+
+/**
+Amalgation of EqualMixin, ToHashMixin, ToStringMixin, and OpCmpMixin
+**/
+mixin template EqualToHashToStringOpCmpMixin() {
+    mixin EqualMixin!();
+    mixin ToHashMixin!();
+    mixin ToStringMixin!();
+    mixin OpCmpMixin!();
+}
+
+/**
 A convertor that is using functional convertor and destructor for conversion logic.
 **/
 class CallbackConvertor(alias convertor, alias destructor) : Convertor
-    if (isConvertor!convertor.Yes && isDestructor!destructor.Yes) {
+    if (isConvertor!convertor.yes && isDestructor!destructor.yes) {
 
     private {
         alias Info = isConvertor!convertor;
@@ -446,14 +517,22 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
         **/
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const
         {
-            enforce!ConvertorException(this.convertsTo(to), text(to, " is not supported destination by convertor expected ", typeid(Info.To)));
-            enforce!ConvertorException(this.convertsFrom(from), text(from.identify, " is not supported source by convertor expected ", typeid(Info.From)));
+            enforce!ConvertorException(
+                this.convertsTo(to),
+                text(to, " is not supported destination by convertor expected ", typeid(Info.To))
+            );
+            enforce!ConvertorException(
+                this.convertsFrom(from),
+                text(from.identify, " is not supported source by convertor expected ", typeid(Info.From))
+            );
 
             static if (is(From : Object)) {
                 Info.From naked = cast(From) from;
 
                 if (naked is null) {
-                    throw new ConvertorException(text("Cannot convert ", from.classinfo, " only supported ", this.from));
+                    throw new ConvertorException(
+                        text("Cannot convert ", from.classinfo, " only supported ", this.from)
+                    );
                 }
             } else {
 
@@ -505,6 +584,8 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
                 allocator.dispose(converted);
             }
         }
+
+        mixin EqualToHashToStringOpCmpMixin!();
     }
 }
 
@@ -522,6 +603,13 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
     }
 
     public {
+
+        /**
+        Constructor for TaggedConvertor
+
+        Params:
+            convertor = convertor for underlying tagged types
+        **/
         this(Convertor convertor) {
             this.convertor = convertor;
         }
@@ -680,6 +768,8 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
         void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
             return this.convertor.destruct(converted, allocator);
         }
+
+        mixin EqualToHashToStringOpCmpMixin!();
     }
 }
 
@@ -702,7 +792,7 @@ interface CombinedConvertor : Convertor {
     /**
     ditto
     **/
-    final T convertors(this T)(Convertor convertors...) @safe nothrow {
+    T convertors(this T)(Convertor convertors...) @safe nothrow {
         return this.convertors(convertors.dup);
     }
 
@@ -733,7 +823,7 @@ interface CombinedConvertor : Convertor {
 A convertor that is delegating converting task to a set of child convertors.
 **/
 class CombinedConvertorImpl : CombinedConvertor {
-    import std.algorithm;
+    import std.algorithm : canFind, find;
 
     private {
         Convertor[] convertors_;
@@ -926,6 +1016,8 @@ class CombinedConvertorImpl : CombinedConvertor {
 
             convertors[0].destruct(converted, allocator);
         }
+
+        mixin EqualToHashToStringOpCmpMixin!();
     }
 }
 
@@ -997,7 +1089,7 @@ class NoOpConvertor : Convertor {
             true if it is able to convert to, false otherwise.
         **/
         bool convertsTo(TypeInfo to) const {
-            return this.to is from;
+            return this.to is to;
         }
 
         /**
@@ -1027,7 +1119,13 @@ class NoOpConvertor : Convertor {
         {
             enforce!ConvertorException(
                 from.identify is to,
-                text("Cannot do no op when expected ", to, " type is not of same type as original from ", from.identify, " type")
+                text(
+                    "Cannot do no op when expected ",
+                    to,
+                    " type is not of same type as original from ",
+                    from.identify,
+                    " type"
+                )
             );
 
             return cast() from;
@@ -1043,6 +1141,8 @@ class NoOpConvertor : Convertor {
         void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
 
         }
+
+        mixin EqualToHashToStringOpCmpMixin!();
     }
 }
 
@@ -1135,11 +1235,11 @@ template CallbackConvertorBuilder(alias convertor, alias destructor) {
                     " when:\n ",
                     fullyQualifiedName!convertor,
                     " implements convertor ",
-                    ConvertorInfo.Yes,
+                    ConvertorInfo.yes,
                     "\n ",
                     fullyQualifiedName!destructor,
                     " implements destructor ",
-                    DestructorInfo.Yes
+                    DestructorInfo.yes
                 );
         }
     }
@@ -1216,7 +1316,7 @@ template MappingConvertorBuilder(alias Accessor, alias Setter, alias ToInspector
         }
 
         Convertor make(To, From)() {
-            import aermicioi.aedi_property_reader.core.mapper : CompositeMapper, CompositeConvertor;
+            import aermicioi.aedi_property_reader.convertor.mapper : CompositeMapper, CompositeConvertor;
             static if (
                 FromInspectorCheck!(To, From) &&
                 ToInspectorCheck!(To, From) &&
@@ -1284,71 +1384,12 @@ template MappingConvertorBuilder(alias Accessor, alias Setter, alias ToInspector
     }
 }
 
-template CombinedConvertorBuilder(Builders...)
-    if (allSatisfy!(isConvertorBuilder, Builders)) {
+/**
+A convertor builder that will scan through all convertor builders and will use first that is able to create a convertor from a source type to a destination type.
 
-    class CombinedConvertorBuilder {
-        bool throwOnFailure = true;
-        Builders builders;
-
-        this(Builders builders, bool throwOnFailure = true) {
-            this.builders = builders;
-            this.throwOnFailure = throwOnFailure;
-        }
-
-        Convertor make(To, From)() {
-            if (!this.isAble!(To, From)) {
-                if (this.throwOnFailure) {
-                    throw new Exception(this.cause!(To, From));
-                } else {
-                    error(this.cause!(To, From));
-                }
-
-                return null;
-            }
-
-            CombinedConvertor convertor = new CombinedConvertor;
-
-            foreach (builder; builders) {
-                convertor.add(builder.make!(To, From));
-            }
-
-            return convertor;
-        }
-
-        bool isAble(To, From)() {
-            foreach (builder; builders) {
-                if (!builder.isAble!(To, From)) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        string cause(To, From)() {
-            if (!this.isAble!(To, From)) {
-                string[] messages;
-
-                foreach (builder; builders) {
-                    messages ~= text(builder, " failed with: ", builder.cause!(To, From));
-                }
-
-                return text(
-                    "None of convertor builders were able to convert from ",
-                    typeid(From),
-                    " to ",
-                    typeid(To),
-                    " where all of them failed with following errors: ",
-                    messages.joiner(", ")
-                );
-            }
-
-            return null;
-        }
-    }
-}
-
+Params:
+    Builders = list of convertor builders, each able to factory a subset of convertors.
+**/
 template AnyConvertorBuilder(Builders...)
     if (allSatisfy!(isConvertorBuilder, Builders)) {
 
@@ -1405,7 +1446,7 @@ template AnyConvertorBuilder(Builders...)
                     " to ",
                     typeid(To),
                     " where all of them failed with following errors: ",
-                    messages.joiner(", ")
+                    messages.joiner("\n")
                 );
             }
 
@@ -1414,6 +1455,9 @@ template AnyConvertorBuilder(Builders...)
     }
 }
 
+/**
+ditto
+**/
 auto factoryAnyConvertorBuilder(Builders...)(Builders builders) {
     return new AnyConvertorBuilder!Builders(builders);
 }

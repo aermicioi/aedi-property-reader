@@ -33,10 +33,22 @@ import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.json.accessor;
 import std.json;
 
+/**
+Json type guesser
+**/
 class JsonTypeGuesser : TypeGuesser!JSONValue {
 
     public {
 
+        /**
+        Guess type of underlying json element.
+
+        Params:
+            serialized = json element to be inspected
+
+        Returns:
+            TypeInfo of underlying data
+        **/
         TypeInfo guess(JSONValue serialized) {
 
             final switch (serialized.type) {

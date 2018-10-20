@@ -32,9 +32,9 @@ module aermicioi.aedi_property_reader.core.test.document;
 import aermicioi.aedi : locate, NotFoundException;
 import aermicioi.aedi_property_reader.core.document : DocumentContainer;
 import aermicioi.aedi_property_reader.core.type_guesser : StringToScalarConvTypeGuesser;
-import aermicioi.aedi_property_reader.core.accessor : AssociativeArrayAccessor;
-import aermicioi.aedi_property_reader.core.convertor : CallbackConvertorBuilder;
-import aermicioi.aedi_property_reader.core.std_conv : convert, destruct;
+import aermicioi.aedi_property_reader.convertor.accessor : AssociativeArrayAccessor;
+import aermicioi.aedi_property_reader.convertor.convertor : CallbackConvertorBuilder;
+import aermicioi.aedi_property_reader.convertor.std_conv : convert, destruct;
 import std.experimental.allocator;
 import std.exception;
 

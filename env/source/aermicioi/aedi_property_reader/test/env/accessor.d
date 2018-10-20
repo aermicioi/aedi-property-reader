@@ -31,7 +31,7 @@ module aermicioi.aedi_property_reader.test.env.accessor;
 
 import aermicioi.aedi;
 import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import std.exception;
 
 unittest {

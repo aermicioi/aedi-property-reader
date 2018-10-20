@@ -27,7 +27,7 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.inspector;
+module aermicioi.aedi_property_reader.convertor.inspector;
 
 import std.traits;
 import std.meta;
@@ -35,9 +35,8 @@ import std.exception;
 import std.conv;
 import aermicioi.util.traits : isPropertyGetter, isPropertySetter, isPublic, isField;
 import aermicioi.aedi : NotFoundException;
-import aermicioi.aedi_property_reader.core.placeholder : unwrap, identify;
-import aermicioi.aedi_property_reader.core.traits : isD;
-import aermicioi.aedi_property_reader.core.type_guesser : TypeGuesser;
+import aermicioi.aedi_property_reader.convertor.placeholder : unwrap, identify;
+import aermicioi.aedi_property_reader.convertor.traits : isD;
 import taggedalgebraic;
 
 /**
@@ -97,7 +96,7 @@ interface Inspector(ComponentType, KeyType = string) {
 /**
 Associative array inspector.
 **/
-class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspector!(ComponentType[KeyType], KeyType), TypeGuesser!(ComponentType[KeyType]) {
+class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspector!(ComponentType[KeyType], KeyType) {
 
     /**
     Identify the type of child field of component.
@@ -130,19 +129,6 @@ class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspec
     }
 
     /**
-    Guess the D type of serialized based on information available in it.
-
-    Params:
-        serialized = the component for which guesser will attempt to guess the type.
-
-    Returns:
-        TypeInfo guessed type
-    **/
-    TypeInfo guess(ComponentType[KeyType] serialized) {
-        return this.typeOf(serialized);
-    }
-
-    /**
     Check if component has a field or a property.
 
     Params:
@@ -166,7 +152,7 @@ class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspec
         an arary of property identities.
     **/
     KeyType[] properties(ComponentType[KeyType] component) const nothrow {
-        import std.array;
+        import std.array : array;
 
         return component.byKey.array;
     }
@@ -175,7 +161,7 @@ class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspec
 /**
 Array inspector
 **/
-class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t), TypeGuesser!(ComponentType[]) {
+class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t) {
 
     /**
     Identify the type of child field of component.
@@ -212,19 +198,6 @@ class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t), TypeG
     }
 
     /**
-    Guess the D type of serialized based on information available in it.
-
-    Params:
-        serialized = the component for which guesser will attempt to guess the type.
-
-    Returns:
-        TypeInfo guessed type
-    **/
-    TypeInfo guess(ComponentType[] serialized) {
-        return this.typeOf(serialized);
-    }
-
-    /**
     Check if component has a field or a property.
 
     Params:
@@ -248,22 +221,31 @@ class ArrayInspector(ComponentType) : Inspector!(ComponentType[], size_t), TypeG
         an arary of property identities.
     **/
     size_t[] properties(ComponentType[] component) const nothrow {
-        import std.array;
-        import std.range;
+        import std.array : array;
+        import std.range : iota;
 
         return iota(component.length).array;
     }
 }
 
-class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector!Tagged, TypeGuesser!(Tagged)
+/**
+An inspector that is able to inspect tagged types, and provide insights for them.
+**/
+class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector!Tagged
     if (anySatisfy!(ApplyRight!(isD, Type), Fields!Union)) {
-    import std.experimental.logger;
-    import aermicioi.aedi_property_reader.core.traits : n;
+    import std.experimental.logger : error;
+    import aermicioi.aedi_property_reader.convertor.traits : n;
 
     private {
         Inspector!Type inspector_;
     }
 
+    /**
+    Constructs TaggedInspector
+
+    Params:
+        inspector = underlying inspector that is able to inspect just one subtype of tagged type
+    **/
     this(Inspector!Type inspector) {
         this.inspector = inspector;
     }
@@ -307,8 +289,8 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
     TypeInfo typeOf(Tagged component, in string property) const nothrow {
         try {
 
-            import std.meta;
-            import aermicioi.util.traits;
+            import std.meta : staticMap;
+            import aermicioi.util.traits.traits : identifier;
 
             static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
@@ -317,7 +299,12 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
                         return typeid(Tagged);
                     }
 
-                    debug(trace) error("Could not identify tagged algebraic's ", typeid(component), " inner type, returning void.").n;
+                    debug(trace) error(
+                        "Could not identify tagged algebraic's ",
+                        typeid(component),
+                        " inner type, returning void."
+                    ).n;
+
                     return typeid(void);
                 }
             }
@@ -344,8 +331,8 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
     TypeInfo typeOf(Tagged component) const nothrow {
         try {
 
-            import std.meta;
-            import aermicioi.util.traits;
+            import std.meta : staticMap;
+            import aermicioi.util.traits.traits : identifier;
 
             static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
@@ -366,25 +353,6 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
     }
 
     /**
-    Guess the D type of serialized based on information available in it.
-
-    Params:
-        serialized = the component for which guesser will attempt to guess the type.
-
-    Returns:
-        TypeInfo guessed type
-    **/
-    TypeInfo guess(Tagged serialized) {
-        TypeInfo type = this.typeOf(serialized);
-
-        if (type is typeid(void)) {
-            return typeid(serialized);
-        }
-
-        return type;
-    }
-
-    /**
     Check if component has a field or a property.
 
     Params:
@@ -397,8 +365,8 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
     bool has(Tagged component, in string property) const nothrow {
         try {
 
-            import std.meta;
-            import aermicioi.util.traits;
+            import std.meta : staticMap;
+            import aermicioi.util.traits.traits : identifier;
 
             static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
@@ -430,8 +398,8 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
     string[] properties(Tagged component) const nothrow {
         try {
 
-            import std.meta;
-            import aermicioi.util.traits;
+            import std.meta : staticMap;
+            import aermicioi.util.traits.traits : identifier;
 
             static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
@@ -453,7 +421,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
 /**
 Inspector for composite components (structs, objects, unions, etc.).
 **/
-class CompositeInspector(ComponentType) : Inspector!(ComponentType, string), TypeGuesser!ComponentType
+class CompositeInspector(ComponentType) : Inspector!(ComponentType, string)
     if (isAggregateType!ComponentType) {
 
     /**
@@ -473,7 +441,10 @@ class CompositeInspector(ComponentType) : Inspector!(ComponentType, string), Typ
                     if (member == property) {
                         static if (
                             isField!(ComponentType, member) ||
-                            (isSomeFunction!m && anySatisfy!(isPropertyGetter, __traits(getOverloads, component, member)))
+                            (
+                                isSomeFunction!m &&
+                                anySatisfy!(isPropertyGetter, __traits(getOverloads, component, member))
+                            )
                         ) {
 
                             return typeid(typeof(__traits(getMember, component, member)));
@@ -501,25 +472,6 @@ class CompositeInspector(ComponentType) : Inspector!(ComponentType, string), Typ
     **/
     TypeInfo typeOf(ComponentType component) const nothrow {
         return typeid(ComponentType);
-    }
-
-    /**
-    Guess the D type of serialized based on information available in it.
-
-    Params:
-        serialized = the component for which guesser will attempt to guess the type.
-
-    Returns:
-        TypeInfo guessed type
-    **/
-    TypeInfo guess(ComponentType serialized) {
-        TypeInfo type = this.typeOf(serialized);
-
-        if (type is typeid(void)) {
-            return typeid(serialized);
-        }
-
-        return type;
     }
 
     /**
@@ -581,6 +533,13 @@ class RuntimeInspector(Type, KeyType = string) : Inspector!(Object, KeyType) {
     }
 
     public {
+
+        /**
+        Constructor for RuntimeInspector
+
+        Params:
+            inspector = underlying inspector that works with unwrapped type
+        **/
         this(Inspector!(Type, KeyType) inspector) {
             this.inspector = inspector;
         }
@@ -805,9 +764,7 @@ class CombinedInspector(ComponentType, KeyType = string) : Inspector!(ComponentT
     **/
     bool has(ComponentType component, in KeyType property) const nothrow {
         foreach (inspector; this.inspectors) {
-            bool has = inspector.has(component, property);
-
-            if (has) {
+            if (inspector.has(component, property)) {
                 return true;
             }
         }

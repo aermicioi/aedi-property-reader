@@ -73,11 +73,6 @@ unittest {
         "1.0,10,\"One hundred\"\n" ~
         "2.0,20,\"Two hundred\"\n");
 
-	import aermicioi.aedi_property_reader.core.inspector;
-	import aermicioi.aedi_property_reader.core.setter;
-	import aermicioi.aedi_property_reader.core.mapper;
-	import aermicioi.aedi_property_reader.core.traits;
-
 	static struct Placeholder {
 		float first;
 		int second;

@@ -30,15 +30,15 @@ Authors:
 module aermicioi.aedi_property_reader.core.document;
 
 import aermicioi.aedi;
-import aermicioi.aedi_property_reader.core.exception : ConvertorException;
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.placeholder;
+import aermicioi.aedi_property_reader.convertor.exception : ConvertorException;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import aermicioi.aedi.storage.wrapper;
 import std.meta;
 import std.conv;
 import std.experimental.allocator;
 import std.exception : enforce;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import std.algorithm;
 import std.array;
@@ -65,6 +65,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
 
     private {
         Convertor[string] convertors;
+        Convertor[Convertor] convertorsByType;
         PropertyAccessor!(DocumentType, FieldType) accessor_;
         TypeGuesser!FieldType guesser_;
 
@@ -172,6 +173,16 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
 		**/
         typeof(this) set(Convertor element, string identity) {
             this.convertors[identity] = element;
+            this.set(element);
+
+            return this;
+        }
+
+        /**
+        ditto
+        **/
+        typeof(this) set(Convertor convertor) {
+            this.convertorsByType[convertor] = convertor;
 
             return this;
         }
@@ -248,7 +259,9 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
             }
 
             if (!this.accessor.has(this.document, identity)) {
-                throw new NotFoundException(text("Could not find \"", identity, "\" in document of type ", typeid(DocumentType)));
+                throw new NotFoundException(
+                    text("Could not find \"", identity, "\" in document of type ", typeid(DocumentType))
+                );
             }
 
             static if (is(FieldType : Object)) {
@@ -263,7 +276,9 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
 
             if (auto convertor = identity in this.convertors) {
                 if (convertor.to !is typeid(void)) {
-                    debug(trace) trace("Found convertor for \"", identity, "\" commencing conversion to ", convertor.to);
+                    debug(trace) trace(
+                        "Found convertor for \"", identity, "\" commencing conversion to ", convertor.to
+                    );
 
                     converted = (*convertor).convert(document, convertor.to, this.allocator);
                     this.components[identity] = converted;
@@ -422,7 +437,8 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
         **/
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const {
             debug(trace) trace("Searching for convertor for ", from.identify, " to ", to);
-            auto convertors = this.convertors.byValue.filter!(
+
+            auto convertors = this.convertorsByType.byValue.filter!(
                 c => c.convertsTo(to) && c.convertsFrom(from)
             );
 
@@ -452,7 +468,10 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
         void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
             auto destructors = this.convertors.byValue.filter!(convertor => convertor.convertsTo(converted));
 
-            enforce!ConvertorException(!destructors.empty, text("Could not destroy ", converted.identify, ", no suitable convertor found."));
+            enforce!ConvertorException(
+                !destructors.empty,
+                text("Could not destroy ", converted.identify, ", no suitable convertor found.")
+            );
 
             destructors.front.destruct(converted, allocator);
         }
@@ -461,6 +480,8 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
 
 /**
 Marker interface that holds up an implementation of a convertor builder.
+Params:
+    ConvertorBuilderFactory = a factory (function(Convertor[] convertor)) that creates a convertor builder
 **/
 interface WithConvertorBuilder(alias ConvertorBuilderFactory) {
 
@@ -474,7 +495,17 @@ interface WithConvertorsFor(ConvertibleTypes...) {
 }
 
 /**
+Marker interface that adds information on source types which document should be able to convert from.
+**/
+interface WithConvertorSources(SourceTypes...) {
+
+}
+
+/**
 Marker interface that adds prebuilt convertors into document container.
+
+Params:
+    ConvertorsFactory = a factory (no arg function) that will create a list of Convertors
 **/
 interface WithConvertors(alias ConvertorsFactory) {
 
@@ -484,9 +515,16 @@ interface WithConvertors(alias ConvertorsFactory) {
 An implementation of document container that holds an advised convertor along the document for usage as default constructor for convertors
 in configuration api.
 **/
-class AdvisedDocumentContainer(DocumentType, FieldType, Interfaces...) : DocumentContainer!(DocumentType, FieldType), AliasSeq!(Interfaces) {
+class AdvisedDocumentContainer(DocumentType, FieldType, Interfaces...) :
+    DocumentContainer!(DocumentType, FieldType), AliasSeq!(Interfaces) {
     public {
 
+        /**
+        Constructor for AdvisedDocumentContainer
+
+        Params:
+            document = document containing raw information.
+        **/
         this(DocumentType document) {
             super(document);
         }

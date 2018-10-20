@@ -31,29 +31,29 @@ module aermicioi.aedi_property_reader.core.core;
 
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.mapper;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.mapper;
 import aermicioi.aedi_property_reader.core.document :
 	DocumentContainerImpl = DocumentContainer,
 	WithConvertorBuilder,
 	WithConvertorsFor,
+	WithConvertorSources,
 	WithConvertors;
 import std.meta;
 import std.traits;
 import std.experimental.logger;
 import std.exception;
 
-alias DefaultConvertibleTypes = AliasSeq!(
-	ubyte, byte, ushort, short, uint, int, ulong, long, float, double, real, char, wchar, dchar,
-	ubyte[], byte[], ushort[], short[], uint[], int[], ulong[], long[], float[], double[], real[], char[], wchar[], dchar[], string, wstring, dstring, string[]
-);
-
 /**
 Configuration context that is providing a nice api to add convertors into a container for a document.
 **/
-struct DocumentContainerBuilder(DocumentContainer : DocumentContainerImpl!(DocumentType, FieldType), ConvertorBuilder, DocumentType, FieldType)
+struct DocumentContainerBuilder
+	(DocumentContainer : DocumentContainerImpl!(DocumentType, FieldType), ConvertorBuilder, DocumentType, FieldType)
 	if (is(DocumentContainer : Storage!(Convertor, string))) {
 
+	/**
+	Builder used to constructo convertors for configured properties.
+	**/
 	ConvertorBuilder builder;
 
 	/**
@@ -61,6 +61,13 @@ struct DocumentContainerBuilder(DocumentContainer : DocumentContainerImpl!(Docum
 	**/
     DocumentContainer container;
 
+	/**
+	Constructor for DocumentContainerBuilder
+
+	Params:
+		container = to configure
+		builder = convertor builder used to create convertors for properties
+	**/
 	this(DocumentContainer container, ConvertorBuilder builder) {
 		this.container = container;
 		this.builder = builder;
@@ -92,6 +99,10 @@ struct DocumentContainerBuilder(DocumentContainer : DocumentContainerImpl!(Docum
 	**/
     ref typeof(this) register(To)(string path) {
 
+		static if (is(DocumentContainer : WithConvertorSources!SourceTypes, SourceTypes...)) {} else {
+			alias SourceTypes = AliasSeq!();
+		}
+
 		debug(trace) trace(
 			"Injecting convertor for ",
 			path,
@@ -102,6 +113,20 @@ struct DocumentContainerBuilder(DocumentContainer : DocumentContainerImpl!(Docum
 		);
 
 		this.register(builder.make!(To, FieldType), path);
+
+		static foreach (From; SourceTypes) {
+
+			debug(trace) trace(
+				"Injecting convertor for ",
+				typeid(From),
+				" in document container to convert to ",
+				typeid(To),
+				" using ",
+				builder
+			);
+
+			this.register(builder.make!(To, From));
+		}
 
 		return this;
     }
@@ -130,14 +155,29 @@ struct DocumentContainerBuilder(DocumentContainer : DocumentContainerImpl!(Docum
         return this.register!To(fullyQualifiedName!Iface);
     }
 
+	/**
+	Register convertor for a property on path.
+
+	Params:
+		convertor = convertor used to convert value found on path
+		path = property path for which convertor could be used
+
+	Returns:
+		typeof(this)
+	**/
 	ref typeof(this) register(Convertor convertor, string path) {
 		this.container.set(convertor, path);
 
 		return this;
 	}
 
+	/**
+	ditto
+	**/
 	ref typeof(this) register(Convertor convertor) {
-		return this.register(convertor, convertor.to.toString);
+		this.container.set(convertor);
+
+		return this;
 	}
 
     alias property = register;
@@ -160,8 +200,12 @@ auto configure(DocumentContainer, ConvertorBuilder)(DocumentContainer container,
 /**
 ditto
 **/
-auto configure(DocumentContainer : WithConvertorBuilder!ConvertorBuilderFactory, alias ConvertorBuilderFactory)(DocumentContainer container) {
-	return DocumentContainerBuilder!(DocumentContainer, ReturnType!ConvertorBuilderFactory)(container, ConvertorBuilderFactory([container]));
+auto configure
+	(DocumentContainer : WithConvertorBuilder!ConvertorBuilderFactory, alias ConvertorBuilderFactory)
+	(DocumentContainer container) {
+
+	return DocumentContainerBuilder!(DocumentContainer, ReturnType!ConvertorBuilderFactory)
+		(container, ConvertorBuilderFactory([container]));
 }
 
 mixin template MapperBuilderMixin(AdvisedConvertors...) {

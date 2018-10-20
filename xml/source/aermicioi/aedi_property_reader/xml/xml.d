@@ -33,11 +33,12 @@ import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.xml.accessor;
 import aermicioi.aedi_property_reader.xml.convertor;
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.core;
+import aermicioi.aedi_property_reader.convertor.std_conv;
 import aermicioi.aedi_property_reader.xml.type_guesser;
 import std.experimental.allocator;
 import std.xml;
@@ -47,7 +48,15 @@ alias XmlDocumentContainer = AdvisedDocumentContainer!(
     XmlElement,
     XmlElement,
     WithConvertorBuilder!XmlConvertorBuilderFactory,
-    WithConvertorsFor!DefaultConvertibleTypes
+    WithConvertorsFor!DefaultConvertibleTypes,
+    WithConvertorSources!Element,
+    WithConvertors!(
+        StdConvStringPrebuiltConvertorsFactory
+    ),
+    WithConvertorSources!(
+        Element,
+        string
+    )
 );
 
 /**
@@ -61,7 +70,12 @@ Params:
 Returns:
     JsonConvertorContainer
 **/
-auto xml(XmlElement value, PropertyAccessor!XmlElement accessor, TypeGuesser!XmlElement guesser, RCIAllocator allocator = theAllocator) {
+auto xml(
+    XmlElement value,
+    PropertyAccessor!XmlElement accessor,
+    TypeGuesser!XmlElement guesser,
+    RCIAllocator allocator = theAllocator
+) {
 
     XmlDocumentContainer container = new XmlDocumentContainer(value);
     container.guesser = guesser;
@@ -106,8 +120,8 @@ Returns:
     XmlConvertorContainer
 **/
 auto xml(string pathOrData, bool returnEmpty = true) {
-    import std.experimental.logger;
-    import std.file;
+    import std.experimental.logger : trace;
+    import std.file : exists, readText;
     debug(trace) trace("Loading xml document from ", pathOrData);
 
     try {
@@ -140,7 +154,9 @@ auto xml(string pathOrData, bool returnEmpty = true) {
                 return xml();
             }
 
-            throw new Exception("Could not create xml convertor container from file or content passed in pathOrData: " ~ pathOrData, e);
+            throw new Exception(
+                "Could not create xml convertor container from file or content passed in pathOrData: " ~ pathOrData, e
+            );
         }
     }
 
@@ -148,14 +164,18 @@ auto xml(string pathOrData, bool returnEmpty = true) {
         return xml();
     }
 
-    throw new Exception("Could not create xml convertor container from file or content passed in pathOrData: " ~ pathOrData);
+    throw new Exception(
+        "Could not create xml convertor container from file or content passed in pathOrData: " ~ pathOrData
+    );
 }
 
 package auto accessor() {
     return dsl(
         new AggregatePropertyAccessor!XmlElement(
-            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementPropertyAccessor)(new XmlElementPropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlAttributePropertyAccessor)(new XmlAttributePropertyAccessor),
+            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementPropertyAccessor)
+                (new XmlElementPropertyAccessor),
+            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlAttributePropertyAccessor)
+                (new XmlAttributePropertyAccessor),
         ),
         new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementIndexAccessor)(new XmlElementIndexAccessor)
     );

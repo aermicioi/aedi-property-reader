@@ -30,17 +30,17 @@ Authors:
 module aermicioi.aedi_property_reader.sdlang.accessor;
 
 import sdlang.ast;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi.exception.not_found_exception : NotFoundException;
 import taggedalgebraic : TaggedAlgebraic;
 import std.exception;
 import std.experimental.logger;
 import aermicioi.aedi_property_reader.core.traits : n;
 
-union SdlangElementUnion {
+private union SdlangElementUnion {
     Tag tag;
     Attribute attribute;
-};
+}
 
 alias SdlangElement = TaggedAlgebraic!(SdlangElementUnion);
 
@@ -139,7 +139,9 @@ class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
             return component.tags[property.to!size_t];
         }
 
-        throw new NotFoundException("Sdlang tag " ~ component.getFullName.toString ~ " doesn't have child on index " ~ property);
+        throw new NotFoundException(
+            "Sdlang tag " ~ component.getFullName.toString ~ " doesn't have child on index " ~ property
+        );
     }
 
     /**
@@ -157,10 +159,12 @@ class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
      **/
     bool has(in Tag component, in string property) const nothrow {
         try {
-            import std.string;
-            import std.conv;
+            import std.string : isNumeric;
+            import std.conv : to;
 
-            return (component !is null) && property.isNumeric && ((cast(Tag) component).tags.length > property.to!size_t);
+            return (component !is null) &&
+                property.isNumeric &&
+                ((cast(Tag) component).tags.length > property.to!size_t);
         } catch (Exception e) {
 
             debug(trace) error("Failed to check property ", property, " existence due to ", e).n;
@@ -210,7 +214,9 @@ class SdlangAttributePropertyAccessor : PropertyAccessor!(Tag, Attribute) {
             return component.attributes[property].front;
         }
 
-        throw new NotFoundException("Sdlang tag " ~ component.getFullName.toString ~ " doesn't have attribute " ~ property);
+        throw new NotFoundException(
+            "Sdlang tag " ~ component.getFullName.toString ~ " doesn't have attribute " ~ property
+        );
     }
 
     /**

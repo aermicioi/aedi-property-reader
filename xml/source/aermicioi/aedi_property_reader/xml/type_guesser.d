@@ -33,6 +33,9 @@ import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.xml.accessor;
 import std.xml;
 
+/**
+Type guesser of data in xml elements
+**/
 class XmlTypeGuesser : TypeGuesser!XmlElement {
 
     private {
@@ -40,6 +43,13 @@ class XmlTypeGuesser : TypeGuesser!XmlElement {
     }
 
     public {
+
+        /**
+        Construct XmlTypeGuesser
+
+        Params:
+            guesser = string type guesser for xml attributes
+        **/
         this(TypeGuesser!string guesser) {
             this.guesser = guesser;
         }
@@ -69,6 +79,15 @@ class XmlTypeGuesser : TypeGuesser!XmlElement {
             return this.guesser_;
         }
 
+        /**
+        Guess type of underlying xml element or attribute
+
+        Params:
+            serialized = xml element or attribute
+
+        Returns:
+            TypeInfo of contained element
+        **/
         TypeInfo guess(XmlElement serialized) {
 
             final switch (serialized.kind) {

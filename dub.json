@@ -10,7 +10,8 @@
 		"aedi-property-reader:yaml": "*",
 		"aedi-property-reader:xml": "*",
 		"aedi-property-reader:properd": "*",
-		"aedi-property-reader:csv": "*"
+		"aedi-property-reader:csv": "*",
+		"aedi-property-reader:convertor": "*"
 	},
 	"subPackages": [
 		"./core",
@@ -21,7 +22,8 @@
 		"./yaml",
 		"./xml",
 		"./properd",
-		"./csv"
+		"./csv",
+		"./convertor"
 	],
 	"configurations": [
 		{

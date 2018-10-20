@@ -85,9 +85,9 @@ unittest {
 		}
 	});
 
-	import aermicioi.aedi_property_reader.core.inspector;
-	import aermicioi.aedi_property_reader.core.setter;
-	import aermicioi.aedi_property_reader.core.mapper;
+	import aermicioi.aedi_property_reader.convertor.inspector;
+	import aermicioi.aedi_property_reader.convertor.setter;
+	import aermicioi.aedi_property_reader.convertor.mapper;
 
 	struct Placeholder {
 		string s;

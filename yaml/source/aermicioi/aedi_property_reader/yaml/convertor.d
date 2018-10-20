@@ -29,8 +29,8 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.yaml.convertor;
 
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.yaml.accessor;
 import aermicioi.aedi_property_reader.yaml.yaml : accessor;
 import aermicioi.aedi_property_reader.yaml.inspector;
@@ -63,7 +63,14 @@ alias YamlConvertorBuilderFactory = (Convertor[] convertors) {
 	);
 };
 
+/**
+Convert yaml node to destination type using allocator
 
+Params:
+	node = yaml node which is converted
+	to = destination type and storage of yaml node
+	allocator = allocator used to allocate neccessary storage
+**/
 void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (!is(To == enum) && !isAggregateType!To && !isSomeChar!To) {
 
@@ -72,26 +79,44 @@ void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = 
 	to = (cast() node).as!To;
 }
 
+/**
+ditto
+**/
 void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (isSomeChar!Z && !is(To == enum)) {
 
-	enforce!InvalidCastException(node.isString, text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a string"));
+	enforce!InvalidCastException(
+		node.isString,
+		text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a string")
+	);
 
 	to = std.conv.to!To((cast() node).as!(string));
 }
 
+/**
+ditto
+**/
 void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (isSomeChar!To && !is(To == enum)) {
 
-	enforce!InvalidCastException(node.isString, text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a string"));
+	enforce!InvalidCastException(
+		node.isString,
+		text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a string")
+	);
 
 	to = (cast() node).as!string.to!char;
 }
 
+/**
+ditto
+**/
 void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (!isSomeString!To && !is(To == enum)) {
 
-	enforce!InvalidCastException(node.isSequence, text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a sequence"));
+	enforce!InvalidCastException(
+		node.isSequence,
+		text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a sequence")
+	);
 
 	auto sequence = (cast() node).sequence;
 	to = allocator.makeArray!Z(sequence.length);
@@ -101,7 +126,11 @@ void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator all
 	}
 }
 
-void convert(To : Z[K], From : Node, Z, K)(in From node, ref To to, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
+/**
+ditto
+**/
+void convert(To : Z[K], From : Node, Z, K)(in From node, ref To to, RCIAllocator allocator = theAllocator)
+	if (!is(To == enum)) {
 
 	enforce(node.isMapping, text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a map"));
 
@@ -118,6 +147,9 @@ void convert(To : Z[K], From : Node, Z, K)(in From node, ref To to, RCIAllocator
 	}
 }
 
+/**
+ditto
+**/
 void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (is(To == enum)) {
 
@@ -127,12 +159,22 @@ void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = 
 	temp.destruct(allocator);
 }
 
+/**
+Destroy component constructed out of yaml element.
+
+Params:
+	to = component about to be destroyed
+	allocator = allocator used originally to create component
+**/
 void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
 	destroy(to);
 
 	to = To.init;
 }
 
+/**
+ditto
+**/
 void destruct(To: Z[], Z)(ref To to, RCIAllocator allocator = theAllocator)
 	if (!isSomeString!To) {
 	allocator.dispose(to);
@@ -141,7 +183,7 @@ void destruct(To: Z[], Z)(ref To to, RCIAllocator allocator = theAllocator)
 }
 
 private string dumper(Node node) {
-	import dyaml.stream;
+	import dyaml.stream : YMemoryStream;
 	YMemoryStream stream = new YMemoryStream;
 
 	Dumper dumper = Dumper(stream);

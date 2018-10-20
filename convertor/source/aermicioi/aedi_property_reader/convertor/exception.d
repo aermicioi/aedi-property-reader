@@ -27,8 +27,11 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.exception;
+module aermicioi.aedi_property_reader.convertor.exception;
 
+/**
+Exception thrown when a problem related to conversion appeared.
+**/
 class ConvertorException : Exception {
     /**
      * Creates a new instance of Exception. The next parameter is used
@@ -36,22 +39,35 @@ class ConvertorException : Exception {
      * This constructor does not automatically throw the newly-created
      * Exception; the $(D throw) statement should be used for that purpose.
      */
-    @nogc @safe pure nothrow this(string msg = "", string file = __FILE__, size_t line = __LINE__, Throwable next = null)
-    {
+    @nogc @safe pure nothrow this(
+        string msg = "",
+        string file = __FILE__,
+        size_t line = __LINE__,
+        Throwable next = null
+    ) {
         super(msg, file, line, next);
     }
 
+    /**
+    ditto
+    **/
     @nogc @safe pure nothrow this(string msg, Throwable next, string file = __FILE__, size_t line = __LINE__)
     {
         super(msg, file, line, next);
     }
 
+    /**
+    ditto
+    **/
     @nogc @safe pure nothrow this(Throwable next, string msg = "", string file = __FILE__, size_t line = __LINE__)
     {
         super(msg, file, line, next);
     }
 }
 
+/**
+Exception thrown when passed argument is of wrong type.
+**/
 class InvalidArgumentException : Exception {
     /**
      * Creates a new instance of Exception. The next parameter is used
@@ -59,16 +75,26 @@ class InvalidArgumentException : Exception {
      * This constructor does not automatically throw the newly-created
      * Exception; the $(D throw) statement should be used for that purpose.
      */
-    @nogc @safe pure nothrow this(string msg = "", string file = __FILE__, size_t line = __LINE__, Throwable next = null)
-    {
+    @nogc @safe pure nothrow this(
+        string msg = "",
+        string file = __FILE__,
+        size_t line = __LINE__,
+        Throwable next = null
+    ) {
         super(msg, file, line, next);
     }
 
+    /**
+    ditto
+    **/
     @nogc @safe pure nothrow this(string msg, Throwable next, string file = __FILE__, size_t line = __LINE__)
     {
         super(msg, file, line, next);
     }
 
+    /**
+    ditto
+    **/
     @nogc @safe pure nothrow this(Throwable next, string msg = "", string file = __FILE__, size_t line = __LINE__)
     {
         super(msg, file, line, next);

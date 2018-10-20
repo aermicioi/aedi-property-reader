@@ -27,10 +27,52 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.traits;
+module aermicioi.aedi_property_reader.convertor.traits;
 
 import std.traits;
 import std.conv;
+
+/**
+Tests if field is property getter.
+**/
+template isPropertyGetter(alias func) {
+    bool isPropertyGetter() {
+        static foreach (overload; __traits(getOverloads, func)) {
+
+            if (
+                (variadicFunctionStyle!overload == Variadic.no) &&
+                (arity!overload == 0) && (functionAttributes!overload & FunctionAttribute.property)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+/**
+Tests if field is property setter
+**/
+template isPropertyPropertySetter(alias Type, string member) {
+    static foreach (overload; __traits(getOverloads, Type, member)) {
+        static if (!is(found) && isPropertyPropertySetter!overload) {
+            enum found = true;
+            enum isPropertyPropertySetter = found;
+        }
+    }
+
+    static if (!is(found) && isPropertyPropertySetter!overload) {
+        enum isPropertyPropertySetter = false;
+    }
+
+}
+
+/**
+ditto
+**/
+enum isPropertyPropertySetter(alias func) = (variadicFunctionStyle!func == Variadic.no) &&
+    (arity!func == 1) && (functionAttributes!func & FunctionAttribute.property);
 
 template match(alias predicate, Types...) {
 
@@ -47,6 +89,9 @@ template match(alias predicate, Types...) {
     }
 }
 
+/**
+Well, it's a nothrow wrapper usable for logger to allow logging in nothrow functions.
+**/
 void n(T)(lazy T value) nothrow {
     try {
         value();

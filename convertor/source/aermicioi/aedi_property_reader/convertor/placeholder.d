@@ -27,10 +27,10 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.placeholder;
+module aermicioi.aedi_property_reader.convertor.placeholder;
 
 import aermicioi.aedi : Wrapper;
-import aermicioi.aedi_property_reader.core.traits : n;
+import aermicioi.aedi_property_reader.convertor.traits : n;
 import std.experimental.allocator;
 import std.conv;
 
@@ -201,7 +201,7 @@ Returns:
     T if it is rooted in Object, or Placeholder!T if it is not.
 **/
 auto unwrap(T)(inout(Object) object) @trusted nothrow pure {
-    import aermicioi.aedi_property_reader.core.traits : n;
+    import aermicioi.aedi_property_reader.convertor.traits : n;
     static if (is(T : Object)) {
 
         return cast(T) object;
@@ -209,7 +209,13 @@ auto unwrap(T)(inout(Object) object) @trusted nothrow pure {
 
         auto wrapper = (cast(Placeholder!T) object);
 
-        assert(wrapper !is null, text(object.classinfo, " does not implement ", typeid(Placeholder!T), " ", typeid(T), " content cannot be extracted")).n;
+        assert(
+            wrapper !is null,
+            text(
+                object.classinfo, " does not implement ", typeid(Placeholder!T),
+                " ", typeid(T), " content cannot be extracted"
+            )
+        ).n;
 
         return wrapper;
     }

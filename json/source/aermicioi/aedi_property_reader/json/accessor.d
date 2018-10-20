@@ -29,7 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.json.accessor;
 
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi.exception.not_found_exception : NotFoundException;
 import std.json;
 import std.exception;
@@ -155,7 +155,8 @@ class JsonIndexAccessor : PropertyAccessor!JSONValue {
             import std.string : isNumeric;
             import std.conv : to;
 
-            return (component.type == JSON_TYPE.ARRAY) && property.isNumeric && (component.array.length > property.to!size_t);
+            return (component.type == JSON_TYPE.ARRAY) &&
+                property.isNumeric && (component.array.length > property.to!size_t);
         } catch (Exception e) {
 
             debug(trace) error("Failed to check indexed property ", property, " existence in json ", component).n;

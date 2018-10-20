@@ -32,14 +32,16 @@ module aermicioi.aedi_property_reader.sdlang.sdlang;
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.sdlang.accessor;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.sdlang.convertor;
-import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.core;
+import aermicioi.aedi_property_reader.convertor.std_conv;
 import aermicioi.aedi_property_reader.sdlang.type_guesser;
 import sdlanguage = sdlang;
+import sdlang.ast : Tag, Attribute;
 import sdlang.token : DateTimeFrac, DateTimeFracUnknownZone;
 import core.time : Duration;
 import std.datetime : Date, SysTime;
@@ -55,7 +57,14 @@ alias SdlangDocumentContainer = AdvisedDocumentContainer!(
         int, long,
         float, double, real,
         Date, DateTimeFrac, SysTime, DateTimeFracUnknownZone, Duration,
-        ubyte[])
+        ubyte[]),
+    WithConvertorSources!(
+        Tag,
+        Attribute
+    ),
+    WithConvertors!(
+        StdConvStringPrebuiltConvertorsFactory
+    )
 );
 
 /**
@@ -69,7 +78,12 @@ Params:
 Returns:
     JsonConvertorContainer
 **/
-auto sdlang(SdlangElement value, PropertyAccessor!SdlangElement accessor, TypeGuesser!SdlangElement guesser, RCIAllocator allocator = theAllocator) {
+auto sdlang(
+    SdlangElement value,
+    PropertyAccessor!SdlangElement accessor,
+    TypeGuesser!SdlangElement guesser,
+    RCIAllocator allocator = theAllocator
+) {
 
     SdlangDocumentContainer container = new SdlangDocumentContainer(value);
     container.guesser = guesser;
@@ -99,7 +113,7 @@ auto sdlang(SdlangElement value, RCIAllocator allocator = theAllocator) {
 ditto
 **/
 auto sdlang(RCIAllocator allocator = theAllocator) {
-    import sdlang.ast;
+    import sdlang.ast : Tag;
 
     return SdlangElement(new Tag()).sdlang(allocator);
 }
@@ -114,7 +128,7 @@ Returns:
     SdlangConvertorContainer
 **/
 auto sdlang(string pathOrData, bool returnEmpty = true) {
-    import std.file;
+    import std.file : exists;
 
     try {
 
@@ -135,21 +149,29 @@ auto sdlang(string pathOrData, bool returnEmpty = true) {
             return sdlang();
         }
 
-        throw new Exception("Could not create sdlang convertor container from file or content passed in pathOrData: " ~ pathOrData, e);
+        throw new Exception(
+            "Could not create sdlang convertor container from file or content passed in pathOrData: " ~ pathOrData, e
+        );
     }
 }
 
 package auto accessor() {
     return dsl(
         new AggregatePropertyAccessor!SdlangElement(
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangAttributePropertyAccessor)(new SdlangAttributePropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangTagPropertyAccessor)(new SdlangTagPropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangIntegerIndexAccessor)(new SdlangIntegerIndexAccessor)
+            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangAttributePropertyAccessor)
+                (new SdlangAttributePropertyAccessor),
+            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangTagPropertyAccessor)
+                (new SdlangTagPropertyAccessor),
+            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangIntegerIndexAccessor)
+                (new SdlangIntegerIndexAccessor)
         ),
         new AggregatePropertyAccessor!SdlangElement(
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangAttributePropertyAccessor)(new SdlangAttributePropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangTagPropertyAccessor)(new SdlangTagPropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangIntegerIndexAccessor)(new SdlangIntegerIndexAccessor)
+            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangAttributePropertyAccessor)
+                (new SdlangAttributePropertyAccessor),
+            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangTagPropertyAccessor)
+                (new SdlangTagPropertyAccessor),
+            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangIntegerIndexAccessor)
+                (new SdlangIntegerIndexAccessor)
         )
     );
 }

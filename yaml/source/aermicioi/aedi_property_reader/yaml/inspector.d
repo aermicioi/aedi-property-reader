@@ -29,7 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.yaml.inspector;
 
-import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.convertor.inspector;
 import dyaml;
 import std.algorithm;
 import std.range;

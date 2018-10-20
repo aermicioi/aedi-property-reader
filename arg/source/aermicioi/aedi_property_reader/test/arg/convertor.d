@@ -38,7 +38,7 @@ unittest {
         no
     }
 
-    string[] args = [
+    immutable string[] args = [
         "command",
         "--integer=29192",
         "--double=1.0"	,
@@ -80,7 +80,7 @@ unittest {
     ["", "--assoc-array=test=t", "--assoc-array=pest=p"].convert!(string[string])(as);
     ["", "--array=second one", "--array=third one"].convert!(string[])(sd);
 
-    assert(i == 29192);
+    assert(i == 29_192);
     assert(d == 1.0);
     assert(b == true);
     assert(c == Colorful.yes);

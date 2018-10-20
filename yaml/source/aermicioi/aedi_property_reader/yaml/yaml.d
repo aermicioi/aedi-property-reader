@@ -31,14 +31,15 @@ module aermicioi.aedi_property_reader.yaml.yaml;
 
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.yaml.accessor;
 import aermicioi.aedi_property_reader.yaml.convertor;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.yaml.type_guesser;
 import aermicioi.aedi_property_reader.core.core;
+import aermicioi.aedi_property_reader.convertor.std_conv;
 import dyaml;
 import std.datetime : SysTime;
 import std.experimental.logger;
@@ -55,7 +56,10 @@ alias YamlDocumentContainer = AdvisedDocumentContainer!(
         bool,
         string,
         SysTime
-)
+    ),
+    WithConvertors!(
+        StdConvStringPrebuiltConvertorsFactory
+    )
 );
 
 /**
@@ -112,7 +116,7 @@ Returns:
     yamlConvertorContainer
 **/
 auto yaml(string pathOrData, bool returnEmpty = true) {
-    import std.file;
+    import std.file : exists;
 
     try {
 
@@ -129,12 +133,14 @@ auto yaml(string pathOrData, bool returnEmpty = true) {
             return yaml();
         }
 
-        throw new Exception("Could not create yaml convertor container from file or content passed in pathOrData: " ~ pathOrData, e);
+        throw new Exception(
+            "Could not create yaml convertor container from file or content passed in pathOrData: " ~ pathOrData, e
+        );
     }
 }
 
 package auto accessor() {
-    import aermicioi.aedi_property_reader.core.accessor;
+    import aermicioi.aedi_property_reader.convertor.accessor : dsl;
 
     return dsl(
         new YamlNodePropertyAccessor(),

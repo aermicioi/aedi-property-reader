@@ -37,13 +37,22 @@ import std.conv;
 import std.getopt;
 import std.range;
 import std.experimental.allocator;
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.arg.accessor;
-import aermicioi.aedi_property_reader.core.setter;
-import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.convertor.setter;
+import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.arg.inspector;
 
+/**
+Convert a list of command line arguments to a value.
+
+Params:
+    from = list of command line arguments used to convert
+    to = target type and storage of converted arguments.
+Throws:
+    GetOptException
+**/
 void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
     if (isScalarType!To) {
     string[] args = cast(string[]) from;
@@ -55,6 +64,9 @@ void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator a
     }
 }
 
+/**
+ditto
+**/
 void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
     if (isSomeString!To) {
     import std.conv : conv = to;
@@ -71,6 +83,9 @@ void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator a
     }
 }
 
+/**
+ditto
+**/
 void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
     if (!isSomeString!To && isArray!To) {
     string[] args = cast(string[]) from;
@@ -80,6 +95,9 @@ void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator a
     getopt(args, identity, &to);
 }
 
+/**
+ditto
+**/
 void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
     if (isAssociativeArray!To) {
     string[] args = cast(string[]) from;
@@ -89,16 +107,28 @@ void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator a
     getopt(args, identity, &to);
 }
 
+/**
+Destroy data that is allocated using command line convertor
+
+Params:
+    to = constructed type with convert that needs to be destroyed.
+**/
 void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     destroy(to);
     to = To.init;
 }
 
 public {
-    enum ArgumentAccessorFactory(From : const(string)[]) = () => new RuntimeFieldAccessor!(const(string)[])(new ArgumentAccessor);
-    enum ArgumentInspectorFactory(From : const(string)[]) = () => new ArgumentInspector;
+    enum ArgumentAccessorFactory(From : const(string)[]) =
+        () => new RuntimeFieldAccessor!(const(string)[])(new ArgumentAccessor);
+
+    enum ArgumentInspectorFactory(From : const(string)[]) =
+        () => new ArgumentInspector;
 }
 
+/**
+Default convertor factory for command line arguments usable by configuration api.
+**/
 alias ArgumentAdvisedConvertorFactory = (Convertor[] convertors) {
     return factoryAnyConvertorBuilder(
         new CallbackConvertorBuilder!(convert, destruct),

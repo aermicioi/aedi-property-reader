@@ -31,10 +31,12 @@ module aermicioi.aedi_property_reader.arg.arg;
 
 import aermicioi.aedi_property_reader.arg.accessor;
 import aermicioi.aedi_property_reader.arg.convertor;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor : DefaultConvertibleTypes;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.core.core;
+import aermicioi.aedi_property_reader.convertor.std_conv;
 import aermicioi.aedi_property_reader.arg.arg;
 import std.experimental.allocator;
 
@@ -42,28 +44,42 @@ alias ArgumentAdvisedDocumentContainer = AdvisedDocumentContainer!(
 	const(string)[],
 	const(string)[],
 	WithConvertorBuilder!ArgumentAdvisedConvertorFactory,
-	WithConvertorsFor!DefaultConvertibleTypes
+	WithConvertorsFor!DefaultConvertibleTypes,
+	WithConvertors!(
+        StdConvStringPrebuiltConvertorsFactory
+    )
 );
 
-auto argument() {
-	import core.runtime;
+/**
+Create container for application arguments passed on command line
 
-	return Runtime.args.argument;
+Params:
+	args = list of console arguments
+	accessor = accessor that knows how to extract a field out of command line arguments
+	guesser = type guesser for fields that no information on type is available
+	allocator = optional allocator used to convert data to D types when possible.
+
+Returns:
+	DocumentType!(string[], string)
+**/
+auto argument(
+	string[] args,
+	PropertyAccessor!(const(string)[]) accessor,
+	TypeGuesser!(const(string)[]) guesser,
+	RCIAllocator allocator
+) {
+	ArgumentAdvisedDocumentContainer container = new ArgumentAdvisedDocumentContainer(args);
+
+	container.accessor = accessor;
+	container.guesser = guesser;
+	container.allocator = allocator;
+
+	return container;
 }
 
-auto argument(string[] args) {
-	return args.argument(
-		new ArgumentAccessor
-	);
-}
-
-auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor) {
-	return args.argument(
-		accessor,
-		new StdConvTypeGuesser!(const(string)[]),
-	);
-}
-
+/**
+ditto
+**/
 auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor, TypeGuesser!(const(string)[]) guesser) {
 	return args.argument(
 		accessor,
@@ -72,12 +88,30 @@ auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor, TypeGu
 	);
 }
 
-auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor, TypeGuesser!(const(string)[]) guesser, RCIAllocator allocator) {
-	ArgumentAdvisedDocumentContainer container = new ArgumentAdvisedDocumentContainer(args);
+/**
+ditto
+**/
+auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor) {
+	return args.argument(
+		accessor,
+		new StdConvTypeGuesser!(const(string)[]),
+	);
+}
 
-	container.accessor = accessor;
-	container.guesser = guesser;
-	container.allocator = allocator;
+/**
+ditto
+**/
+auto argument(string[] args) {
+	return args.argument(
+		new ArgumentAccessor
+	);
+}
 
-	return container;
+/**
+ditto
+**/
+auto argument() {
+	import core.runtime : Runtime;
+
+	return Runtime.args.argument;
 }

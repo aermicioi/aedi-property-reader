@@ -1,15 +1,14 @@
 {
-	"name": "core",
+	"name": "convertor",
 	"authors": [
 		"Alexandru Ermicioi"
 	],
-	"description": "Core interfaces and components for aedi property reader",
+	"description": "Convertors from various data formats, to d types",
 	"copyright": "Copyright © 2017, Alexandru Ermicioi",
 	"license": "BSL-1.0",
 	"dependencies": {
 		"aedi": "~>1.0.0",
-		"taggedalgebraic": "~>0.10.9",
-		"aedi-property-reader:convertor": "*"
+		"taggedalgebraic": "~>0.10.9"
 	},
 	"configurations": [
 		{

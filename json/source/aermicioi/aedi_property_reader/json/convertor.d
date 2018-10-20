@@ -29,10 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.json.convertor;
 
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.setter;
-import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.convertor;
 import aermicioi.aedi_property_reader.json.accessor;
 import aermicioi.aedi_property_reader.json.inspector;
 import aermicioi.aedi.factory;
@@ -47,10 +44,14 @@ import std.experimental.allocator;
 import std.exception : enforce;
 
 private {
-    enum JAccessor(From : JSONValue) = () => new RuntimeFieldAccessor!JSONValue(dsl(new JsonPropertyAccessor, new JsonIndexAccessor));
-    enum JInspector(From : JSONValue) = () => new JsonInspector;
-    enum CSetter(To) = () => new CompositeSetter!To();
-    enum CInspector(To) = () => new CompositeInspector!To();
+    enum JAccessor(From : JSONValue) =
+        () => new RuntimeFieldAccessor!JSONValue(dsl(new JsonPropertyAccessor, new JsonIndexAccessor));
+    enum JInspector(From : JSONValue) =
+        () => new JsonInspector;
+    enum CSetter(To) =
+        () => new CompositeSetter!To();
+    enum CInspector(To) =
+        () => new CompositeInspector!To();
 }
 
 alias JsonConvertorBuilderFactory = (Convertor[] convertors) {
@@ -80,7 +81,9 @@ void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allo
     if (isFloatingPoint!To && !is(To == enum)) {
 
     if (json.type != JSON_TYPE.FLOAT) {
-        throw new InvalidCastException("Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To);
+        throw new InvalidCastException(
+            "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
+        );
     }
 
     value = json.floating.to!To;
@@ -102,7 +105,9 @@ void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allo
         return;
     }
 
-    throw new InvalidCastException("Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To);
+    throw new InvalidCastException(
+        "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
+    );
 }
 
 /**
@@ -117,7 +122,9 @@ void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allo
     }
 
     if (json.type != JSON_TYPE.UINTEGER) {
-        throw new InvalidCastException("Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To);
+        throw new InvalidCastException(
+            "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
+        );
     }
 
     value = json.uinteger.to!To;
@@ -139,7 +146,10 @@ ditto
 **/
 void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (isSomeChar!To && !is(To == enum)) {
-    enforce!InvalidCastException(json.type == JSON_TYPE.STRING, text("Could not convert json ", json, " value to type ", fullyQualifiedName!To));
+    enforce!InvalidCastException(
+        json.type == JSON_TYPE.STRING,
+        text("Could not convert json ", json, " value to type ", fullyQualifiedName!To)
+    );
 
     value = json.str.to!To;
 }
@@ -151,7 +161,9 @@ void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allo
     if (isSomeString!To && !is(To == enum)) {
 
     if (json.type != JSON_TYPE.STRING) {
-        throw new InvalidCastException("Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To);
+        throw new InvalidCastException(
+            "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
+        );
     }
 
     value = json.str.to!To;
@@ -164,7 +176,9 @@ void convert(To : Z[], From : JSONValue, Z)(in From json, ref To value, RCIAlloc
     if (!isSomeString!To && !is(To == enum)) {
 
     if (json.type != JSON_TYPE.ARRAY) {
-        throw new InvalidCastException("Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To);
+        throw new InvalidCastException(
+            "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
+        );
     }
 
     value = allocator.makeArray!Z(json.array.length);
@@ -177,10 +191,13 @@ void convert(To : Z[], From : JSONValue, Z)(in From json, ref To value, RCIAlloc
 /**
 ditto
 **/
-void convert(To : Z[string], From : JSONValue, Z)(in From json, ref To value, RCIAllocator allocator = theAllocator) if (!is(To == enum)) {
+void convert(To : Z[string], From : JSONValue, Z)(in From json, ref To value, RCIAllocator allocator = theAllocator)
+    if (!is(To == enum)) {
 
     if (json.type != JSON_TYPE.OBJECT) {
-        throw new InvalidCastException("Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To);
+        throw new InvalidCastException(
+            "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
+        );
     }
 
     auto jsonAssociativeArray = json.object;
@@ -196,7 +213,8 @@ void convert(To : Z[string], From : JSONValue, Z)(in From json, ref To value, RC
 /**
 ditto
 **/
-void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator) if (is(To == enum)) {
+void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
+    if (is(To == enum)) {
 
     string temp;
     json.convert!string(temp, allocator);
@@ -204,11 +222,20 @@ void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allo
 	temp.destruct(allocator);
 }
 
+/**
+Destroy a component allocated using json converting algorithms
+
+Params:
+    to = component to be destroyed
+**/
 void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
     destroy(to);
     to = to.init;
 }
 
+/**
+ditto
+**/
 void destruct(To : Z[], Z)(ref To to, RCIAllocator allocator = theAllocator)
     if (!isSomeString!To) {
     allocator.dispose(to);

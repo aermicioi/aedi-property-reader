@@ -27,49 +27,59 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.env.env;
+module aermicioi.aedi_property_reader.convertor.test.convertor;
 
 import aermicioi.aedi_property_reader.convertor.convertor;
-import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi_property_reader.core.type_guesser;
-import aermicioi.aedi_property_reader.core.core;
-import aermicioi.aedi_property_reader.core.document;
-import aermicioi.aedi_property_reader.convertor.std_conv;
-
-alias EnvironmentDocumentContainer = AdvisedDocumentContainer!(
-    string[string],
-    string,
-    WithConvertorBuilder!StdConvAdvisedConvertorBuilderFactory,
-	WithConvertorsFor!DefaultConvertibleTypes,
-    WithConvertors!(
-        StdConvStringPrebuiltConvertorsFactory
-    )
-);
+import aermicioi.aedi_property_reader.convertor.exception;
+import aermicioi.aedi_property_reader.convertor.placeholder;
+import std.conv;
+import std.experimental.allocator;
+import std.exception;
 
 /**
-Create environment variable container
-
-Params:
-    guesser = type guesser for unknown environment properties
-Returns:
-    DocumentContainer!(string[string], string)
+Dummy convertor usable for testing purposes
 **/
-auto env(TypeGuesser!string guesser) {
-    import std.process : environment;
-    import std.experimental.allocator : theAllocator;
-
-    EnvironmentDocumentContainer container = new EnvironmentDocumentContainer(environment.toAA);
-
-    container.guesser = guesser;
-    container.accessor = new AssociativeArrayAccessor!string;
-    container.allocator = theAllocator;
-
-    return container;
+void convert(in string from, ref size_t to, RCIAllocator allocator = theAllocator) {
+    to = from.to!size_t;
 }
 
 /**
-ditto
+Dummy destructor usable for testing purposes.
 **/
-auto env() {
-    return env(new StringToScalarConvTypeGuesser);
+void destruct(ref size_t to, RCIAllocator allocator = theAllocator) {
+    destroy(to);
+    to = size_t.init;
+}
+
+unittest {
+    auto convertor = new CallbackConvertor!(convert, destruct);
+    size_t v = 10;
+    string sv = "20";
+
+    assert(convertor.from is typeid(string));
+    assert(convertor.to is typeid(size_t));
+
+    assert(convertor.convertsFrom(typeid(string)));
+    assert(convertor.convertsTo(typeid(size_t)));
+
+    assert(convertor.convertsFrom(sv.placeholder));
+    assert(convertor.convertsTo(v.placeholder));
+
+    assert(convertor.convert(sv.placeholder, typeid(size_t)).unwrap!size_t == 20);
+    assertThrown!ConvertorException(convertor.convert(sv.placeholder, typeid(string)));
+    assertThrown!ConvertorException(convertor.convert(v.placeholder, typeid(size_t)));
+
+}
+
+unittest {
+    import taggedalgebraic : TaggedAlgebraic;
+    union U {
+        int i;
+        string b;
+    }
+
+    alias Algebraic = TaggedAlgebraic!U;
+
+    alias T = TaggedConvertor!Algebraic;
+
 }

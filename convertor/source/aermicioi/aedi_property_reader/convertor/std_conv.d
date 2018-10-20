@@ -27,15 +27,14 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.std_conv;
+module aermicioi.aedi_property_reader.convertor.std_conv;
 
 import std.conv : to;
 import std.experimental.allocator;
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.setter;
-import aermicioi.aedi_property_reader.core.inspector;
-import aermicioi.aedi_property_reader.core.core;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.setter;
+import aermicioi.aedi_property_reader.convertor.inspector;
 
 /**
 Convert from component to component using std.conv.to family of functions.

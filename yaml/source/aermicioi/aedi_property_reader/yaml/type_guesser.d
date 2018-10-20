@@ -32,10 +32,21 @@ module aermicioi.aedi_property_reader.yaml.type_guesser;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import dyaml;
 
+/**
+Type guesser for yaml elements
+**/
 class YamlTypeGuesser : TypeGuesser!Node {
 
     public {
 
+        /**
+        Guess type of yaml node
+
+        Params:
+            serialized = yaml node that is inspected
+        Returns:
+            TypeInfo of underlying yaml node data
+        **/
         TypeInfo guess(Node serialized) {
 
             if (serialized.isInt) {

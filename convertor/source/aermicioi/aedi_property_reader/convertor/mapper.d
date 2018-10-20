@@ -27,14 +27,14 @@ License:
 Authors:
     Alexandru Ermicioi
 **/
-module aermicioi.aedi_property_reader.core.mapper;
+module aermicioi.aedi_property_reader.convertor.mapper;
 
-import aermicioi.aedi_property_reader.core.exception;
-import aermicioi.aedi_property_reader.core.convertor;
-import aermicioi.aedi_property_reader.core.inspector;
-import aermicioi.aedi_property_reader.core.setter;
-import aermicioi.aedi_property_reader.core.accessor;
-import aermicioi.aedi_property_reader.core.placeholder;
+import aermicioi.aedi_property_reader.convertor.exception;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.inspector;
+import aermicioi.aedi_property_reader.convertor.setter;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import std.experimental.allocator;
 import std.experimental.logger;
 import std.exception;
@@ -378,27 +378,40 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
         **/
         void map(From from, ref To to, RCIAllocator allocator = theAllocator) const {
 
-            debug(trace) trace("Mapping ", this.fromInspector.properties(from), " of ", from.identify, " to ", to.identify);
+            debug(trace) trace(
+                "Mapping ",
+                this.fromInspector.properties(from),
+                " of ",
+                from.identify,
+                " to ",
+                to.identify
+            );
+
             foreach (property; this.fromInspector.properties(from)) {
 
                 debug(trace) trace("Migrating \"", property, "\" property ");
                 if (this.toInspector.has(to, property) || this.force) {
 
                     Object value = this.accessor.access(from, property);
-                    import std.stdio;
 
                     if (
-                        (this.fromInspector.typeOf(from, property) != this.toInspector.typeOf(to, property))
+                        this.fromInspector.typeOf(from, property) != this.toInspector.typeOf(to, property)
                     ) {
                         if (this.conversion) {
                             if (this.toInspector.typeOf(to, property) is typeid(void)) {
                                 if (this.skip) {
-                                    debug(trace) trace("Skipping migration of \"", property, "\" due to missing type information in destination component");
+                                    debug(trace) trace(
+                                        "Skipping migration of \"",
+                                        property,
+                                        "\" due to missing type information in destination component"
+                                    );
+
                                     continue;
                                 }
 
                                 throw new ConvertorException(text(
-                                        "Cannot identify type of \"", property, "\" in destination component, probably missing"
+                                        "Cannot identify type of \"", property,
+                                        "\" in destination component, probably missing"
                                 ));
                             }
 
@@ -415,18 +428,27 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                             );
 
                             enforce!ConvertorException(!compatible.empty, text(
-                                "Could not find convertor to convert \"", property, "\" from ", this.fromInspector.typeOf(from, property),
-                                " to ", this.toInspector.typeOf(to, property)
+                                "Could not find convertor to convert \"", property, "\" from ",
+                                this.fromInspector.typeOf(from, property), " to ", this.toInspector.typeOf(to, property)
                             ));
 
-                            debug(trace) trace("Found convertor for \"", property, "\" from ", this.fromInspector.typeOf(from, property), " to ", this.toInspector.typeOf(to, property));
+                            debug(trace) trace(
+                                "Found convertor for \"",
+                                property,
+                                "\" from ",
+                                this.fromInspector.typeOf(from, property),
+                                " to ",
+                                this.toInspector.typeOf(to, property)
+                            );
 
                             value = compatible.front.convert(value, this.toInspector.typeOf(to, property), allocator);
                         } else {
 
                             throw new InvalidArgumentException(text(
-                                "Invalid assignment \"", property, "\" has type of ", this.fromInspector.typeOf(from, property),
-                                " in from component while in to component it is ", this.toInspector.typeOf(to, property)
+                                "Invalid assignment \"", property, "\" has type of ",
+                                this.fromInspector.typeOf(from, property),
+                                " in from component while in to component it is ",
+                                this.toInspector.typeOf(to, property)
                             ));
                         }
                     }
@@ -442,7 +464,18 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                         debug(trace) trace("Migrated \"", property, "\" from ", from.identify, " to ", to.identify);
                     } catch (Exception e) {
 
-                        debug(trace) trace("Couldn't ", this.force ? "forcefully " : "", "set property \"", property, "\" to ", to.identify, " from ", from.identify, " due to ", e);
+                        debug(trace) trace(
+                            "Couldn't ",
+                            this.force ? "forcefully " : "",
+                            "set property \"",
+                            property,
+                            "\" to ",
+                            to.identify,
+                            " from ",
+                            from.identify,
+                            " due to ",
+                            e
+                        );
                     }
                 } else {
 
@@ -457,8 +490,8 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
 An implementation of convertor that is using a mapper to map from component to component.
 **/
 class CompositeConvertor(To, From) : CombinedConvertor {
-    import std.algorithm;
-    import std.array;
+    import std.algorithm : filter;
+    import std.array: array;
 
     private {
         Mapper!(To, From) mapper_;
@@ -656,13 +689,21 @@ class CompositeConvertor(To, From) : CombinedConvertor {
             Resulting converted component.
         **/
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const {
-            enforce!InvalidArgumentException(this.convertsFrom(from), text(
-                "Cannot convert ", from.identify, " to ", typeid(To), ", ", from.identify, " is not supported by ", typeid(this)
-            ));
+            enforce!InvalidArgumentException(
+                this.convertsFrom(from),
+                text(
+                    "Cannot convert ", from.identify, " to ", typeid(To),
+                    ", ", from.identify, " is not supported by ", typeid(this)
+                )
+            );
 
-            enforce!InvalidArgumentException(this.convertsTo(to), text(
-                "Cannot convert ", from.identify, " to ", typeid(To), ", ", to, " is not supported by ", typeid(this)
-            ));
+            enforce!InvalidArgumentException(
+                this.convertsTo(to),
+                text(
+                    "Cannot convert ", from.identify, " to ", typeid(To),
+                    ", ", to, " is not supported by ", typeid(this)
+                )
+            );
 
             static if (is(To : Object)) {
                 To placeholder = allocator.make!To;
@@ -988,13 +1029,23 @@ class RuntimeMapper : Mapper!(Object, Object) {
             auto fromInspectors = this.inspectors.filter!(inspector => inspector.typeOf(from) is from.identify);
             auto toInspectors = this.inspectors.filter!(inspector => inspector.typeOf(to) is to.identify);
 
-            enforce!InvalidArgumentException(!accessors.empty, text("No field accessor for ", from.identify, " has been provided, cannot map to ", to.identify));
-            enforce!InvalidArgumentException(!setters.empty, text("No field setter for ", to.identify, " has been provided, cannot map from ", from.identify));
-            enforce!InvalidArgumentException(!fromInspectors.empty, text("No inspector for ", from.identify, " has been provided, cannot map to ", to.identify));
-            enforce!InvalidArgumentException(!toInspectors.empty, text("No inspector for ", to.identify, " has been provided, cannot map from ", to.identify));
+            enforce!InvalidArgumentException(
+                !accessors.empty,
+                text("No field accessor for ", from.identify, " has been provided, cannot map to ", to.identify)
+            );
+            enforce!InvalidArgumentException(
+                !setters.empty,
+                text("No field setter for ", to.identify, " has been provided, cannot map from ", from.identify)
+            );
+            enforce!InvalidArgumentException(
+                !fromInspectors.empty,
+                text("No inspector for ", from.identify, " has been provided, cannot map to ", to.identify)
+            );
+            enforce!InvalidArgumentException(
+                !toInspectors.empty,
+                text("No inspector for ", to.identify, " has been provided, cannot map from ", to.identify)
+            );
 
-            import std.stdio;
-            writeln(to.identify);
             auto mapper = this.factory()(
                 accessors.front,
                 setters.front,

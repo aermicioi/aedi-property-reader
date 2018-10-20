@@ -32,15 +32,15 @@ module aermicioi.aedi_property_reader.json.json;
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.json.accessor;
-import aermicioi.aedi_property_reader.core.accessor;
+import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.json.convertor;
 import aermicioi.aedi_property_reader.json.inspector;
 import aermicioi.aedi_property_reader.json.type_guesser;
-import aermicioi.aedi_property_reader.core.convertor;
+import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.core.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
-import aermicioi.aedi_property_reader.core.std_conv;
+import aermicioi.aedi_property_reader.convertor.std_conv;
 import std.json;
 import std.experimental.allocator;
 import std.experimental.logger;
@@ -49,7 +49,10 @@ alias JsonDocumentContainer = AdvisedDocumentContainer!(
     JSONValue,
     JSONValue,
     WithConvertorBuilder!JsonConvertorBuilderFactory,
-	WithConvertorsFor!DefaultConvertibleTypes
+	WithConvertorsFor!DefaultConvertibleTypes,
+    WithConvertors!(
+        StdConvStringPrebuiltConvertorsFactory
+    )
 );
 
 /**
@@ -63,7 +66,12 @@ Params:
 Returns:
     JsonConvertorContainer
 **/
-auto json(JSONValue value, PropertyAccessor!JSONValue accessor, TypeGuesser!JSONValue guesser, RCIAllocator allocator = theAllocator) {
+auto json(
+    JSONValue value,
+    PropertyAccessor!JSONValue accessor,
+    TypeGuesser!JSONValue guesser,
+    RCIAllocator allocator = theAllocator
+) {
 
     JsonDocumentContainer container = new JsonDocumentContainer(value);
     container.guesser = guesser;
@@ -107,7 +115,7 @@ Returns:
     JsonConvertorContainer
 **/
 auto json(string pathOrData, bool returnEmpty = true) {
-    import std.file;
+    import std.file : exists, readText;
 
     debug(trace) trace("Loading json document from ", pathOrData);
     debug(trace) trace("Checking if ", pathOrData, " is a json file");

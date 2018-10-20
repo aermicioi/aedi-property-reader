@@ -29,7 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.sdlang.inspector;
 
-import aermicioi.aedi_property_reader.core.inspector;
+import aermicioi.aedi_property_reader.convertor.inspector;
 import sdlang;
 import sdlang.ast;
 import std.algorithm;
