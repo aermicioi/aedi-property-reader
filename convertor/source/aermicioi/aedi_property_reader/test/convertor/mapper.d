@@ -96,7 +96,7 @@ unittest {
     auto mapper = new CompositeMapper!(Placeholder, string[string]);
     mapper.conversion = false;
     mapper.setter = new CompositeSetter!Placeholder;
-    mapper.accessor = new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string, string));
+    mapper.accessor = new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string]));
     mapper.fromInspector = new AssociativeArrayInspector!string;
     mapper.toInspector = new CompositeInspector!Placeholder;
 
@@ -136,7 +136,7 @@ unittest {
 
     mapper.accessor =
         new RuntimeCompositeAccessor!(string[string], Object)
-            (new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string, string)));
+            (new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string])));
 
     mapper.fromInspector =
         new RuntimeInspector!(string[string])
@@ -206,7 +206,7 @@ unittest {
 
     mapper.accessors = cast(PropertyAccessor!Object[]) [
         new RuntimeCompositeAccessor!(string[string], Object)(new RuntimeFieldAccessor!(string[string], string)
-            (new AssociativeArrayAccessor!(string, string))),
+            (new AssociativeArrayAccessor!(string[string]))),
         new RuntimeCompositeAccessor!(Placeholder, Object)(new CompositeAccessor!Placeholder)
     ];
 

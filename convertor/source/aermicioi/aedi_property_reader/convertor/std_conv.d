@@ -63,7 +63,7 @@ void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
 }
 
 public {
-    enum AssociativeArrayAccessorFactory(T) = () => new AssociativeArrayAccessor!T;
+    enum AssociativeArrayAccessorFactory(T) = () => new AssociativeArrayAccessor!(T[]);
     enum AssociativeArrayInspectorFactory(T) = () => new AssociativeArrayInspector!T;
     enum AssociativeArraySetterFactory(T) = () => new AssociativeArraySetter!T;
 }

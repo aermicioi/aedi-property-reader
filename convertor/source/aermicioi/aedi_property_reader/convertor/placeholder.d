@@ -33,6 +33,7 @@ import aermicioi.aedi : Wrapper;
 import aermicioi.aedi_property_reader.convertor.traits : n;
 import std.experimental.allocator;
 import std.conv;
+import std.traits : Unqual;
 
 /**
 Interface for objects that are aware of a type and can provide it.
@@ -107,10 +108,11 @@ class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
         this.payload = value;
     }
 
-    /**
-    ditto
-    **/
     this(ref const T value) const {
+        this.payload = value;
+    }
+
+    this(ref immutable T value) immutable {
         this.payload = value;
     }
 
@@ -121,11 +123,12 @@ class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
         this(value);
     }
 
-    /**
-    ditto
-    **/
     this(const T value) const {
-        this(value);
+        this.payload = value;
+    }
+
+    this(immutable T value) immutable {
+        this.payload = value;
     }
 
     /**
@@ -149,7 +152,7 @@ class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
             Reference to stored value.
         **/
         ref T value(ref T value) nothrow @safe {
-            static if (!is(typeof(this.payload) == const)) {
+            static if (!is(T == const) && !is(T == immutable)) {
 
                 this.payload = value;
             }
@@ -180,11 +183,22 @@ Returns:
     Placeholder!T with value as content.
 **/
 auto placeholder(T)(auto ref T value, RCIAllocator allocator = theAllocator) @trusted {
-    static if (is(T : Object)) {
+    static if (is(T : Object) || is(T : const Object) || is(T : immutable Object)) {
         return value;
     } else {
-        return allocator.make!(PlaceholderImpl!T)(value);
+        import std.traits : QualifierOf;
+        alias WithStorageOfT = QualifierOf!T;
+
+        return allocator.make!(WithStorageOfT!(PlaceholderImpl!T))(value);
     }
+}
+
+/**
+ditto
+**/
+auto placeholderWithStorageClass(alias StorageType, T)(auto ref T value, RCIAllocator allocator = theAllocator) @trusted {
+
+    return placeholder!(StorageType!T)(cast(StorageType!T) value, allocator);
 }
 
 /**
@@ -202,7 +216,7 @@ Returns:
 **/
 auto unwrap(T)(inout(Object) object) @trusted nothrow pure {
     import aermicioi.aedi_property_reader.convertor.traits : n;
-    static if (is(T : Object)) {
+    static if (is(T : Object) || is(T : const Object) || is(T : immutable Object)) {
 
         return cast(T) object;
     } else {
@@ -235,7 +249,9 @@ Params:
 Returns:
     TypeInfo of stored type of object implements TypeAware, or classinfo of object itself.
 **/
-TypeInfo identify(T : Object)(in T object) @trusted nothrow @nogc pure {
+TypeInfo identify(T)(T object) @trusted nothrow @nogc pure
+    if (is(T : Object) || is(T : const Object) || is(T : immutable Object)) {
+
     if (object is null) {
         return typeid(null);
     }
@@ -258,8 +274,24 @@ Params:
 Returns:
     TypeInfo the type of component
 **/
-TypeInfo identify(T)(in T component) nothrow @nogc @safe
-    if (!is(T : Object)) {
+TypeInfo identify(T)(auto ref T component) nothrow @nogc @safe
+    if (!(is(T : Object) || is(T : const Object) || is(T : immutable Object))) {
+    import std.stdio;
 
     return typeid(component);
+}
+
+struct MutableStorage(T) {
+
+    T payload;
+
+    this(T payload) {
+        this.payload = payload;
+    }
+
+    alias payload this;
+}
+
+auto mutableStorage(T)(T payload) {
+    return MutableStorage!T(payload);
 }
