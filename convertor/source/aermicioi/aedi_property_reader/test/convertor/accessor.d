@@ -173,7 +173,6 @@ unittest {
 
 	Placeholder elems;
 	CompositeAccessor!Placeholder accessor = new CompositeAccessor!Placeholder;
-	accessor.allocator = theAllocator;
 
 	assert(accessor.has(elems, "getter"));
 	assert(accessor.has(elems, "foo"));
@@ -191,7 +190,6 @@ unittest {
 unittest {
 	const Placeholder elems;
 	CompositeAccessor!(const Placeholder) accessor = new CompositeAccessor!(const Placeholder);
-	accessor.allocator = theAllocator;
 
 	assert(accessor.has(elems, "getter"));
 	assert(accessor.has(elems, "foo"));
@@ -209,7 +207,6 @@ unittest {
 unittest {
 	immutable Placeholder elems;
 	CompositeAccessor!(immutable Placeholder) accessor = new CompositeAccessor!(immutable Placeholder);
-	accessor.allocator = theAllocator;
 
 	assert(accessor.has(elems, "getter"));
 	assert(accessor.has(elems, "foo"));

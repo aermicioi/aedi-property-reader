@@ -46,6 +46,7 @@ import std.variant;
 import std.traits;
 import std.meta;
 import std.experimental.logger;
+import std.experimental.allocator;
 
 /**
 Interface for objects that are able to get child component out of parent one.
@@ -63,13 +64,15 @@ interface PropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = s
 
      Params:
          component = a component which has some properties identified by property.
+         property = property of component that needs to be extracted, even by allocating some memory.
+         allocator = optional allocator used only for allocation of accessed components. It should not be used for other purposes whatsoever.
      Throws:
          NotFoundException in case when no requested property is available.
          InvalidArgumentException in case when passed arguments are somehow invalid for use.
      Returns:
          FieldType accessed property.
      **/
-    FieldType access(ComponentType component, in KeyType property) const;
+    FieldType access(ComponentType component, in KeyType property, RCIAllocator allocator = theAllocator) const;
 
     /**
      Check if requested property is present in component.
@@ -81,10 +84,11 @@ interface PropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = s
      Params:
          component = component which is supposed to have property
          property = speculated property that is to be tested if it is present in component
+         allocator = optional allocator used only for allocation of accessed/tested components. It should not be used for other purposes whatsoever.
      Returns:
          true if property is in component
      **/
-    bool has(in ComponentType component, in KeyType property) const nothrow;
+    bool has(ComponentType component, in KeyType property, RCIAllocator allocator = theAllocator) const nothrow;
 
     /**
      Identify the type of supported component.
@@ -173,18 +177,18 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
             }
         }
 
-    /**
-     Get a property out of component
+        /**
+        Get a property out of component
 
-     Params:
-         component = a component which has some properties identified by property.
-     Throws:
-         NotFoundException in case when no requested property is available.
-         InvalidArgumentException in case when passed arguments are somehow invalid for use.
-     Returns:
-         FieldType accessed property.
-     **/
-        FieldType access(ComponentType component, in KeyType property) const {
+        Params:
+            component = a component which has some properties identified by property.
+        Throws:
+            NotFoundException in case when no requested property is available.
+            InvalidArgumentException in case when passed arguments are somehow invalid for use.
+        Returns:
+            FieldType accessed property.
+        **/
+        FieldType access(ComponentType component, in KeyType property, RCIAllocator allocator = theAllocator) const {
 
             foreach (accessor; this.accessors) {
 
@@ -198,20 +202,20 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
             throw new NotFoundException("Could not find element");
         }
 
-    /**
-     Check if requested property is present in component.
+        /**
+        Check if requested property is present in component.
 
-     Check if requested property is present in component.
-     The method could have allocation side effects due to the fact that
-     it is not restricted in calling access method of the accessor.
+        Check if requested property is present in component.
+        The method could have allocation side effects due to the fact that
+        it is not restricted in calling access method of the accessor.
 
-     Params:
-         component = component which is supposed to have property
-         property = speculated property that is to be tested if it is present in component
-     Returns:
-         true if property is in component
-     **/
-        bool has(in ComponentType component, in KeyType property) const nothrow {
+        Params:
+            component = component which is supposed to have property
+            property = speculated property that is to be tested if it is present in component
+        Returns:
+            true if property is in component
+        **/
+        bool has(ComponentType component, in KeyType property, RCIAllocator allocator = theAllocator) const nothrow {
 
             foreach (accessor; this.accessors) {
 
@@ -347,7 +351,7 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
         Returns:
             FieldType accessed property.
         **/
-        QualifierOfComponent!FieldType access(ComponentType component, in KeyType path) const {
+        QualifierOfComponent!FieldType access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
             import std.experimental.allocator : theAllocator, make;
 
             auto identities = path.splitter(this.separator);
@@ -391,14 +395,14 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
         Returns:
             true if property is in component
         **/
-        bool has(in ComponentType component, in KeyType path) const nothrow {
+        bool has(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const nothrow {
             import std.experimental.allocator : theAllocator, make;
 
             try {
 
                 auto identities = path.splitter(this.separator);
 
-                MutableStorage!(ComponentType)* current =  theAllocator.make!(MutableStorage!(ComponentType))(cast(QualifierOfComponent!ComponentType) component); // TODO evict this necessary evil.
+                MutableStorage!(ComponentType)* current =  theAllocator.make!(MutableStorage!(ComponentType))(component);
                 scope(exit) theAllocator.dispose(current);
 
                 foreach (identity; identities) {
@@ -606,7 +610,7 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
      Returns:
          FieldType accessed property.
      **/
-        FieldType access(ComponentType component, in KeyType path) const {
+        FieldType access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
             import std.experimental.allocator : make, theAllocator, dispose;
             enforce!NotFoundException(this.has(component, path), text("Property ", path, " not found in ", component));
 
@@ -653,7 +657,7 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
      Returns:
          true if property is in component
      **/
-        bool has(in ComponentType component, in KeyType path) const nothrow {
+        bool has(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const nothrow {
             import std.experimental.allocator : make, theAllocator, dispose;
 
             try {
@@ -672,7 +676,7 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
                     return false;
                 }
 
-                MutableStorage!FieldType* property = theAllocator.make!(MutableStorage!FieldType)(this.accessor.access(cast(ComponentType) component, splitted.front));
+                MutableStorage!FieldType* property = theAllocator.make!(MutableStorage!FieldType)(this.accessor.access(component, splitted.front));
                 scope(exit) theAllocator.dispose(property);
 
                 splitted.popFront;
@@ -823,7 +827,7 @@ class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType =
      Returns:
          FieldType accessed property.
      **/
-        FieldType access(ComponentType component, in KeyType path) const {
+        FieldType access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
             enforce!InvalidArgumentException(this.valid(path), text("Not found or malformed ticked property ", path));
 
             return this.accessor.access(component, path.drop(1).dropBack(1));
@@ -842,7 +846,7 @@ class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType =
      Returns:
          true if property is in component
      **/
-        bool has(in ComponentType component, in KeyType path) const {
+        bool has(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
 
             try {
 
@@ -958,18 +962,18 @@ class TaggedElementPropertyAccessorWrapper(
             }
         }
 
-    /**
-     Get a property out of component
+        /**
+        Get a property out of component
 
-     Params:
-         component = a component which has some properties identified by property.
-     Throws:
-         NotFoundException in case when no requested property is available.
-         InvalidArgumentException in case when passed arguments are somehow invalid for use.
-     Returns:
-         FieldType accessed property.
-     **/
-        Tagged access(Tagged component, in KeyType property) const
+        Params:
+            component = a component which has some properties identified by property.
+        Throws:
+            NotFoundException in case when no requested property is available.
+            InvalidArgumentException in case when passed arguments are somehow invalid for use.
+        Returns:
+            FieldType accessed property.
+        **/
+        Tagged access(Tagged component, in KeyType property, RCIAllocator allocator = theAllocator) const
         {
             if (this.has(component, property)) {
                 return Tagged(this.accessor.access(cast(X) component, property));
@@ -980,20 +984,20 @@ class TaggedElementPropertyAccessorWrapper(
             throw new NotFoundException(text(component.kind, " does not have ", property));
         }
 
-    /**
-     Check if requested property is present in component.
+        /**
+        Check if requested property is present in component.
 
-     Check if requested property is present in component.
-     The method could have allocation side effects due to the fact that
-     it is not restricted in calling access method of the accessor.
+        Check if requested property is present in component.
+        The method could have allocation side effects due to the fact that
+        it is not restricted in calling access method of the accessor.
 
-     Params:
-         component = component which is supposed to have property
-         property = speculated property that is to be tested if it is present in component
-     Returns:
-         true if property is in component
-     **/
-        bool has(in Tagged component, in KeyType property) const nothrow {
+        Params:
+            component = component which is supposed to have property
+            property = speculated property that is to be tested if it is present in component
+        Returns:
+            true if property is in component
+        **/
+        bool has(Tagged component, in KeyType property, RCIAllocator allocator = theAllocator) const nothrow {
             try {
 
                 import std.meta : staticMap;
@@ -1002,7 +1006,7 @@ class TaggedElementPropertyAccessorWrapper(
                     static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
                         if (mixin("component.Kind." ~ e ~ " == component.kind")) {
 
-                            return this.accessor.has(cast(const(X)) component, property);
+                            return this.accessor.has(cast(X) component, property);
                         }
 
                         return false;
@@ -1081,7 +1085,7 @@ class AssociativeArrayAccessor(ComponentType : Type[Key], Type, Key) : PropertyA
         Returns:
             FieldType accessed property.
         **/
-        Type access(ComponentType component, in Key property) const {
+        Type access(ComponentType component, in Key property, RCIAllocator allocator = theAllocator) const {
             auto peek = property in component;
             enforce!NotFoundException(peek, text("Could not find ", property, " in associative array ", component));
 
@@ -1101,7 +1105,7 @@ class AssociativeArrayAccessor(ComponentType : Type[Key], Type, Key) : PropertyA
         Returns:
             true if property is in component
         **/
-        bool has(in ComponentType component, in Key property) const nothrow {
+        bool has(ComponentType component, in Key property, RCIAllocator allocator = theAllocator) const nothrow {
             return (property in component) !is null;
         }
 
@@ -1144,7 +1148,7 @@ class ArrayAccessor(ComponentType : Type[], Type) : PropertyAccessor!(ComponentT
         Returns:
             FieldType accessed property.
         **/
-        Type access(ComponentType component, in size_t property) const {
+        Type access(ComponentType component, in size_t property, RCIAllocator allocator = theAllocator) const {
             enforce!NotFoundException(
                 this.has(component, property),
                 text("Could not find property ", property, " in array ", component)
@@ -1166,7 +1170,7 @@ class ArrayAccessor(ComponentType : Type[], Type) : PropertyAccessor!(ComponentT
         Returns:
             true if property is in component
         **/
-        bool has(in ComponentType component, in size_t property) const nothrow {
+        bool has(ComponentType component, in size_t property, RCIAllocator allocator = theAllocator) const nothrow {
             return property < component.length;
         }
 
@@ -1237,7 +1241,7 @@ class VariantAccessor(
             Returns:
                 FieldType accessed property.
             **/
-            FieldType access(ComponentType component, KType key) const {
+            FieldType access(ComponentType component, KType key, RCIAllocator allocator = theAllocator) const {
                 return this.access(component, Unqual!KeyType(key));
             }
 
@@ -1254,7 +1258,7 @@ class VariantAccessor(
             Returns:
                 true if property is in component
             **/
-            bool has(ComponentType component, KType key) const nothrow {
+            bool has(ComponentType component, KType key, RCIAllocator allocator = theAllocator) const nothrow {
                 return this.has(component, Unqual!KeyType(key));
             }
         }
@@ -1270,7 +1274,7 @@ class VariantAccessor(
         Returns:
             FieldType accessed property.
         **/
-        FieldType access(ComponentType component, in KeyType key) const {
+        FieldType access(ComponentType component, in KeyType key, RCIAllocator allocator = theAllocator) const {
             static foreach (Component; ComponentTypes) {{
                 static if (
                     is(Component : X[W], X, W) &&
@@ -1317,7 +1321,7 @@ class VariantAccessor(
         Returns:
             true if property is in component
         **/
-        bool has(in ComponentType component, in KeyType key) const nothrow {
+        bool has(ComponentType component, in KeyType key, RCIAllocator allocator = theAllocator) const nothrow {
             try {
                 static foreach (Component; ComponentTypes) {{
                     static if (
@@ -1444,7 +1448,7 @@ template RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyT
             Returns:
                 FieldType accessed property.
             **/
-            FieldType access(WithComponentStorageClass!Object component, in KeyType path) const {
+            FieldType access(WithComponentStorageClass!Object component, in KeyType path, RCIAllocator allocator = theAllocator) const {
                 enforce!InvalidArgumentException(
                     this.isValidComponent(component),
                     text("Invalid component passed ", component.identify, " when expected ", typeid(ComponentType))
@@ -1468,7 +1472,7 @@ template RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyT
             Returns:
                 true if property is in component
             **/
-            bool has(in Object component, in KeyType path) const nothrow {
+            bool has(WithComponentStorageClass!Object component, in KeyType path, RCIAllocator allocator = theAllocator) const nothrow {
 
                 return this.isValidComponent(component) &&
                     this.accessor.has(component.unwrap!ComponentType, path);
@@ -1500,7 +1504,7 @@ template RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyT
         }
 
         private {
-            bool isValidComponent(in Object component) const nothrow {
+            bool isValidComponent(WithComponentStorageClass!Object component) const nothrow {
                 static if (is(ComponentType : Object) || is(ComponentType : const Object) || is(ComponentType : immutable Object)) {
                     return (component.identify is typeid(Unqual!ComponentType));
                 } else {
@@ -1526,9 +1530,8 @@ template RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType 
     private alias WithStorageOfFieldType = QualifierOf!FieldType;
 
     class RuntimeFieldAccessor :
-        AllocatingPropertyAccessor!(ComponentType, WithStorageOfFieldType!Object, KeyType) {
+        PropertyAccessor!(ComponentType, WithStorageOfFieldType!Object, KeyType) {
         import aermicioi.aedi_property_reader.convertor.placeholder : identify, unwrap;
-        mixin AllocatorAwareMixin!(typeof(this));
 
         private {
             PropertyAccessor!(ComponentType, FieldType, KeyType) accessor_;
@@ -1543,7 +1546,6 @@ template RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType 
                 accessor = accessor used to access fields out of component that are to be type erased on return.
             **/
             this(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) {
-                this.allocator = theAllocator;
                 this.accessor = accessor;
             }
 
@@ -1583,11 +1585,11 @@ template RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType 
             Returns:
                 FieldType accessed property.
             **/
-            WithStorageOfFieldType!Object access(ComponentType component, in KeyType path) const {
+            WithStorageOfFieldType!Object access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
                 import aermicioi.aedi_property_reader.convertor.placeholder : placeholder;
                 enforce!NotFoundException(this.has(component, path), text("Could not find property ", path));
 
-                return this.accessor.access(component, path).placeholder(cast() this.allocator);
+                return this.accessor.access(component, path).placeholder(cast() allocator);
             }
 
             /**
@@ -1603,7 +1605,7 @@ template RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType 
             Returns:
                 true if property is in component
             **/
-            bool has(in ComponentType component, in KeyType path) const nothrow {
+            bool has(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const nothrow {
 
                 return this.accessor.has(component, path);
             }
@@ -1657,23 +1659,13 @@ template CompositeAccessor(Type) {
         }
     }
 
-    class CompositeAccessor : AllocatingPropertyAccessor!(Type, WithStorageClassOfType!Object, string) {
+    class CompositeAccessor : PropertyAccessor!(Type, WithStorageClassOfType!Object, string) {
         import std.traits;
         import std.meta;
         import aermicioi.util.traits;
         import aermicioi.aedi_property_reader.convertor.convertor;
 
-        mixin AllocatorAwareMixin!(typeof(this));
-
         public {
-            /**
-            Default constructor for composite accessor.
-            **/
-            this() {
-                import std.experimental.allocator : theAllocator;
-
-                this.allocator = theAllocator;
-            }
 
             /**
             Get a property out of component
@@ -1686,7 +1678,7 @@ template CompositeAccessor(Type) {
             Returns:
                 FieldType accessed property.
             **/
-            WithStorageClassOfType!Object access(Type component, in string property) const {
+            WithStorageClassOfType!Object access(Type component, in string property, RCIAllocator allocator = theAllocator) const {
                 foreach (string member; __traits(allMembers, Type)) {
 
                     static if (isPublic!(component, member)) {
@@ -1694,7 +1686,7 @@ template CompositeAccessor(Type) {
                             static if (isField!(Type, member)) {
 
                                 return (__traits(getMember, component, member))
-                                    .placeholderWithStorageClass!WithStorageClassOfType(cast() this.allocator);
+                                    .placeholderWithStorageClass!WithStorageClassOfType(cast() allocator);
                             } else static if(isSomeFunction!(__traits(getMember, component, member))) {
 
                                 static foreach(overload; __traits(getOverloads, Type, member)) {
@@ -1707,7 +1699,7 @@ template CompositeAccessor(Type) {
                                     ) {
 
                                         return (__traits(getMember, component, member))
-                                            .placeholderWithStorageClass!WithStorageClassOfType(cast() this.allocator);
+                                            .placeholderWithStorageClass!WithStorageClassOfType(cast() allocator);
                                     }
                                 }
                             }
@@ -1731,7 +1723,7 @@ template CompositeAccessor(Type) {
             Returns:
                 true if property is in component
             **/
-            bool has(in Type component, in string property) const nothrow {
+            bool has(Type component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
 
                 foreach (string member; __traits(allMembers, Type)) {
 
@@ -1885,7 +1877,7 @@ class KeyConvertingAccessor
         Returns:
             FieldType accessed property.
         **/
-        FieldType access(ComponentType component, in InputKeyType property) const {
+        FieldType access(ComponentType component, in InputKeyType property, RCIAllocator allocator = theAllocator) const {
             auto wrapped = (cast() property).placeholder;
             Object key = convertor.convert(wrapped, typeid(ConvertedKeyType));
             scope(exit) (cast() convertor).destruct(key); // TODO find a proper way to retain constness while extracting type info from methods
@@ -1906,7 +1898,7 @@ class KeyConvertingAccessor
         Returns:
             true if property is in component
         **/
-        bool has(in ComponentType component, in InputKeyType property) const nothrow {
+        bool has(ComponentType component, in InputKeyType property, RCIAllocator allocator = theAllocator) const nothrow {
             try {
                 Object key = convertor.convert((cast() property).placeholder, typeid(ConvertedKeyType)); // TODO find a proper way to retain constness while extracting type info from methods
                 scope(exit) convertor.destruct(key);
