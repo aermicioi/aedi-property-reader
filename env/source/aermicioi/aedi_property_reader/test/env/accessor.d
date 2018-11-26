@@ -40,7 +40,7 @@ unittest {
 		"moo": "moomoo"
 	];
 
-	AssociativeArrayAccessor!string accessor = new AssociativeArrayAccessor!string;
+	AssociativeArrayAccessor!(string[string]) accessor = new AssociativeArrayAccessor!(string[string]);
 
 	assert(accessor.has(elems, "foo"));
 	assert(accessor.has(elems, "moo"));

@@ -37,6 +37,7 @@ import std.exception;
 import std.algorithm;
 import std.array;
 import std.experimental.logger;
+import std.experimental.allocator;
 import aermicioi.aedi_property_reader.core.traits : n;
 
 private union XmlElementUnion {
@@ -62,7 +63,7 @@ class XmlElementPropertyAccessor : PropertyAccessor!Element {
      Returns:
          FieldType accessed property.
      **/
-    Element access(Element component, in string property) const {
+    Element access(Element component, in string property, RCIAllocator allocator = theAllocator) const {
 
         if (this.has(component, property)) {
             return component.elements.find!(e => e.tag.name == property).front;
@@ -84,7 +85,7 @@ class XmlElementPropertyAccessor : PropertyAccessor!Element {
      Returns:
          true if property is in component
      **/
-    bool has(in Element component, string property) const nothrow {
+    bool has(in Element component, string property, RCIAllocator allocator = theAllocator) const nothrow {
         return (component !is null) && component.elements.canFind!(e => e.tag.name == property);
     }
 
@@ -124,7 +125,7 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
      Returns:
          FieldType accessed property.
      **/
-    Element access(Element component, in string property) const {
+    Element access(Element component, in string property, RCIAllocator allocator = theAllocator) const {
 
         if (this.has(component, property)) {
             import std.conv : to;
@@ -148,7 +149,7 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
      Returns:
          true if property is in component
      **/
-    bool has(in Element component, string property) const nothrow {
+    bool has(in Element component, string property, RCIAllocator allocator = theAllocator) const nothrow {
         try {
             import std.string : isNumeric;
             import std.conv : to;
@@ -197,7 +198,7 @@ class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
      Returns:
          FieldType accessed property.
      **/
-    string access(Element component, in string property) const {
+    string access(Element component, in string property, RCIAllocator allocator = theAllocator) const {
 
         if (this.has(component, property)) {
             return component.tag.attr[property];
@@ -219,7 +220,7 @@ class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
      Returns:
          true if property is in component
      **/
-    bool has(in Element component, in string property) const nothrow {
+    bool has(in Element component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
         return (component !is null) && ((property in component.tag.attr) !is null);
     }
 

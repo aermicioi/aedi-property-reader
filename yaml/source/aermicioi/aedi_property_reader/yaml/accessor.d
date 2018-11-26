@@ -34,6 +34,7 @@ import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi.exception.not_found_exception : NotFoundException;
 import std.exception;
 import std.experimental.logger;
+import std.experimental.allocator;
 import aermicioi.aedi_property_reader.core.traits : n;
 
 /**
@@ -52,7 +53,7 @@ class YamlNodePropertyAccessor : PropertyAccessor!(Node, Node) {
      Returns:
          FieldType accessed property.
      **/
-    Node access(Node component, in string property) const {
+    Node access(Node component, in string property, RCIAllocator allocator = theAllocator) const {
 
         if (this.has(component, property)) {
             return component[property];
@@ -74,7 +75,7 @@ class YamlNodePropertyAccessor : PropertyAccessor!(Node, Node) {
      Returns:
          true if property is in component
      **/
-    bool has(in Node component, in string property) const nothrow {
+    bool has(in Node component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
         try {
             return component.isMapping && component.containsKey(property);
         } catch (Exception e) {
@@ -121,7 +122,7 @@ class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
      Returns:
          FieldType accessed property.
      **/
-    Node access(Node component, in string property) const {
+    Node access(Node component, in string property, RCIAllocator allocator = theAllocator) const {
 
         if (this.has(component, property)) {
             import std.conv : to;
@@ -145,7 +146,7 @@ class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
      Returns:
          true if property is in component
      **/
-    bool has(in Node component, in string property) const nothrow {
+    bool has(in Node component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
         try {
             import std.string : isNumeric;
             import std.conv : to;

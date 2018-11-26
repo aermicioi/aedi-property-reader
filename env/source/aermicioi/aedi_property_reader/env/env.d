@@ -61,7 +61,7 @@ auto env(TypeGuesser!string guesser) {
     EnvironmentDocumentContainer container = new EnvironmentDocumentContainer(environment.toAA);
 
     container.guesser = guesser;
-    container.accessor = new AssociativeArrayAccessor!string;
+    container.accessor = new AssociativeArrayAccessor!(string[string]);
     container.allocator = theAllocator;
 
     return container;

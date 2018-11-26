@@ -109,23 +109,6 @@ interface PropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = s
 }
 
 /**
-Interface for accessor objects that are aware of an allocator and supposedly will use it
-to allocate memory for returned component.
-
-Interface for accessor objects that are aware of an allocator and supposedly will use it
-to allocate memory for returned component.
-ImplSpec:
-    The allocator in accessor is considered mutable even if the object is constant, therefore
-    it should be safe to access it from const methods. In case of immutable implementor the
-    behavior is undefined, and therefore it is advised to avoid such cases.
-**/
-interface AllocatingPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :
-    PropertyAccessor!(ComponentType, FieldType, KeyType),
-    AllocatorAware!() {
-
-}
-
-/**
 An accessor that queries stored accessors for component.
 **/
 class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyType = string) :

@@ -35,6 +35,7 @@ import aermicioi.aedi.exception.not_found_exception : NotFoundException;
 import taggedalgebraic : TaggedAlgebraic;
 import std.exception;
 import std.experimental.logger;
+import std.experimental.allocator;
 import aermicioi.aedi_property_reader.core.traits : n;
 
 private union SdlangElementUnion {
@@ -60,7 +61,7 @@ class SdlangTagPropertyAccessor : PropertyAccessor!(Tag, Tag) {
      Returns:
          FieldType accessed property.
      **/
-    Tag access(Tag component, in string property) const {
+    Tag access(Tag component, in string property, RCIAllocator allocator = theAllocator) const {
 
         if (property in component.tags) {
             return component.tags[property].front;
@@ -82,7 +83,7 @@ class SdlangTagPropertyAccessor : PropertyAccessor!(Tag, Tag) {
      Returns:
          true if property is in component
      **/
-    bool has(in Tag component, in string property) const nothrow {
+    bool has(in Tag component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
 
         try {
 
@@ -131,7 +132,7 @@ class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
      Returns:
          FieldType accessed property.
      **/
-    Tag access(Tag component, in string property) const {
+    Tag access(Tag component, in string property, RCIAllocator allocator = theAllocator) const {
 
         if (this.has(component, property)) {
             import std.conv : to;
@@ -157,7 +158,7 @@ class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
      Returns:
          true if property is in component
      **/
-    bool has(in Tag component, in string property) const nothrow {
+    bool has(in Tag component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
         try {
             import std.string : isNumeric;
             import std.conv : to;
@@ -208,7 +209,7 @@ class SdlangAttributePropertyAccessor : PropertyAccessor!(Tag, Attribute) {
      Returns:
          FieldType accessed property.
      **/
-    Attribute access(Tag component, in string property) const {
+    Attribute access(Tag component, in string property, RCIAllocator allocator = theAllocator) const {
 
         if (property in component.attributes) {
             return component.attributes[property].front;
@@ -232,7 +233,7 @@ class SdlangAttributePropertyAccessor : PropertyAccessor!(Tag, Attribute) {
      Returns:
          true if property is in component
      **/
-    bool has(in Tag component, in string property) const nothrow {
+    bool has(in Tag component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
         try {
 
             return (component !is null) && property in (cast(Tag) component).attributes;

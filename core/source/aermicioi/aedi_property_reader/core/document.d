@@ -54,7 +54,7 @@ that is accessable by a PropertyAccessor implementation. Components stored in
 document will be converted according to convertor associated to property
 path from document.
 **/
-class DocumentContainer(DocumentType, FieldType = DocumentType) :
+@safe class DocumentContainer(DocumentType, FieldType = DocumentType) :
     Container,
     Storage!(Convertor, string),
     AllocatorAware!(),
@@ -209,7 +209,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
 
         Sets up the internal state of container (Ex, for singleton container it will spawn all objects that locator contains).
         **/
-        Container instantiate() {
+        Container instantiate() @trusted {
             foreach (identity, convertor; this.convertors) {
                 if (this.accessor.has(this.document, identity)) {
                     this.get(identity);
@@ -225,7 +225,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
         Destruct all managed components. The method denotes the end of container lifetime, and therefore destruction of all managed components
         by it.
         **/
-        Container terminate() {
+        Container terminate() @trusted {
             foreach (identity, convertor; this.convertors) {
                 if (auto component = identity in this.components) {
                     convertor.destruct(*component, this.allocator);
@@ -247,7 +247,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
 		Returns:
 			Object element if it is available.
 		**/
-        Object get(string identity) {
+        Object get(string identity) @trusted {
             debug(trace) trace("Searching for \"", identity, '"');
 
             Object converted;
@@ -310,13 +310,13 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
     	Returns:
     		bool true if an element by key is present in Locator.
         **/
-        bool has(string identity) inout {
+        bool has(string identity) inout @trusted {
             if (identity in this.components) {
 
                 return true;
             }
 
-            return this.accessor.has(this.document, identity);
+            return this.accessor.has(cast(DocumentType) this.document, identity);
         }
 
         @property {
@@ -435,7 +435,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const {
+        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const @trusted {
             debug(trace) trace("Searching for convertor for ", from.identify, " to ", to);
 
             auto convertors = this.convertorsByType.byValue.filter!(
@@ -465,7 +465,7 @@ class DocumentContainer(DocumentType, FieldType = DocumentType) :
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
+        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const @trusted {
             auto destructors = this.convertors.byValue.filter!(convertor => convertor.convertsTo(converted));
 
             enforce!ConvertorException(

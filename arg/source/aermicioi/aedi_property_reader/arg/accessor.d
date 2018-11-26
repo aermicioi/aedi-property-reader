@@ -36,6 +36,7 @@ import std.array;
 import std.string;
 import std.conv;
 import std.range;
+import std.experimental.allocator;
 
 /**
 Accessor filtering a list of strings out of strings that are not containing a command line property
@@ -159,7 +160,7 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
      Returns:
          FieldType accessed property.
      **/
-    const(string)[] access(const(string)[] component, string property) const {
+    const(string)[] access(const(string)[] component, string property, RCIAllocator allocator = theAllocator) const {
         if (property.empty) {
             return component;
         }
@@ -180,7 +181,7 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
      Returns:
          true if property is in component
      **/
-    bool has(in const(string)[] component, string property) const nothrow {
+    bool has(in const(string)[] component, string property, RCIAllocator allocator = theAllocator) const nothrow {
 
         if (component.length > 1) {
 

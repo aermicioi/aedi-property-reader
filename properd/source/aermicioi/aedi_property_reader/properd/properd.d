@@ -137,5 +137,5 @@ auto properd(string pathOrData, bool returnEmpty = true) {
 private auto accessor() {
     import aermicioi.aedi_property_reader.convertor.accessor : AssociativeArrayAccessor;
 
-    return new AssociativeArrayAccessor!string;
+    return new AssociativeArrayAccessor!(string[string]);
 }

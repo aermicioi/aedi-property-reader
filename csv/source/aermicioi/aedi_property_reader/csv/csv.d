@@ -49,7 +49,7 @@ import aermicioi.aedi_property_reader.convertor.std_conv :
 
 public {
     enum CsvAccessorFactory(From : string[string]) =
-        () => new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!string);
+        () => new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string]));
     enum CsvSetterFactory(To : string[string]) =
         () => new RuntimeFieldSetter!(string[string], string)(new AssociativeArraySetter!string);
     enum CsvInspector(Type : string[string]) =
@@ -183,7 +183,7 @@ auto csv(string fileOrPath, bool returnEmpty = true) {
 
 private auto defaultAccessor() {
     return new KeyConvertingAccessor!(string[string][], string[string], string, size_t)(
-        new ArrayAccessor!(string[string]),
+        new ArrayAccessor!(string[string][]),
         new CallbackConvertor!(stdConvert!(size_t, const string), stdDestruct!(size_t))
     );
 }

@@ -47,7 +47,7 @@ unittest {
     ]);
 
     document.guesser = new StringToScalarConvTypeGuesser;
-    document.accessor = new AssociativeArrayAccessor!string;
+    document.accessor = new AssociativeArrayAccessor!(string[string]);
     document.allocator = theAllocator;
 
     document.set(builder.make!(long, string)(), "long");

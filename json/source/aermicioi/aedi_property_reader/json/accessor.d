@@ -34,6 +34,7 @@ import aermicioi.aedi.exception.not_found_exception : NotFoundException;
 import std.json;
 import std.exception;
 import std.conv : text;
+import std.experimental.allocator;
 import std.experimental.logger;
 import aermicioi.aedi_property_reader.core.traits : n;
 
@@ -53,7 +54,7 @@ class JsonPropertyAccessor : PropertyAccessor!JSONValue {
      Returns:
          FieldType accessed property.
      **/
-    JSONValue access(JSONValue component, in string property) const {
+    JSONValue access(JSONValue component, in string property, RCIAllocator allocator = theAllocator) const {
 
         if (this.has(component, property)) {
             return component.object[property];
@@ -75,7 +76,7 @@ class JsonPropertyAccessor : PropertyAccessor!JSONValue {
      Returns:
          true if property is in component
      **/
-    bool has(in JSONValue component, in string property) const nothrow {
+    bool has(in JSONValue component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
 
         try {
 
@@ -125,7 +126,7 @@ class JsonIndexAccessor : PropertyAccessor!JSONValue {
      Returns:
          FieldType accessed property.
      **/
-    JSONValue access(JSONValue component, in string property) const {
+    JSONValue access(JSONValue component, in string property, RCIAllocator allocator = theAllocator) const {
 
         if (this.has(component, property)) {
             import std.conv : to;
@@ -149,7 +150,7 @@ class JsonIndexAccessor : PropertyAccessor!JSONValue {
      Returns:
          true if property is in component
      **/
-    bool has(in JSONValue component, in string property) const nothrow {
+    bool has(in JSONValue component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
 
         try {
             import std.string : isNumeric;
