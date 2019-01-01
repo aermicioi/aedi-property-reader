@@ -80,8 +80,8 @@ unittest {
 	}
 
 	with (c.configure) {
-		property!Placeholder("0");
-		property!Placeholder("1");
+		register!Placeholder("0");
+		register!Placeholder("1");
     }
 
 	assert(c.locate!Placeholder("0") == Placeholder(1.0, 10, "One hundred"));

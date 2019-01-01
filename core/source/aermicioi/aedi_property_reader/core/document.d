@@ -393,7 +393,7 @@ path from document.
             true if it is able to convert from, or false otherwise.
         **/
         bool convertsFrom(TypeInfo from) @safe const nothrow pure  {
-            return this.convertorsById.byValue.canFind!(convertor => convertor.convertsFrom(from));
+            return this.convertor.convertsFrom(from);
         }
 
         /**
@@ -411,7 +411,7 @@ path from document.
             true if it is able to convert from, or false otherwise.
         **/
         bool convertsFrom(in Object from) @safe const nothrow pure  {
-            return this.convertorsById.byValue.canFind!(convertor => convertor.convertsFrom(from));
+            return this.convertor.convertsFrom(from);
         }
 
         /**
@@ -428,7 +428,7 @@ path from document.
             true if it is able to convert to, false otherwise.
         **/
         bool convertsTo(TypeInfo to) @safe const nothrow pure  {
-            return this.convertorsById.byValue.canFind!(convertor => convertor.convertsTo(to));
+            return this.convertor.convertsTo(to);
         }
 
         /**
@@ -447,7 +447,7 @@ path from document.
             true if it is able to convert to, false otherwise.
         **/
         bool convertsTo(in Object to) @safe const nothrow pure  {
-            return this.convertorsById.byValue.canFind!(convertor => convertor.convertsTo(to));
+            return this.convertor.convertsTo(to);
         }
 
         /**
