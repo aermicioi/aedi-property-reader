@@ -30,6 +30,7 @@ Authors:
 module aermicioi.aedi_property_reader.convertor;
 
 public import aermicioi.aedi_property_reader.convertor.convertor;
+public import aermicioi.aedi_property_reader.convertor.chaining_convertor;
 public import aermicioi.aedi_property_reader.convertor.std_conv;
 public import aermicioi.aedi_property_reader.convertor.mapper;
 public import aermicioi.aedi_property_reader.convertor.exception;

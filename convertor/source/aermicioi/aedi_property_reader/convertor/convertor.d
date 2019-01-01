@@ -47,10 +47,21 @@ import std.traits;
 import std.experimental.logger;
 import taggedalgebraic : TaggedAlgebraic;
 
-alias DefaultConvertibleTypes = AliasSeq!(
-	ubyte, byte, ushort, short, uint, int, ulong, long, float, double, real, char, wchar, dchar,
+alias ScalarConvertibleTypes = AliasSeq!(
+	ubyte, byte, ushort, short, uint, int, ulong, long, float, double, real, char, wchar, dchar
+);
+
+alias StringConvertibleTypes = AliasSeq!(
+    string, wstring, dstring
+);
+
+alias ScalarArrayConvertibleTypes = AliasSeq!(
 	ubyte[], byte[], ushort[], short[], uint[], int[], ulong[], long[], float[], double[], real[],
-    char[], wchar[], dchar[], string, wstring, dstring, string[]
+    char[], wchar[], dchar[], string[]
+);
+
+alias DefaultConvertibleTypes = AliasSeq!(
+    ScalarConvertibleTypes, StringConvertibleTypes, ScalarArrayConvertibleTypes
 );
 
 /**
@@ -350,7 +361,7 @@ Mixin that provides default implementation of equality comparison for convertors
 mixin template EqualMixin() {
 
     override bool opEquals(Object o) {
-        return super.opEquals(o) || this.opEquals(cast(Convertor) o);
+        return super.opEquals(o) || ((this.classinfo is o.classinfo) && this.opEquals(cast(Convertor) o));
     }
 
     bool opEquals(Convertor convertor) {
@@ -370,6 +381,7 @@ mixin template ToHashMixin() {
         size_t[8] buffer;
         buffer[0] = this.from.toHash;
         buffer[1] = this.to.toHash;
+        buffer[2] = this.classinfo.toHash;
 
         return cast(size_t) *(&digest!(MurmurHash3!128)(buffer[])[0]);
     }
@@ -382,8 +394,10 @@ mixin template ToStringMixin() {
 
     override string toString() {
         import std.conv : text;
+        import std.algorithm : until;
+        import std.range : retro;
         return text(
-            typeid(this),
+            typeid(this).name.retro.until('.').array.retro,
             " [", this.from, ", ", this.to, "]"
         );
     }
@@ -394,9 +408,17 @@ Default implementation of comparison between two or more convertors.
 **/
 mixin template OpCmpMixin() {
 
-    override int opCmp(Object o) {
+    override int opCmp(Object o) const {
 
-        return cast(int)cast(void*)this - cast(int)cast(void*)o;
+        auto result = cast(int)cast(void*)this - cast(int)cast(void*)o;
+
+        if (result == 0) {
+            result =
+                this.classinfo.name < o.classinfo.name ? -1 :
+                (this.classinfo.name > o.classinfo.name ? 1 : 0);
+        }
+
+        return result;
     }
 }
 
@@ -547,7 +569,7 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
 
 
             static if (is(Info.To : Object)) {
-                Info.To placeholder = make!(Info.To);
+                Info.To placeholder = allocator.make!(Info.To);
 
                 convertor(naked, placeholder, allocator);
             } else {
@@ -576,7 +598,10 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
         void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
             static if (is(Info.To : Object)) {
 
-                destructor(converted, allocator);
+                auto c = cast(Info.To) converted;
+                destructor(c, allocator);
+
+                converted = null;
             } else {
                 auto container = cast(Placeholder!(Info.To)) converted;
 
@@ -834,7 +859,7 @@ class CombinedConvertorImpl : CombinedConvertor {
         /**
         Default constructor for AggregateConvertor
         **/
-        this(Convertor[] convertors...) {
+        @safe this(Convertor[] convertors...) {
             this.convertors = convertors.dup;
         }
 
@@ -1205,7 +1230,7 @@ template CallbackConvertorBuilder(alias convertor, alias destructor) {
         }
 
         Convertor make(To, From)() {
-            static if (is(CallbackConvertor!(convertor!(To, From), destructor!To))) {
+            static if (isAble!(To, From)) {
 
                 return new CallbackConvertor!(convertor!(To, From), destructor!To);
             } else {
@@ -1220,11 +1245,11 @@ template CallbackConvertorBuilder(alias convertor, alias destructor) {
             }
         }
 
-        bool isAble(To, From)() {
-            return is(CallbackConvertor!(convertor!(To, From), destructor!To));
+        static bool isAble(To, From)() {
+            return maybeConvertor!(convertor, To, From).yes && maybeDestructor!(destructor, To).yes;
         }
 
-        string cause(To, From)() {
+        static string cause(To, From)() {
             alias ConvertorInfo = maybeConvertor!(convertor, To, From);
             alias DestructorInfo = maybeDestructor!(destructor, To);
             return text(

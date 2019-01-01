@@ -32,6 +32,7 @@ module aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.chaining_convertor;
 import aermicioi.aedi_property_reader.convertor.mapper;
 import aermicioi.aedi_property_reader.core.document :
 	DocumentContainerImpl = DocumentContainer,
@@ -68,9 +69,10 @@ struct DocumentContainerBuilder
 		container = to configure
 		builder = convertor builder used to create convertors for properties
 	**/
-	this(DocumentContainer container, ConvertorBuilder builder) {
+	this(DocumentContainer container, ConvertorBuilder builder, CombinedConvertor convertor) {
 		this.container = container;
 		this.builder = builder;
+		this.container.convertor = convertor;
 
 		static if (is(DocumentContainer : WithConvertorsFor!Types, Types...)) {
 			static foreach (Type; Types) {
@@ -79,10 +81,17 @@ struct DocumentContainerBuilder
 		}
 
 		static if (is(DocumentContainer : WithConvertors!ConvertorsFactory, alias ConvertorsFactory)) {
-			foreach (convertor; ConvertorsFactory()) {
-				this.register(convertor, convertor.to.toString);
+			foreach (prebuilt; ConvertorsFactory()) {
+				this.register(prebuilt, prebuilt.to.toString);
 			}
 		}
+	}
+
+	/**
+	ditto
+	**/
+	this(DocumentContainer container, ConvertorBuilder builder) {
+		this(container, builder, new CombinedConvertorImpl());
 	}
 
 	/**
@@ -184,6 +193,131 @@ struct DocumentContainerBuilder
 }
 
 /**
+Configuration context that is providing a nice api to add convertors into a container for a document.
+**/
+struct WithHelpDocumentContainerBuilder(BuilderType) {
+	import std.conv : text;
+	import std.typecons : Flag;
+
+	BuilderType builder;
+	boolean withDefaultHelpInfo;
+
+	/**
+	ditto
+	**/
+    alias builder this;
+
+	ref typeof(this) title(string title) {
+		this.builder.container.title = title;
+	}
+
+	/**
+	Associate a convertor to a field in document that has property path, to be used for conversion.
+
+	Params:
+		To = the type of destination component that convertor should yield
+		path = property path for a field in document.
+		description = the help information used to display help response
+	**/
+	ref typeof(this) register(To)(string path, string description) {
+		this.builder.register!To(path);
+
+		this.builder.container.add(path, description);
+		return this;
+	}
+
+	/**
+	ditto
+	**/
+    ref typeof(this) register(To)(string path) {
+		this.builder.register!To(path);
+
+		if (this.withDefaultHelpInfo) {
+
+			this.builder.container.add(path, text("A field of ", typeid(To), " type"));
+		}
+		return this;
+    }
+
+    ref typeof(this) register(To)() {
+
+        return this.register!(To, To);
+    }
+
+	/**
+	Associate a convertor to a type for an interface to be used by document when no specific convertor is provided for document field.
+
+	Params:
+		Iface = interface for which the convertor is bound to.
+		To = the type of destination component that convertor should yield
+		description = the description used for help panel.
+	**/
+	ref typeof(this) register(Iface, To : Iface)(string description) {
+		this.builder.register!(Iface, To);
+
+		this.builder.container.add(path, description);
+		return this;
+	}
+
+	/**
+	ditto
+	**/
+    ref typeof(this) register(Iface, To : Iface)() {
+        import std.traits : fullyQualifiedName;
+
+        return this.register!To(fullyQualifiedName!Iface);
+    }
+
+	/**
+	Register convertor for a property on path.
+
+	Params:
+		convertor = convertor used to convert value found on path
+		path = property path for which convertor could be used
+		description = the description used for help panel.
+
+	Returns:
+		typeof(this)
+	**/
+	ref typeof(this) register(Convertor convertor, string path, string description) {
+		this.builder.register(convertor, path);
+		this.builder.container.add(path, description);
+
+		return this;
+	}
+
+	/**
+	ditto
+	**/
+	ref typeof(this) register(Convertor convertor, string path) {
+		this.builder.register(convertor, path);
+
+		if (this.withDefaultHelpInfo) {
+			if (convertor.to !is typeid(void)) {
+				this.builder.container.add(path, text("A field of ", convert.to, " type"));
+			} else {
+				this.builder.container.add(path, null);
+			}
+		}
+
+		return this;
+	}
+
+	/**
+	ditto
+	**/
+	ref typeof(this) register(Convertor convertor) {
+		this.builder.register(convertor);
+
+		return this;
+	}
+
+    alias property = register;
+}
+
+
+
+/**
 Take a document container and create a configuration context for it.
 
 Params:
@@ -193,8 +327,8 @@ Params:
 Returns:
 	DocumentContainerBuilder(DocumentContainer, AdvisedConvertor, DocumentType, FieldType) a configuration context
 **/
-auto configure(DocumentContainer, ConvertorBuilder)(DocumentContainer container, ConvertorBuilder builder) {
-    return DocumentContainerBuilder!(DocumentContainer, ConvertorBuilder)(container, builder);
+auto configure(DocumentContainerType, ConvertorBuilderType)(DocumentContainerType container, ConvertorBuilderType builder) {
+    return DocumentContainerBuilder!(DocumentContainerType, ConvertorBuilderType)(container, builder);
 }
 
 /**

@@ -80,8 +80,6 @@ unittest {
 		enum "first"
 	});
 
-
-
 	int i, k;
 	ubyte u;
 	char ch;
@@ -115,4 +113,5 @@ unittest {
 	} catch (InvalidCastException e) {
 
 	}
+
 }

@@ -33,6 +33,9 @@ import aermicioi.aedi_property_reader;
 import aermicioi.aedi : container;
 import std.socket;
 
+public alias configure = aermicioi.aedi.configurer.register.context.configure;
+public alias configure = aermicioi.aedi_property_reader.core.core.configure;
+
 struct Component {
 	long first;
 	double second;

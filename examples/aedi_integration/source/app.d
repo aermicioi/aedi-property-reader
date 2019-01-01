@@ -36,6 +36,9 @@ import std.algorithm;
 import std.experimental.allocator;
 import std.conv;
 
+public alias configure = aermicioi.aedi.configurer.register.context.configure;
+public alias configure = aermicioi.aedi_property_reader.core.core.configure;
+
 @component
 class Car {
     @setter("car.color".lref)

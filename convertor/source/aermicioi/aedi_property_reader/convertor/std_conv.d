@@ -85,12 +85,20 @@ alias StdConvAdvisedConvertorBuilderFactory = (Convertor[] convertors = []) {
 };
 
 alias StdConvStringPrebuiltConvertorsFactory = () {
-    auto factory = new CallbackConvertorBuilder!(convert, destruct);
     Convertor[] convertors;
 
-    foreach (Type; DefaultConvertibleTypes) {
-        convertors ~= factory.make!(Type, string);
-        convertors ~= factory.make!(string, Type);
+    import std.meta;
+
+    static foreach (FromType; AliasSeq!(ScalarConvertibleTypes, StringConvertibleTypes)) {
+        static foreach (ToType; AliasSeq!(ScalarConvertibleTypes, StringConvertibleTypes)) {
+            convertors ~= new CallbackConvertor!(convert!(ToType, FromType), destruct!ToType)();
+        }
+    }
+
+    static foreach (FromType; AliasSeq!(StringConvertibleTypes, ScalarArrayConvertibleTypes)) {
+        static foreach (ToType; AliasSeq!(StringConvertibleTypes, ScalarArrayConvertibleTypes)) {
+            convertors ~= new CallbackConvertor!(convert!(ToType, FromType), destruct!ToType)();
+        }
     }
 
     return convertors;

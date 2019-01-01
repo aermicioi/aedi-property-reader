@@ -39,6 +39,7 @@ import std.conv;
 import std.traits;
 import std.meta;
 import std.exception;
+import std.experimental.allocator;
 
 /**
 Provides ability to set a property of FieldType into CompositeType.
@@ -55,7 +56,7 @@ interface PropertySetter(CompositeType, FieldType = CompositeType, KeyType = str
     Throws:
         InvalidArgumentException when value or composite is not what was expected
     **/
-    void set(ref CompositeType composite, FieldType value, KeyType property) const;
+    void set(ref CompositeType composite, FieldType value, KeyType property, RCIAllocator allocator = theAllocator) const;
 
     /**
      Identify the type of supported component.
@@ -110,7 +111,7 @@ class AssociativeArraySetter(Type, KeyType = Type) : PropertySetter!(Type[KeyTyp
         Throws:
             InvalidArgumentException when value or composite is not what was expected
         **/
-        void set(ref Type[KeyType] composite, Type field, KeyType key) const {
+        void set(ref Type[KeyType] composite, Type field, KeyType key, RCIAllocator allocator = theAllocator) const {
             composite[key] = field;
         }
 
@@ -150,7 +151,7 @@ class ArraySetter(Type) : PropertySetter!(Type[], Type, size_t) {
     Throws:
         InvalidArgumentException when value or composite is not what was expected
     **/
-    void set(ref Type[] composite, Type field, size_t key) const {
+    void set(ref Type[] composite, Type field, size_t key, RCIAllocator allocator = theAllocator) const {
         enforce!InvalidArgumentException(key < composite.length, text(
             "Cannot assign ",
             field,
@@ -201,7 +202,7 @@ class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, st
     Throws:
         InvalidArgumentException when value or composite is not what was expected
     **/
-    void set(T)(ref ComponentType component, T field, string property) const {
+    void set(T)(ref ComponentType component, T field, string property, RCIAllocator allocator = theAllocator) const {
         import std.experimental.allocator : theAllocator, dispose;
         auto wrapped = field.placeholder(theAllocator);
         this.set(component, wrapped, property);
@@ -214,7 +215,7 @@ class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, st
     /**
     ditto
     **/
-    void set(ref ComponentType component, Object field, string property) const {
+    void set(ref ComponentType component, Object field, string property, RCIAllocator allocator = theAllocator) const {
         static foreach (member; __traits(allMembers, ComponentType)) {{
             static if (isPublic!(ComponentType, member)) {
                 alias m = Alias!(__traits(getMember, component, member));
@@ -340,7 +341,7 @@ class RuntimeCompositeSetter(Type, FieldType = Type, KeyType = string) : Propert
         Throws:
             InvalidArgumentException when value or composite is not what was expected
         **/
-        void set(ref Object composite, FieldType field, KeyType key) const {
+        void set(ref Object composite, FieldType field, KeyType key, RCIAllocator allocator = theAllocator) const {
             auto placeholder = composite.unwrap!Type;
             this.setter.set(placeholder, field, key);
         }
@@ -426,7 +427,7 @@ class RuntimeFieldSetter(Type, FieldType = Type, KeyType = string) : PropertySet
         Throws:
             InvalidArgumentException when value or composite is not what was expected
         **/
-        void set(ref Type composite, Object field, KeyType key) const {
+        void set(ref Type composite, Object field, KeyType key, RCIAllocator allocator = theAllocator) const {
             this.setter.set(composite, field.unwrap!FieldType, key);
         }
 

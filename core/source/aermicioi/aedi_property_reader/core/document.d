@@ -43,6 +43,7 @@ import aermicioi.aedi_property_reader.core.type_guesser;
 import std.algorithm;
 import std.array;
 import std.experimental.logger;
+import std.traits : Unqual;
 
 /**
 An implementation of Container interface from aedi IoC providing access to
@@ -60,16 +61,15 @@ path from document.
     AllocatorAware!(),
     Convertor
 {
-
     mixin AllocatorAwareMixin!(typeof(this));
 
     private {
-        Convertor[string] convertors;
-        Convertor[Convertor] convertorsByType;
+        Convertor[string] convertorsById;
+        CombinedConvertor convertor_;
         PropertyAccessor!(DocumentType, FieldType) accessor_;
         TypeGuesser!FieldType guesser_;
 
-        DocumentType document_;
+        TypeWrapper document_;
         Object[string] components;
     }
 
@@ -83,9 +83,35 @@ path from document.
         **/
         this(DocumentType document) {
             this.document = document;
+            this.convertor = new CombinedConvertorImpl();
         }
 
         @property {
+
+            /**
+            Set convertor
+
+            Params:
+                convertor = combined convertor used in converting from type to another
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) convertor(CombinedConvertor convertor) @safe nothrow pure {
+                this.convertor_ = convertor;
+
+                return this;
+            }
+
+            /**
+            Get convertor
+
+            Returns:
+                CombinedConvertor
+            **/
+            inout(CombinedConvertor) convertor() @safe nothrow pure inout {
+                return this.convertor_;
+            }
 
             /**
             Set guesser
@@ -111,17 +137,18 @@ path from document.
             inout(TypeGuesser!FieldType) guesser() @safe nothrow pure inout {
                 return this.guesser_;
             }
+
             /**
             Set document
 
             Params:
-                document = document containing valuable components
+                document = document representing the root of configuration
 
             Returns:
                 typeof(this)
             **/
             typeof(this) document(DocumentType document) @safe nothrow {
-                this.document_ = document;
+                this.document_ = TypeWrapper(document);
 
                 return this;
             }
@@ -133,7 +160,7 @@ path from document.
                 DocumentType
             **/
             inout(DocumentType) document() @safe nothrow pure inout {
-                return this.document_;
+                return this.document_.payload;
             }
 
             /**
@@ -172,7 +199,7 @@ path from document.
 			Storage
 		**/
         typeof(this) set(Convertor element, string identity) {
-            this.convertors[identity] = element;
+            this.convertorsById[identity] = element;
             this.set(element);
 
             return this;
@@ -182,7 +209,7 @@ path from document.
         ditto
         **/
         typeof(this) set(Convertor convertor) {
-            this.convertorsByType[convertor] = convertor;
+            this.convertor.add(convertor);
 
             return this;
         }
@@ -199,7 +226,7 @@ path from document.
     		Storage
         **/
         typeof(this) remove(string identity) {
-            this.convertors.remove(identity);
+            this.convertorsById.remove(identity);
 
             return this;
         }
@@ -210,7 +237,7 @@ path from document.
         Sets up the internal state of container (Ex, for singleton container it will spawn all objects that locator contains).
         **/
         Container instantiate() @trusted {
-            foreach (identity, convertor; this.convertors) {
+            foreach (identity, convertor; this.convertorsById) {
                 if (this.accessor.has(this.document, identity)) {
                     this.get(identity);
                 }
@@ -226,7 +253,7 @@ path from document.
         by it.
         **/
         Container terminate() @trusted {
-            foreach (identity, convertor; this.convertors) {
+            foreach (identity, convertor; this.convertorsById) {
                 if (auto component = identity in this.components) {
                     convertor.destruct(*component, this.allocator);
                 }
@@ -274,7 +301,7 @@ path from document.
 
             debug(trace) trace("Searching for suitable convertor for \"", identity, "\" of ", typeid(FieldType));
 
-            if (auto convertor = identity in this.convertors) {
+            if (auto convertor = identity in this.convertorsById) {
                 if (convertor.to !is typeid(void)) {
                     debug(trace) trace(
                         "Found convertor for \"", identity, "\" commencing conversion to ", convertor.to
@@ -294,6 +321,7 @@ path from document.
 
                 TypeInfo guess = this.guesser.guess(document.value);
             }
+
             debug(trace) trace("Guessed ", guess, " type, commencing conversion");
             return this.convert(document, guess, this.allocator);
         }
@@ -316,7 +344,7 @@ path from document.
                 return true;
             }
 
-            return this.accessor.has(cast(DocumentType) this.document, identity);
+            return this.accessor.has((cast(TypeWrapper) this.document_).payload, identity);
         }
 
         @property {
@@ -365,7 +393,7 @@ path from document.
             true if it is able to convert from, or false otherwise.
         **/
         bool convertsFrom(TypeInfo from) @safe const nothrow pure  {
-            return this.convertors.byValue.canFind!(convertor => convertor.convertsFrom(from));
+            return this.convertorsById.byValue.canFind!(convertor => convertor.convertsFrom(from));
         }
 
         /**
@@ -383,7 +411,7 @@ path from document.
             true if it is able to convert from, or false otherwise.
         **/
         bool convertsFrom(in Object from) @safe const nothrow pure  {
-            return this.convertors.byValue.canFind!(convertor => convertor.convertsFrom(from));
+            return this.convertorsById.byValue.canFind!(convertor => convertor.convertsFrom(from));
         }
 
         /**
@@ -400,7 +428,7 @@ path from document.
             true if it is able to convert to, false otherwise.
         **/
         bool convertsTo(TypeInfo to) @safe const nothrow pure  {
-            return this.convertors.byValue.canFind!(convertor => convertor.convertsTo(to));
+            return this.convertorsById.byValue.canFind!(convertor => convertor.convertsTo(to));
         }
 
         /**
@@ -419,7 +447,7 @@ path from document.
             true if it is able to convert to, false otherwise.
         **/
         bool convertsTo(in Object to) @safe const nothrow pure  {
-            return this.convertors.byValue.canFind!(convertor => convertor.convertsTo(to));
+            return this.convertorsById.byValue.canFind!(convertor => convertor.convertsTo(to));
         }
 
         /**
@@ -436,20 +464,7 @@ path from document.
             Resulting converted component.
         **/
         Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const @trusted {
-            debug(trace) trace("Searching for convertor for ", from.identify, " to ", to);
-
-            auto convertors = this.convertorsByType.byValue.filter!(
-                c => c.convertsTo(to) && c.convertsFrom(from)
-            );
-
-            if (!convertors.empty) {
-                debug(trace) trace("Found convertor ", convertors.front.classinfo, " for ", from.identify, " to ", to);
-
-                return convertors.front.convert(from, to, allocator);
-            }
-
-            debug(trace) trace("No suitable convertor found for ", from.identify, " to ", to);
-            throw new ConvertorException(text("Could not convert ", from.identify, " to ", to));
+            return this.convertor.convert(from, to, allocator);
         }
 
         /**
@@ -466,7 +481,7 @@ path from document.
             allocator = allocator used to allocate converted component.
         **/
         void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const @trusted {
-            auto destructors = this.convertors.byValue.filter!(convertor => convertor.convertsTo(converted));
+            auto destructors = this.convertorsById.byValue.filter!(convertor => convertor.convertsTo(converted));
 
             enforce!ConvertorException(
                 !destructors.empty,
@@ -474,6 +489,16 @@ path from document.
             );
 
             destructors.front.destruct(converted, allocator);
+        }
+    }
+
+    private {
+        /**
+        A dirty hack used to evade tagged algebraic or any other
+        custom implementation of cast while stripping out constness/immutability of the payload in has method
+        **/
+        static struct TypeWrapper {
+            DocumentType payload;
         }
     }
 }
@@ -488,7 +513,7 @@ interface WithConvertorBuilder(alias ConvertorBuilderFactory) {
 }
 
 /**
-Marker interface that adds information of types to which document container should already have convertors.
+Marker interface that adds information of types to which document container should already have Convertors.
 **/
 interface WithConvertorsFor(ConvertibleTypes...) {
 
@@ -502,7 +527,7 @@ interface WithConvertorSources(SourceTypes...) {
 }
 
 /**
-Marker interface that adds prebuilt convertors into document container.
+Marker interface that adds prebuilt Convertors into document container.
 
 Params:
     ConvertorsFactory = a factory (no arg function) that will create a list of Convertors
@@ -512,7 +537,7 @@ interface WithConvertors(alias ConvertorsFactory) {
 }
 
 /**
-An implementation of document container that holds an advised convertor along the document for usage as default constructor for convertors
+An implementation of document container that holds an advised convertor along the document for usage as default constructor for convertorsById
 in configuration api.
 **/
 class AdvisedDocumentContainer(DocumentType, FieldType, Interfaces...) :

@@ -34,6 +34,9 @@ import aermicioi.aedi_property_reader;
 import vibe.vibe;
 import std.functional : toDelegate;
 
+public alias configure = aermicioi.aedi.configurer.register.context.configure;
+public alias configure = aermicioi.aedi_property_reader.core.core.configure;
+
 void showError(HTTPServerRequest req, HTTPServerResponse res, HTTPServerErrorInfo error)
 {
 	res.render!("error.dt", req, error);

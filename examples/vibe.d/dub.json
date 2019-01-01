@@ -5,6 +5,7 @@
 	],
 	"dependencies": {
 		"vibe-d": "~>0.8.0",
+		"vibe-d:tls": "~>0.8.0",
 		"aedi-property-reader": {
 			"path": "../../"
 		}
@@ -15,7 +16,10 @@
 	"dflags": [
 		"-J./source/views/"
 	],
-	"debugVersions": [
-		"trace"
+	"subConfigurations": {
+		"vibe-d:tls": "notls"
+	},
+	"versions": [
+		"VibeNoSSL"
 	]
 }

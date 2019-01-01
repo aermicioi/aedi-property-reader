@@ -483,6 +483,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                 }
             }
         }
+
     }
 }
 
@@ -737,6 +738,8 @@ class CompositeConvertor(To, From) : CombinedConvertor {
             allocator.dispose(converted);
             converted = Object.init;
         }
+
+        mixin EqualToHashToStringOpCmpMixin!();
     }
 }
 
