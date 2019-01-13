@@ -33,7 +33,7 @@ import std.traits;
 import std.meta;
 import std.exception;
 import std.conv;
-import aermicioi.util.traits : isPropertyGetter, isPropertySetter, isPublic, isField;
+import aermicioi.aedi.util.traits : isPropertyGetter, isPropertySetter, isPublic, isField;
 import aermicioi.aedi : NotFoundException;
 import aermicioi.aedi_property_reader.convertor.placeholder : unwrap, identify;
 import aermicioi.aedi_property_reader.convertor.traits : isD;
@@ -290,7 +290,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
         try {
 
             import std.meta : staticMap;
-            import aermicioi.util.traits.traits : identifier;
+            import aermicioi.aedi.util.traits.traits : identifier;
 
             static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
@@ -332,7 +332,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
         try {
 
             import std.meta : staticMap;
-            import aermicioi.util.traits.traits : identifier;
+            import aermicioi.aedi.util.traits.traits : identifier;
 
             static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
@@ -366,7 +366,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
         try {
 
             import std.meta : staticMap;
-            import aermicioi.util.traits.traits : identifier;
+            import aermicioi.aedi.util.traits.traits : identifier;
 
             static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
@@ -399,7 +399,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
         try {
 
             import std.meta : staticMap;
-            import aermicioi.util.traits.traits : identifier;
+            import aermicioi.aedi.util.traits.traits : identifier;
 
             static foreach (e; staticMap!(identifier, EnumMembers!(Tagged.Kind))) {
                 static if (mixin("is(typeof(Union." ~ e ~ ") : Type)")) {
@@ -619,7 +619,7 @@ class RuntimeInspector(Type, KeyType = string) : Inspector!(Object, KeyType) {
         Returns:
             TypeInfo guessed type
         **/
-        TypeInfo guess(Object serialized) {
+        TypeInfo guess(Object serialized) const {
             TypeInfo type = this.typeOf(serialized);
 
             if (type is typeid(void)) {

@@ -30,10 +30,10 @@ Authors:
 module aermicioi.aedi_property_reader.json.accessor;
 
 import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi.exception.not_found_exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import std.json;
 import std.exception;
-import std.conv : text;
+import std.conv : text, to;
 import std.experimental.allocator;
 import std.experimental.logger;
 import aermicioi.aedi_property_reader.core.traits : n;
@@ -60,7 +60,7 @@ class JsonPropertyAccessor : PropertyAccessor!JSONValue {
             return component.object[property];
         }
 
-        throw new NotFoundException(text("Json ", component, " doesn't have ", property));
+        throw new NotFoundException(text("${component} doesn't have ${identity}"), property, component.to!string);
     }
 
     /**
@@ -134,7 +134,7 @@ class JsonIndexAccessor : PropertyAccessor!JSONValue {
             return component.array[property.to!size_t];
         }
 
-        throw new NotFoundException(text("Json ", component, " doesn't have child on index ", property));
+        throw new NotFoundException(text("${component} doesn't have child on index ${identity}"), property.to!string, component.to!string);
     }
 
     /**

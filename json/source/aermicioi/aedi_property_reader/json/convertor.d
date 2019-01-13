@@ -36,7 +36,7 @@ import aermicioi.aedi.factory;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.storage.wrapper;
 import aermicioi.aedi.storage.decorator;
-import aermicioi.aedi.exception;
+import aermicioi.aedi_property_reader.convertor.exception;
 import std.json;
 import std.traits;
 import std.conv : to, text;
@@ -56,7 +56,7 @@ private {
 
 alias JsonConvertorBuilderFactory = (Convertor[] convertors) {
     return factoryAnyConvertorBuilder(
-        new CallbackConvertorBuilder!(convert, destruct),
+        new TypeGuessCallbackConvertorBuilder!(convert, destruct),
         new MappingConvertorBuilder!(
             JAccessor,
             CSetter,
@@ -79,12 +79,7 @@ Returns:
 **/
 void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (isFloatingPoint!To && !is(To == enum)) {
-
-    if (json.type != JSON_TYPE.FLOAT) {
-        throw new InvalidCastException(
-            "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
-        );
-    }
+    enforce(json.type == JSON_TYPE.FLOAT, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
 
     value = json.floating.to!To;
 }
@@ -105,9 +100,7 @@ void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allo
         return;
     }
 
-    throw new InvalidCastException(
-        "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
-    );
+    throw new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value));
 }
 
 /**
@@ -120,12 +113,7 @@ void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allo
         value = json.integer.to!To;
         return;
     }
-
-    if (json.type != JSON_TYPE.UINTEGER) {
-        throw new InvalidCastException(
-            "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
-        );
-    }
+    enforce(json.type == JSON_TYPE.UINTEGER, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
 
     value = json.uinteger.to!To;
 }
@@ -135,8 +123,7 @@ ditto
 **/
 void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (!isUnsigned!To && isIntegral!To && !is(To == enum)) {
-    enforce!InvalidCastException(json.type == JSON_TYPE.INTEGER,
-            text("Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To));
+    enforce(json.type == JSON_TYPE.INTEGER, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
 
     value = json.integer.to!To;
 }
@@ -146,10 +133,7 @@ ditto
 **/
 void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (isSomeChar!To && !is(To == enum)) {
-    enforce!InvalidCastException(
-        json.type == JSON_TYPE.STRING,
-        text("Could not convert json ", json, " value to type ", fullyQualifiedName!To)
-    );
+    enforce(json.type == JSON_TYPE.STRING, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
 
     value = json.str.to!To;
 }
@@ -159,12 +143,7 @@ ditto
 **/
 void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (isSomeString!To && !is(To == enum)) {
-
-    if (json.type != JSON_TYPE.STRING) {
-        throw new InvalidCastException(
-            "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
-        );
-    }
+    enforce(json.type == JSON_TYPE.STRING, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
 
     value = json.str.to!To;
 }
@@ -174,12 +153,7 @@ ditto
 **/
 void convert(To : Z[], From : JSONValue, Z)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (!isSomeString!To && !is(To == enum)) {
-
-    if (json.type != JSON_TYPE.ARRAY) {
-        throw new InvalidCastException(
-            "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
-        );
-    }
+    enforce(json.type == JSON_TYPE.ARRAY, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
 
     value = allocator.makeArray!Z(json.array.length);
 
@@ -193,12 +167,7 @@ ditto
 **/
 void convert(To : Z[string], From : JSONValue, Z)(in From json, ref To value, RCIAllocator allocator = theAllocator)
     if (!is(To == enum)) {
-
-    if (json.type != JSON_TYPE.OBJECT) {
-        throw new InvalidCastException(
-            "Could not convert json " ~ json.toString() ~ " value to type " ~ fullyQualifiedName!To
-        );
-    }
+    enforce(json.type == JSON_TYPE.OBJECT, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
 
     auto jsonAssociativeArray = json.object;
 

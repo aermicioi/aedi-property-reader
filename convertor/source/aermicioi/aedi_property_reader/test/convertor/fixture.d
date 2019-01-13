@@ -32,46 +32,6 @@ module aermicioi.aedi_property_reader.test.convertor.fixture;
 import aermicioi.aedi;
 import std.conv;
 
-class MockLocator : Locator!(string, string) {
-
-    private {
-        immutable static string[string] dummy;
-    }
-
-    public {
-
-        static this() {
-            dummy = [
-                "size_t": "192",
-                "string": "some test",
-                "array": "[10, 20, 20]",
-                "ubyte": "20"
-            ];
-        }
-
-        /**
-        Dummy get method
-        **/
-        string get(string identity) {
-            auto reference = identity in dummy;
-
-            if (reference is null) {
-                import aermicioi.aedi.exception.not_found_exception;
-                throw new NotFoundException("Dummy data not found in string storage");
-            }
-
-            return *reference;
-        }
-
-        /**
-        Dummy has method
-        **/
-        bool has(string identity) inout {
-            return (identity in dummy) !is null;
-        }
-    }
-}
-
 class ConvertorFactoryString(ToType, FromType : string = string) : ConvertorFactory!(FromType, ToType) {
     private {
         string convertible_;

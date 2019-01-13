@@ -30,10 +30,10 @@ Authors:
 module aermicioi.aedi_property_reader.convertor.accessor;
 
 import aermicioi.aedi.storage.allocator_aware;
-import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi.exception.invalid_cast_exception;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.exception : InvalidCastException;
 import aermicioi.aedi_property_reader.convertor.exception;
-import aermicioi.util.traits;
+import aermicioi.aedi.util.traits;
 import aermicioi.aedi_property_reader.convertor.traits : isD, n;
 import aermicioi.aedi_property_reader.convertor.placeholder;
 import taggedalgebraic;
@@ -181,8 +181,8 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
                 }
             }
 
-            import aermicioi.aedi.exception.not_found_exception : NotFoundException;
-            throw new NotFoundException("Could not find element");
+            import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+            throw new NotFoundException("Could not find element ${property} in ${component}", property.to!string, component.to!string);
         }
 
         /**
@@ -352,13 +352,8 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
                 } else {
 
                     throw new NotFoundException(text(
-                        "Could not find ",
-                        identity,
-                        " in ",
-                        typeid(component),
-                        " for property path of ",
-                        path
-                    ));
+                        "Could not find \"", identity, "\" in ${component} for property path of ${property}",
+                    ), path.to!string, component.to!string);
                 }
             }
 
@@ -595,7 +590,7 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
      **/
         FieldType access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
             import std.experimental.allocator : make, theAllocator, dispose;
-            enforce!NotFoundException(this.has(component, path), text("Property ", path, " not found in ", component));
+            enforce(this.has(component, path), new NotFoundException(text("Property ${property} not found in ${component}"), path.to!string, component.to!string));
 
             auto splitted = path.splitter(this.beggining);
             enforce!InvalidArgumentException(
@@ -962,9 +957,9 @@ class TaggedElementPropertyAccessorWrapper(
                 return Tagged(this.accessor.access(cast(X) component, property));
             }
 
-            import aermicioi.aedi.exception.not_found_exception : NotFoundException;
+            import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
             import std.conv : text;
-            throw new NotFoundException(text(component.kind, " does not have ", property));
+            throw new NotFoundException("${component} does not have ${property}", property.to!string, component.to!string);
         }
 
         /**
@@ -1070,7 +1065,7 @@ class AssociativeArrayAccessor(ComponentType : Type[Key], Type, Key) : PropertyA
         **/
         Type access(ComponentType component, in Key property, RCIAllocator allocator = theAllocator) const {
             auto peek = property in component;
-            enforce!NotFoundException(peek, text("Could not find ", property, " in associative array ", component));
+            enforce(peek, new NotFoundException("Could not find ${property} in associative array ${component}", property.to!string, component.to!string));
 
             return *peek;
         }
@@ -1132,9 +1127,9 @@ class ArrayAccessor(ComponentType : Type[], Type) : PropertyAccessor!(ComponentT
             FieldType accessed property.
         **/
         Type access(ComponentType component, in size_t property, RCIAllocator allocator = theAllocator) const {
-            enforce!NotFoundException(
+            enforce(
                 this.has(component, property),
-                text("Could not find property ", property, " in array ", component)
+                new NotFoundException("Could not find property ${property} in array ${component}", property.to!string, component.to!string)
             );
 
             return component[property];
@@ -1288,7 +1283,7 @@ class VariantAccessor(
                 }
             }}
 
-            throw new NotFoundException(text("Could not find ", key, " in ", component));
+            throw new NotFoundException("Could not find ${property} in ${component}", key.to!string, component.to!string);
         }
 
         /**
@@ -1437,7 +1432,7 @@ template RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyT
                     text("Invalid component passed ", component.identify, " when expected ", typeid(ComponentType))
                 );
 
-                enforce!NotFoundException(this.has(component, path), text("Could not find property ", path));
+                enforce(this.has(component, path), new NotFoundException("Could not find property ${property} in ${component}", path.to!string, component.to!string));
 
                 return this.accessor.access(component.unwrap!ComponentType, path);
             }
@@ -1570,7 +1565,7 @@ template RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType 
             **/
             WithStorageOfFieldType!Object access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
                 import aermicioi.aedi_property_reader.convertor.placeholder : placeholder;
-                enforce!NotFoundException(this.has(component, path), text("Could not find property ", path));
+                enforce(this.has(component, path), new NotFoundException("Could not find property ${property}in ${component}", path.to!string, component.to!string));
 
                 return this.accessor.access(component, path).placeholder(cast() allocator);
             }
@@ -1645,7 +1640,7 @@ template CompositeAccessor(Type) {
     class CompositeAccessor : PropertyAccessor!(Type, WithStorageClassOfType!Object, string) {
         import std.traits;
         import std.meta;
-        import aermicioi.util.traits;
+        import aermicioi.aedi.util.traits;
         import aermicioi.aedi_property_reader.convertor.convertor;
 
         public {
@@ -1690,7 +1685,7 @@ template CompositeAccessor(Type) {
                     }
                 }
 
-                throw new NotFoundException(text(typeid(Type), " does not have \"", property, "\" property"));
+                throw new NotFoundException("${component} does not have ${property} property", property.to!string,  component.to!string);
             }
 
             /**

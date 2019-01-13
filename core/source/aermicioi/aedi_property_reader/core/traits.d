@@ -32,30 +32,10 @@ module aermicioi.aedi_property_reader.core.traits;
 import std.traits;
 import std.conv;
 
-template match(alias predicate, Types...) {
-
-    static foreach (alias T; Types) {
-        static if (!is(typeof(found)) && predicate!T) {
-            enum found = true;
-            alias match = T;
-        }
-    }
-
-    static if (!is(typeof(found)) || !found) {
-
-        static assert(false, "No match found for passed template args");
-    }
-}
-
 void n(T)(lazy T value) nothrow {
     try {
         value();
     } catch (Exception e) {
 
     }
-}
-
-public {
-    enum isD(T, X) = is(T : X);
-
 }

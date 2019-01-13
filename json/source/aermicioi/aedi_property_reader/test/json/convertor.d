@@ -32,7 +32,7 @@ module aermicioi.aedi_property_reader.test.json.convertor;
 import std.process;
 import std.exception;
 import std.json;
-import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import aermicioi.aedi_property_reader.json.convertor;
 
 unittest {

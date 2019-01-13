@@ -31,8 +31,8 @@ module aermicioi.aedi_property_reader.test.yaml.convertor;
 
 import std.exception;
 import dyaml;
-import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi.exception.invalid_cast_exception;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.exception : InvalidCastException;
 import aermicioi.aedi_property_reader.yaml.convertor;
 
 unittest {

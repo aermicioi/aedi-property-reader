@@ -30,7 +30,7 @@ Authors:
 module aermicioi.aedi_property_reader.yaml.test.accessor;
 
 import aermicioi.aedi_property_reader.yaml.accessor;
-import aermicioi.aedi.exception.not_found_exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import dyaml;
 import std.exception;
 

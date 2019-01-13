@@ -31,11 +31,12 @@ module aermicioi.aedi_property_reader.xml.accessor;
 
 import std.xml;
 import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi.exception.not_found_exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import taggedalgebraic : TaggedAlgebraic;
 import std.exception;
 import std.algorithm;
 import std.array;
+import std.conv : to;
 import std.experimental.logger;
 import std.experimental.allocator;
 import aermicioi.aedi_property_reader.core.traits : n;
@@ -69,7 +70,7 @@ class XmlElementPropertyAccessor : PropertyAccessor!Element {
             return component.elements.find!(e => e.tag.name == property).front;
         }
 
-        throw new NotFoundException("Xml tag " ~ component.toString ~ " doesn't have child " ~ property);
+        throw new NotFoundException("Xml tag ${component} doesn't have child ${property}", property, component.to!string);
     }
 
     /**
@@ -133,7 +134,7 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
             return component.elements[property.to!size_t];
         }
 
-        throw new NotFoundException("Xml tag " ~ component.toString ~ " doesn't have child on index " ~ property);
+        throw new NotFoundException("Xml tag ${component} doesn't have child on index ${property}", property, component.to!string);
     }
 
     /**
@@ -204,7 +205,7 @@ class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
             return component.tag.attr[property];
         }
 
-        throw new NotFoundException("Xml tag " ~ component.toString ~ " doesn't have attribute " ~ property);
+        throw new NotFoundException("Xml tag ${component} doesn't have attribute ${property}", property, component.to!string);
     }
 
     /**

@@ -53,8 +53,8 @@ class MockLocator : Locator!(string, string) {
             auto reference = identity in dummy;
 
             if (reference is null) {
-                import aermicioi.aedi.exception.not_found_exception;
-                throw new NotFoundException("Dummy data not found in string storage");
+                import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+                throw new NotFoundException("${identity} not found in mock storage", identity, null);
             }
 
             return *reference;

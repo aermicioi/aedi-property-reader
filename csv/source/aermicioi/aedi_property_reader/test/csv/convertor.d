@@ -30,7 +30,7 @@ Authors:
 module aermicioi.aedi_property_reader.test.csv.convertor;
 
 import aermicioi.aedi;
-import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import aermicioi.aedi_property_reader.convertor.std_conv;
 import std.exception;
 

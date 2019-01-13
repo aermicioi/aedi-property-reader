@@ -34,7 +34,7 @@ import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.sdlang.accessor;
 import aermicioi.aedi_property_reader.sdlang.inspector;
-import aermicioi.aedi.exception.invalid_cast_exception : InvalidCastException;
+import aermicioi.aedi_property_reader.convertor.exception : InvalidCastException;
 import aermicioi.aedi_property_reader.sdlang.accessor : SdlangElement;
 import sdlang.ast;
 import sdlang;
@@ -57,7 +57,7 @@ public {
 
 alias SdlangConvertorBuilderFactory = (Convertor[] convertors) {
 	return factoryAnyConvertorBuilder(
-		new CallbackConvertorBuilder!(convert, destruct),
+		new TypeGuessCallbackConvertorBuilder!(convert, destruct),
 		new MappingConvertorBuilder!(
 			SdlangAccessorFactory,
 			CompositeSetterFactory,
@@ -76,7 +76,7 @@ Params:
 	allocator = optional allocator used to allocate required memory
 
 Throws:
-	InvalidCastException if not possible
+	ConvertorException if not possible
 **/
 void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
 	if (!is(To == enum) && !isNumeric!To && !isSomeChar!To && !isSomeString!To) {
@@ -86,7 +86,7 @@ void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = t
 		to = (cast() from).expectValue!To;
 	} catch (ValueNotFoundException e) {
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 	}
 }
 
@@ -112,11 +112,11 @@ void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = t
 				}
 			}
 
-			throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"));
+			throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to));
 		}
 	} catch (ValueNotFoundException e) {
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"), e);
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 	}
 }
 
@@ -142,11 +142,11 @@ void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = t
 				}
 			}
 
-			throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"));
+			throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to));
 		}
 	} catch (ValueNotFoundException e) {
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"), e);
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 	}
 }
 
@@ -165,7 +165,7 @@ void convert(To : E[], From : Tag, E)(in From from, ref To to, RCIAllocator allo
 			value = from.values[index].get!E;
 		} catch (VariantException e) {
 
-			throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value ", e));
+			throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 		}
 	}
 }
@@ -181,7 +181,7 @@ void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = t
 		to = (cast() from).expectValue!string.to!To;
 	} catch (ValueNotFoundException e) {
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 	}
 }
 
@@ -196,7 +196,7 @@ void convert(To : T[], From : Tag, T)(in From from, ref To to, RCIAllocator allo
 		to = (cast() from).expectValue!string.to!To;
 	} catch (ValueNotFoundException e) {
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 	}
 }
 
@@ -212,7 +212,7 @@ void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocat
 
 	} catch (VariantException e) {
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 	}
 }
 
@@ -228,7 +228,7 @@ void convert(To : T[], From : Attribute, T)(in From from, ref To to, RCIAllocato
 
 	} catch (VariantException e) {
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 	}
 }
 
@@ -244,7 +244,7 @@ void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocat
 
 	} catch (VariantException e) {
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 	}
 }
 
@@ -264,10 +264,10 @@ void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocat
 			}
 		}
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"));
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to));
 	} catch (VariantException e) {
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value", e));
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 	}
 }
 
@@ -287,10 +287,10 @@ void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocat
 			}
 		}
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"));
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to));
 	} catch (VariantException e) {
 
-		throw new InvalidCastException(text("Could not convert value to requested ", typeid(To), " value"), e);
+		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
 	}
 }
 

@@ -31,6 +31,6 @@ module aermicioi.aedi_property_reader.core;
 
 public import aermicioi.aedi_property_reader.core.core;
 public import aermicioi.aedi_property_reader.core.document;
-public import aermicioi.aedi_property_reader.core.type_guesser;
+public import aermicioi.aedi_property_reader.convertor.type_guesser;
 public import aermicioi.aedi_property_reader.convertor;
 public import aermicioi.aedi : locate;

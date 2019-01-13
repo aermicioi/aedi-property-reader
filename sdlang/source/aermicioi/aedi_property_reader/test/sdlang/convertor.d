@@ -61,8 +61,8 @@ module aermicioi.aedi_property_reader.test.sdlang.convertor;
 import std.meta;
 import std.exception;
 import sdlang;
-import aermicioi.aedi.exception.not_found_exception;
-import aermicioi.aedi.exception.invalid_cast_exception;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.exception : InvalidCastException;
 import aermicioi.aedi_property_reader.sdlang.convertor;
 import aermicioi.aedi_property_reader.sdlang.accessor : SdlangElement;
 

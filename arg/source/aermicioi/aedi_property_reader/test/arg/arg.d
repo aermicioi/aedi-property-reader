@@ -30,7 +30,7 @@ Authors:
 module aermicioi.aedi_property_reader.test.arg.arg;
 
 import aermicioi.aedi : locate;
-import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import aermicioi.aedi.test.fixture;
 import aermicioi.aedi_property_reader.arg;
 import aermicioi.aedi_property_reader.core;

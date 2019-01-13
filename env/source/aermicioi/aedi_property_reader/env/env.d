@@ -31,7 +31,7 @@ module aermicioi.aedi_property_reader.env.env;
 
 import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.convertor.std_conv;

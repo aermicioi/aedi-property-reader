@@ -33,7 +33,7 @@ import aermicioi.aedi : NotFoundException;
 import aermicioi.aedi_property_reader.convertor.exception;
 import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.convertor.placeholder;
-import aermicioi.util.traits : isPublic, isField;
+import aermicioi.aedi.util.traits : isPublic, isField;
 import aermicioi.aedi_property_reader.convertor.traits;
 import std.conv;
 import std.traits;
@@ -259,10 +259,8 @@ class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, st
         throw new NotFoundException(text(
             "Component of type ",
             typeid(ComponentType),
-            " does not have ",
-            property,
-            " property"
-        ));
+            " does not have ${identity} property"
+        ), property);
     }
 
     /**

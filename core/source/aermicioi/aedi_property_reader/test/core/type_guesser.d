@@ -29,7 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.core.test.type_guesser;
 
-import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 
 unittest {
     auto guesser = new StringToScalarConvTypeGuesser;

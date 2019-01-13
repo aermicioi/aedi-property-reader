@@ -29,6 +29,9 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.convertor.exception;
 
+import aermicioi.aedi.exception.di_exception;
+import aermicioi.aedi.util.range;
+
 /**
 Exception thrown when a problem related to conversion appeared.
 **/
@@ -62,6 +65,143 @@ class ConvertorException : Exception {
     @nogc @safe pure nothrow this(Throwable next, string msg = "", string file = __FILE__, size_t line = __LINE__)
     {
         super(msg, file, line, next);
+    }
+
+    void pushMessage(scope void delegate(in char[]) sink) const @system {
+        sink(this.message);
+    }
+
+    mixin AdvancedExceptionPrinting!();
+}
+
+/**
+Exception thrown when property is not found in document/component
+**/
+class NotFoundException : ConvertorException {
+    string property;
+    string component;
+
+    /**
+     * Creates a new instance of Exception. The next parameter is used
+     * internally and should always be $(D null) when passed by user code.
+     * This constructor does not automatically throw the newly-created
+     * Exception; the $(D throw) statement should be used for that purpose.
+     */
+    @nogc @safe pure nothrow this(
+        string msg,
+        string identity,
+        string component,
+        string file = __FILE__,
+        size_t line = __LINE__,
+        Throwable next = null
+    ) {
+        this.property = property;
+        this.component = component;
+        super(msg, file, line, next);
+    }
+
+    /**
+    ditto
+    **/
+    @nogc @safe pure nothrow this(
+        string msg,
+        string identity,
+        string component,
+        Throwable next,
+        string file = __FILE__,
+        size_t line = __LINE__
+    ) {
+        this.property = property;
+        this.component = component;
+        super(msg, file, line, next);
+    }
+
+    /**
+    ditto
+    **/
+    @nogc @safe pure nothrow this(Throwable next, string msg = "", string file = __FILE__, size_t line = __LINE__)
+    {
+        super(msg, file, line, next);
+    }
+
+    override void pushMessage(scope void delegate(in char[]) sink) const @system {
+        import std.algorithm : substitute;
+        import std.utf : byChar;
+		auto substituted = this.msg.substitute("${property}", property, "${component}", component).byChar;
+
+        while (!substituted.empty) {
+            auto buffer = BufferSink!(char[256])();
+            import std.range;
+            buffer.put(substituted);
+
+            sink(buffer.slice);
+        }
+    }
+}
+
+
+/**
+Exception thrown when property is not found in document/component
+**/
+class InvalidCastException : ConvertorException {
+    TypeInfo from;
+    TypeInfo to;
+
+    /**
+     * Creates a new instance of Exception. The next parameter is used
+     * internally and should always be $(D null) when passed by user code.
+     * This constructor does not automatically throw the newly-created
+     * Exception; the $(D throw) statement should be used for that purpose.
+     */
+    @nogc @safe pure nothrow this(
+        string msg,
+        TypeInfo from,
+        TypeInfo to,
+        string file = __FILE__,
+        size_t line = __LINE__,
+        Throwable next = null
+    ) {
+        this.from = from;
+        this.to = to;
+        super(msg, file, line, next);
+    }
+
+    /**
+    ditto
+    **/
+    @nogc @safe pure nothrow this(
+        string msg,
+        TypeInfo from,
+        TypeInfo to,
+        Throwable next,
+        string file = __FILE__,
+        size_t line = __LINE__
+    ) {
+        this.from = from;
+        this.to = to;
+        super(msg, file, line, next);
+    }
+
+    /**
+    ditto
+    **/
+    @nogc @safe pure nothrow this(Throwable next, string msg = "", string file = __FILE__, size_t line = __LINE__)
+    {
+        super(msg, file, line, next);
+    }
+
+    override void pushMessage(scope void delegate(in char[]) sink) const @system {
+        import std.algorithm : substitute;
+        import std.utf : byChar;
+		auto substituted = this.msg.substitute("${from}", from.toString, "${to}", to.toString).byChar;
+
+        while (!substituted.empty) {
+            auto buffer = BufferSink!(char[256])();
+            import std.range;
+            buffer.put(substituted);
+
+            sink(buffer.slice);
+        }
     }
 }
 

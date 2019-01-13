@@ -33,7 +33,7 @@ import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.convertor.convertor;
-import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.yaml.accessor;
 import aermicioi.aedi_property_reader.yaml.convertor;
 import aermicioi.aedi_property_reader.core.document;

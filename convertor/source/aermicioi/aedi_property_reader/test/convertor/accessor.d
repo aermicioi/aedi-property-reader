@@ -31,7 +31,7 @@ module aermicioi.aedi_property_reader.test.convertor.core;
 
 import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.convertor.placeholder : unwrap;
-import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import aermicioi.aedi_property_reader.convertor.placeholder;
 import aermicioi.aedi_property_reader.convertor.exception;
 import std.exception;

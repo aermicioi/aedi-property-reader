@@ -39,7 +39,7 @@ import std.conv;
 import std.experimental.allocator;
 import std.exception : enforce;
 import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 import std.algorithm;
 import std.array;
 import std.experimental.logger;
@@ -287,7 +287,7 @@ path from document.
 
             if (!this.accessor.has(this.document, identity)) {
                 throw new NotFoundException(
-                    text("Could not find \"", identity, "\" in document of type ", typeid(DocumentType))
+                    text("Could not find ${identity} in document of type ", typeid(DocumentType)), identity
                 );
             }
 
@@ -451,6 +451,53 @@ path from document.
         }
 
         /**
+        Check whether convertor is able to convert from type to type.
+
+        Check whether convertor is able to convert from type to type.
+        This set of methods should be the most precise way of determining
+        whether convertor is able to convert from type to type, since it
+        provides both components to the decision logic implemented by convertor
+        compared to the case with $(D_INLINECODE convertsTo) and $(D_INLINECODE convertsFrom).
+        Note that those methods are still useful when categorization or other
+        logic should be applied per original or destination type.
+
+        Implementation:
+            This is default implementation of converts methods which delegate
+            the decision to $(D_INLINECODE convertsTo) and $(D_INLINECODE convertsFrom).
+
+        Params:
+            from = the original component or it's type to convert from
+            to = the destination component or it's type to convert to
+
+        Returns:
+            true if it is able to convert from component to destination component
+        **/
+        bool converts(TypeInfo from, TypeInfo to) @safe const nothrow {
+            return this.convertor.converts(from, to);
+        }
+
+        /**
+        ditto
+        **/
+        bool converts(TypeInfo from, in Object to) @safe const nothrow {
+            return this.convertor.converts(from, to);
+        }
+
+        /**
+        ditto
+        **/
+        bool converts(in Object from, TypeInfo to) @safe const nothrow {
+            return this.convertor.converts(from, to);
+        }
+
+        /**
+        ditto
+        **/
+        bool converts(in Object from, in Object to) @safe const nothrow {
+            return this.convertor.converts(from, to);
+        }
+
+        /**
         Convert from component to component.
 
         Params:
@@ -533,6 +580,13 @@ Params:
     ConvertorsFactory = a factory (no arg function) that will create a list of Convertors
 **/
 interface WithConvertors(alias ConvertorsFactory) {
+
+}
+
+/**
+Marker interface that provides a configuration for component container.
+**/
+interface WithComponentPayload(alias payload) {
 
 }
 

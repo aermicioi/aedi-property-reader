@@ -35,7 +35,7 @@ import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.xml.accessor;
 import aermicioi.aedi_property_reader.xml.xml : accessor;
 import aermicioi.aedi_property_reader.xml.inspector;
-import aermicioi.aedi.exception;
+import aermicioi.aedi_property_reader.convertor.exception;
 import std.traits;
 import std.xml;
 import std.string : strip;
@@ -56,7 +56,7 @@ public {
 
 alias XmlConvertorBuilderFactory = (Convertor[] convertors) {
     return factoryAnyConvertorBuilder(
-        new CallbackConvertorBuilder!(convert, destruct),
+        new TypeGuessCallbackConvertorBuilder!(convert, destruct),
         new MappingConvertorBuilder!(
             XmlAccessorFactory,
             CompositeSetterFactory,
@@ -86,13 +86,7 @@ void convert(To, From : Element)(in From from, ref To value, RCIAllocator alloca
 
         value = from.text.strip.to!To;
     } catch (ConvException e) {
-        throw new InvalidCastException(
-            "Could not convert xml " ~
-            from.toString() ~
-            " value to type " ~
-            fullyQualifiedName!To,
-            e
-        );
+        throw new InvalidCastException("Could not convert ${from} value to ${to}", typeid(from), typeid(value), e);
     }
 }
 
@@ -107,13 +101,7 @@ void convert(To, From : Element)(in From from, ref To value, RCIAllocator alloca
 
         value = from.text.strip.to!To;
     } catch (ConvException e) {
-        throw new InvalidCastException(
-            "Could not convert xml " ~
-            from.toString() ~
-            " value to type " ~
-            fullyQualifiedName!To,
-            e
-        );
+        throw new InvalidCastException("Could not convert ${from} value to ${to}", typeid(from), typeid(value), e);
     }
 }
 
@@ -127,13 +115,7 @@ void convert(To, From : Element)(in From from, ref To value, RCIAllocator alloca
 
         value = from.text.to!To;
     } catch (ConvException e) {
-        throw new InvalidCastException(
-            "Could not convert xml " ~
-            from.toString() ~
-            " value to type " ~
-            fullyQualifiedName!To,
-            e
-        );
+        throw new InvalidCastException("Could not convert ${from} value to ${to}", typeid(from), typeid(value), e);
     }
 }
 

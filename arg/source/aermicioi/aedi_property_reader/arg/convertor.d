@@ -131,7 +131,7 @@ Default convertor factory for command line arguments usable by configuration api
 **/
 alias ArgumentAdvisedConvertorFactory = (Convertor[] convertors) {
     return factoryAnyConvertorBuilder(
-        new CallbackConvertorBuilder!(convert, destruct),
+        new TypeGuessCallbackConvertorBuilder!(convert, destruct),
         new MappingConvertorBuilder!(
             ArgumentAccessorFactory,
             CompositeSetterFactory,

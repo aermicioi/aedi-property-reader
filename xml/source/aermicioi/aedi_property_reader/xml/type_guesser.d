@@ -29,7 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.xml.type_guesser;
 
-import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.xml.accessor;
 import std.xml;
 
@@ -88,7 +88,7 @@ class XmlTypeGuesser : TypeGuesser!XmlElement {
         Returns:
             TypeInfo of contained element
         **/
-        TypeInfo guess(XmlElement serialized) {
+        TypeInfo guess(XmlElement serialized) const @trusted {
 
             final switch (serialized.kind) {
                 case XmlElement.Kind.attribute: {

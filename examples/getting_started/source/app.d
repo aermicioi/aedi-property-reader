@@ -30,8 +30,12 @@ Authors:
 module app;
 
 import aermicioi.aedi_property_reader;
-import aermicioi.aedi : container;
-import std.socket;
+import aermicioi.aedi : container, describing, aliasing, Locator, DescriptionsProvider, Describer, ValueContainer, values, typed, AediNotFoundException = NotFoundException;
+import std.getopt;
+import std.conv : text;
+import std.range;
+import std.array : array;
+import std.algorithm : map, filter;
 
 public alias configure = aermicioi.aedi.configurer.register.context.configure;
 public alias configure = aermicioi.aedi_property_reader.core.core.configure;
@@ -42,39 +46,78 @@ struct Component {
 	string third;
 }
 
-void load(T : DocumentContainer!X, X...)(T container) {
-	with (container.configure) {
-		register!long("first");
-		register!double("second");
-		register!string("third");
-		register!Component("");
-		register!Component("json");
-		register!Component("xml");
-		register!Component("sdlang");
-		register!Component("yaml");
+void load(T : DocumentContainer!X, X...)(T container, Locator!() locator) {
+	with (container.configure(locator)) {
+		register!long("first").describe("First value", "First configuration value");
+		register!double("second").describe("Second value", "Second configuration value");
+		register!string("third").describe("Third value", "Third configuration value");
+		register!string("fourth").describe("Fourth value", "Fourth configuration value");
+		register!Component("").describe("Root component", "Root document for configuration");
+		register!Component("xml").describe("XML component", "XML document for configuration");
+		register!Component("json").describe("JSON component", "JSON document for configuration");
+		register!Component("yaml").describe("YAML component", "YAML document for configuration");
+		register!Component("sdlang").describe("SDLANG component", "SDLANG document for configuration");
+		register!bool("help").optional(false).describe("Help information", "Display help information in console");
+		register!bool("verbose").optional(false).describe("Verbose mode", "Display any issues in console");
 	}
+}
+
+void load(T : ValueContainer)(T container, Locator!() locator) {
+
 }
 
 void main()
 {
 	auto c = container(
+		argument(),
 		xml("config.xml"),
 		json("config.json"),
 		yaml("config.yaml"),
-		sdlang("config.sdlang")
-	);
+		sdlang("config.sdlang"),
+		values()
+	)
+	.describing("Aedi property reader getting started", "A minimalistic program used to show how to use property reader")
+	.aliasing;
 
-	foreach (subcontainer; c) {
-		subcontainer.load;
+	foreach (subcontainer; c.decorated.decorated) {
+		subcontainer.load(c);
 	}
 
-	import std.stdio;
-	c.locate!Component("").writeln;
-	c.locate!Component("xml").writeln;
-	c.locate!Component("json").writeln;
-	c.locate!Component("yaml").writeln;
-	c.locate!Component("sdlang").writeln;
-	writeln("first: ", c.locate!long("first"));
-	writeln("second: ", c.locate!double("second"));
-	writeln("third: ", c.locate!string("third"));
+	if (c.locate!bool("help")) {
+		auto application = c.locate!(Describer!()).describe(null, c);
+		defaultGetoptPrinter(
+			text(application.title, " - ", application.description),
+			c.locate!(DescriptionsProvider!string)
+				.provide
+				.map!(description => Option(description.identity, text(description.title, "\t-\t", description.description)))
+				.array
+		);
+
+		return;
+	}
+
+	try {
+		import std.stdio;
+		c.locate!Component("").writeln;
+		c.locate!Component("xml").writeln;
+		c.locate!Component("json").writeln;
+		c.locate!Component("yaml").writeln;
+		c.locate!Component("sdlang").writeln;
+		writeln("first: ", c.locate!long("first"));
+		writeln("second: ", c.locate!double("second"));
+		writeln("third: ", c.locate!string("third"));
+		writeln("fourth: ", c.locate!string("fourth"));
+	} catch (AediNotFoundException e) {
+		defaultGetoptPrinter(
+			text("Missing ", c.locate!(Describer!()).describe(e.identity, null).title, " please provide it on command line or in a configuration file."),
+			c.locate!(Describer!()).describe(e.identity, null)
+				.only
+				.map!(description => Option(description.identity, text(description.title, "\t-\t", description.description)))
+				.array
+		);
+
+		if (c.locate!bool("verbose")) {
+			throw e;
+		}
+	}
 }

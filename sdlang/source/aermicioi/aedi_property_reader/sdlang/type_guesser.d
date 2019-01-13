@@ -29,7 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.sdlang.type_guesser;
 
-import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.sdlang.accessor;
 import sdlang.ast;
 
@@ -49,7 +49,7 @@ class SdlangTypeGuesser : TypeGuesser!SdlangElement {
         Returns:
             TypeInfo of contained data
         **/
-        TypeInfo guess(SdlangElement serialized) {
+        TypeInfo guess(SdlangElement serialized) const {
 
             final switch (serialized.kind) {
                 case SdlangElement.Kind.tag: {

@@ -82,7 +82,7 @@ unittest {
 }
 
 unittest {
-    auto builder = new CallbackConvertorBuilder!(stdConvert, stdDestruct);
+    auto builder = new TypeGuessCallbackConvertorBuilder!(stdConvert, stdDestruct);
 
     string[string] from = [
         "i": "10",
@@ -119,7 +119,7 @@ unittest {
 }
 
 unittest {
-    auto builder = new CallbackConvertorBuilder!(stdConvert, stdDestruct);
+    auto builder = new TypeGuessCallbackConvertorBuilder!(stdConvert, stdDestruct);
     auto from = cast(Object) [
         "i": "10",
         "p": "sample string",
@@ -163,7 +163,7 @@ unittest {
 }
 
 unittest {
-    auto builder = new CallbackConvertorBuilder!(stdConvert, stdDestruct);
+    auto builder = new TypeGuessCallbackConvertorBuilder!(stdConvert, stdDestruct);
     auto from = cast(Object) [
         "i": "10",
         "p": "sample string",

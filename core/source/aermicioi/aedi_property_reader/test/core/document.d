@@ -31,15 +31,15 @@ module aermicioi.aedi_property_reader.core.test.document;
 
 import aermicioi.aedi : locate, NotFoundException;
 import aermicioi.aedi_property_reader.core.document : DocumentContainer;
-import aermicioi.aedi_property_reader.core.type_guesser : StringToScalarConvTypeGuesser;
+import aermicioi.aedi_property_reader.convertor.type_guesser : StringToScalarConvTypeGuesser;
 import aermicioi.aedi_property_reader.convertor.accessor : AssociativeArrayAccessor;
-import aermicioi.aedi_property_reader.convertor.convertor : CallbackConvertorBuilder;
+import aermicioi.aedi_property_reader.convertor.convertor : TypeGuessCallbackConvertorBuilder;
 import aermicioi.aedi_property_reader.convertor.std_conv : convert, destruct;
 import std.experimental.allocator;
 import std.exception;
 
 unittest {
-    auto builder = new CallbackConvertorBuilder!(convert, destruct);
+    auto builder = new TypeGuessCallbackConvertorBuilder!(convert, destruct);
 
     DocumentContainer!(string[string], string) document = new DocumentContainer!(string[string], string)([
         "foo": "foofoo",

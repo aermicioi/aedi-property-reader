@@ -253,6 +253,8 @@ class ChainingConvertor : CombinedConvertor {
             return this.convertors.canFind!(c => c.convertsTo(to));
         }
 
+        mixin ConvertsMixin;
+
         /**
         Convert from component to component.
 

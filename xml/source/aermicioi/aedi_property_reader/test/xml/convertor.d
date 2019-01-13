@@ -32,7 +32,7 @@ module aermicioi.aedi_property_reader.test.xml.convertor;
 import std.process;
 import std.exception;
 import std.xml;
-import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import aermicioi.aedi_property_reader.xml.convertor;
 
 unittest {

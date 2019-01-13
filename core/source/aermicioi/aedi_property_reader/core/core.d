@@ -33,6 +33,7 @@ import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.convertor.chaining_convertor;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.convertor.mapper;
 import aermicioi.aedi_property_reader.core.document :
 	DocumentContainerImpl = DocumentContainer,
@@ -44,6 +45,16 @@ import std.meta;
 import std.traits;
 import std.experimental.logger;
 import std.exception;
+
+/**
+Configuration context for a property
+**/
+struct PropertyContext(Type, DocumentContainer) {
+	string path;
+	Convertor[] convertors;
+	DocumentContainer container;
+	Locator!() locator;
+}
 
 /**
 Configuration context that is providing a nice api to add convertors into a container for a document.
@@ -63,16 +74,22 @@ struct DocumentContainerBuilder
     DocumentContainer container;
 
 	/**
+	Locator useable in registering properties.
+	**/
+	Locator!() locator;
+
+	/**
 	Constructor for DocumentContainerBuilder
 
 	Params:
 		container = to configure
 		builder = convertor builder used to create convertors for properties
 	**/
-	this(DocumentContainer container, ConvertorBuilder builder, CombinedConvertor convertor) {
+	this(DocumentContainer container, ConvertorBuilder builder, CombinedConvertor convertor, Locator!() locator) {
 		this.container = container;
 		this.builder = builder;
 		this.container.convertor = convertor;
+		this.locator = locator;
 
 		static if (is(DocumentContainer : WithConvertorsFor!Types, Types...)) {
 			static foreach (Type; Types) {
@@ -90,13 +107,6 @@ struct DocumentContainerBuilder
 	/**
 	ditto
 	**/
-	this(DocumentContainer container, ConvertorBuilder builder) {
-		this(container, builder, new CombinedConvertorImpl());
-	}
-
-	/**
-	ditto
-	**/
     alias container this;
 
 	/**
@@ -106,11 +116,13 @@ struct DocumentContainerBuilder
 		To = the type of destination component that convertor should yield
 		path = property path for a field in document.
 	**/
-    ref typeof(this) register(To)(string path) {
+    PropertyContext!(To, DocumentContainer) register(To)(string path) {
 
 		static if (is(DocumentContainer : WithConvertorSources!SourceTypes, SourceTypes...)) {} else {
 			alias SourceTypes = AliasSeq!();
 		}
+
+		PropertyContext!(To, DocumentContainer) context = PropertyContext!(To, DocumentContainer)(path, null, container, locator);
 
 		debug(trace) trace(
 			"Injecting convertor for ",
@@ -121,7 +133,7 @@ struct DocumentContainerBuilder
 			builder
 		);
 
-		this.register(builder.make!(To, FieldType), path);
+		context.convertors ~= this.register(builder.make!(To, FieldType), path).convertors;
 
 		static foreach (From; SourceTypes) {
 
@@ -134,10 +146,10 @@ struct DocumentContainerBuilder
 				builder
 			);
 
-			this.register(builder.make!(To, From));
+			context.convertors ~= this.register(builder.make!(To, From)).convertors;
 		}
 
-		return this;
+		return context;
     }
 
 	/**
@@ -146,7 +158,7 @@ struct DocumentContainerBuilder
 	Params:
 		To = the type of destination component that convertor should yield
 	**/
-    ref typeof(this) register(To)() {
+    PropertyContext!(To, DocumentContainer) register(To)() {
 
         return this.register!(To, To);
     }
@@ -158,7 +170,7 @@ struct DocumentContainerBuilder
 		Iface = interface for which the convertor is bound to.
 		To = the type of destination component that convertor should yield
 	**/
-    ref typeof(this) register(Iface, To : Iface)() {
+    PropertyContext!(To, DocumentContainer) register(Iface, To : Iface)() {
         import std.traits : fullyQualifiedName;
 
         return this.register!To(fullyQualifiedName!Iface);
@@ -174,148 +186,23 @@ struct DocumentContainerBuilder
 	Returns:
 		typeof(this)
 	**/
-	ref typeof(this) register(Convertor convertor, string path) {
+	PropertyContext!(void, DocumentContainer) register(Convertor convertor, string path) {
 		this.container.set(convertor, path);
 
-		return this;
+		return PropertyContext!(void, DocumentContainer)(path, [convertor], container, locator);
 	}
 
 	/**
 	ditto
 	**/
-	ref typeof(this) register(Convertor convertor) {
+	PropertyContext!(void, DocumentContainer) register(Convertor convertor) {
 		this.container.set(convertor);
 
-		return this;
+		return PropertyContext!(void, DocumentContainer)(null, [convertor], container, locator);
 	}
 
     alias property = register;
 }
-
-/**
-Configuration context that is providing a nice api to add convertors into a container for a document.
-**/
-struct WithHelpDocumentContainerBuilder(BuilderType) {
-	import std.conv : text;
-	import std.typecons : Flag;
-
-	BuilderType builder;
-	boolean withDefaultHelpInfo;
-
-	/**
-	ditto
-	**/
-    alias builder this;
-
-	ref typeof(this) title(string title) {
-		this.builder.container.title = title;
-	}
-
-	/**
-	Associate a convertor to a field in document that has property path, to be used for conversion.
-
-	Params:
-		To = the type of destination component that convertor should yield
-		path = property path for a field in document.
-		description = the help information used to display help response
-	**/
-	ref typeof(this) register(To)(string path, string description) {
-		this.builder.register!To(path);
-
-		this.builder.container.add(path, description);
-		return this;
-	}
-
-	/**
-	ditto
-	**/
-    ref typeof(this) register(To)(string path) {
-		this.builder.register!To(path);
-
-		if (this.withDefaultHelpInfo) {
-
-			this.builder.container.add(path, text("A field of ", typeid(To), " type"));
-		}
-		return this;
-    }
-
-    ref typeof(this) register(To)() {
-
-        return this.register!(To, To);
-    }
-
-	/**
-	Associate a convertor to a type for an interface to be used by document when no specific convertor is provided for document field.
-
-	Params:
-		Iface = interface for which the convertor is bound to.
-		To = the type of destination component that convertor should yield
-		description = the description used for help panel.
-	**/
-	ref typeof(this) register(Iface, To : Iface)(string description) {
-		this.builder.register!(Iface, To);
-
-		this.builder.container.add(path, description);
-		return this;
-	}
-
-	/**
-	ditto
-	**/
-    ref typeof(this) register(Iface, To : Iface)() {
-        import std.traits : fullyQualifiedName;
-
-        return this.register!To(fullyQualifiedName!Iface);
-    }
-
-	/**
-	Register convertor for a property on path.
-
-	Params:
-		convertor = convertor used to convert value found on path
-		path = property path for which convertor could be used
-		description = the description used for help panel.
-
-	Returns:
-		typeof(this)
-	**/
-	ref typeof(this) register(Convertor convertor, string path, string description) {
-		this.builder.register(convertor, path);
-		this.builder.container.add(path, description);
-
-		return this;
-	}
-
-	/**
-	ditto
-	**/
-	ref typeof(this) register(Convertor convertor, string path) {
-		this.builder.register(convertor, path);
-
-		if (this.withDefaultHelpInfo) {
-			if (convertor.to !is typeid(void)) {
-				this.builder.container.add(path, text("A field of ", convert.to, " type"));
-			} else {
-				this.builder.container.add(path, null);
-			}
-		}
-
-		return this;
-	}
-
-	/**
-	ditto
-	**/
-	ref typeof(this) register(Convertor convertor) {
-		this.builder.register(convertor);
-
-		return this;
-	}
-
-    alias property = register;
-}
-
-
 
 /**
 Take a document container and create a configuration context for it.
@@ -323,64 +210,77 @@ Take a document container and create a configuration context for it.
 Params:
 	container = container for which configuration context is created.
 	builder = builder used to construct convertors used by container.
+	convertor = convertor used to resolve conversion chain from origin to destination type.
+	locator = locator used in registration and construction of properties.
 
 Returns:
 	DocumentContainerBuilder(DocumentContainer, AdvisedConvertor, DocumentType, FieldType) a configuration context
 **/
-auto configure(DocumentContainerType, ConvertorBuilderType)(DocumentContainerType container, ConvertorBuilderType builder) {
-    return DocumentContainerBuilder!(DocumentContainerType, ConvertorBuilderType)(container, builder);
+auto configure(DocumentContainerType, ConvertorBuilderType)(
+	DocumentContainerType container,
+	ConvertorBuilderType builder,
+	CombinedConvertor convertor = new CombinedConvertorImpl(),
+	Locator!() locator = null
+) if (!is(ConvertorBuilderType : Locator!())) {
+    return DocumentContainerBuilder!(DocumentContainerType, ConvertorBuilderType)(container, builder, convertor, locator);
 }
 
 /**
 ditto
 **/
-auto configure
-	(DocumentContainer : WithConvertorBuilder!ConvertorBuilderFactory, alias ConvertorBuilderFactory)
-	(DocumentContainer container) {
+auto configure(DocumentContainer : WithConvertorBuilder!ConvertorBuilderFactory, alias ConvertorBuilderFactory)(
+		DocumentContainer container,
+		CombinedConvertor convertor = new CombinedConvertorImpl(),
+		Locator!() locator = null
+	) {
 
 	return DocumentContainerBuilder!(DocumentContainer, ReturnType!ConvertorBuilderFactory)
-		(container, ConvertorBuilderFactory([container]));
+		(container, ConvertorBuilderFactory([container]), convertor, locator);
 }
 
-mixin template MapperBuilderMixin(AdvisedConvertors...) {
+/**
+ditto
+**/
+auto configure(DocumentContainer : WithConvertorBuilder!ConvertorBuilderFactory, alias ConvertorBuilderFactory)(
+		DocumentContainer container,
+		Locator!() locator
+	) {
 
-	struct MapperBuilderImpl(MapperType : Mapper!(To, From), To, From) {
+	return DocumentContainerBuilder!(DocumentContainer, ReturnType!ConvertorBuilderFactory)
+		(container, ConvertorBuilderFactory([container]), new CombinedConvertorImpl(), locator);
+}
 
-		MapperType mapper;
+/**
+Register a description for property.
 
-		alias mapper this;
+See:
+	Aedi framework $(D_INLINECODE .describe) component configuration method.
+**/
+Context describe(Context : PropertyContext!(To, DocumentContainer), DocumentContainer, To)(Context context, string title, string description)
+	in(context.locator !is null, "Component locator is missing. It is required for proper functioning") {
+	import aermicioi.aedi : IdentityDescriber, locate;
+	context.locator.locate!(IdentityDescriber!())().register(context.path, title, description);
 
-		ref auto register(To, From)() {
-			static foreach (AdvisedConvertor; AdvisedConvertors) {
-				static if (is(typeof(AdvisedConvertor.AdvisedConvertorImplementation!(To, From)))) {
-					enum converted = true;
-					mapper.convertors = mapper.convertors ~ AdvisedConvertor.AdvisedConvertorImplementation!(To, From)();
-				}
-			}
+	return context;
+}
 
-			static if (is(typeof(converted)) && !converted) {
-				static assert("Could not configure mapper with a convertor");
-			}
+/**
+Register a default value for property.
 
-			return this;
-		}
+Params:
+	context = property context
+	value = default value for property
 
-		struct WithFrom(With) {
+Returns:
+	Configuration context
+**/
+Context optional(Context : PropertyContext!(To, DocumentContainer), DocumentContainer, To)(Context context, auto ref To value)
+	in(context.locator !is null, "Component locator is missing. It is required for fetching default values storage.") {
+	import aermicioi.aedi : ValueContainer, locate, configure;
 
-			ref auto register(To)() {
-				return register!(To, From);
-			}
-		}
-
-		struct WithTo(With) {
-
-			ref auto register(From)() {
-				return register!(To, From);
-			}
-		}
+	with (context.locator.locate!ValueContainer.configure) {
+		register(value, context.path);
 	}
 
-	auto configure(MapperType : Mapper!(To, From), To, From)(MapperType mapper) {
-		return MapperBuilderImpl!MapperType(mapper);
-	}
+	return context;
 }

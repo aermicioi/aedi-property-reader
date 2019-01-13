@@ -30,7 +30,7 @@ Authors:
 module aermicioi.aedi_property_reader.test.arg.accessor;
 
 import aermicioi.aedi_property_reader.arg.accessor;
-import aermicioi.aedi.exception.not_found_exception;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import std.exception;
 
 unittest {

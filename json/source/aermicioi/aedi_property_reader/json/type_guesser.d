@@ -29,7 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.json.type_guesser;
 
-import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.json.accessor;
 import std.json;
 
@@ -49,7 +49,7 @@ class JsonTypeGuesser : TypeGuesser!JSONValue {
         Returns:
             TypeInfo of underlying data
         **/
-        TypeInfo guess(JSONValue serialized) {
+        TypeInfo guess(JSONValue serialized) const {
 
             final switch (serialized.type) {
                 case JSON_TYPE.ARRAY:

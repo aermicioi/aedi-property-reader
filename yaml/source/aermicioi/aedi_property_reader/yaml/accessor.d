@@ -31,7 +31,7 @@ module aermicioi.aedi_property_reader.yaml.accessor;
 
 import dyaml;
 import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi.exception.not_found_exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import std.exception;
 import std.experimental.logger;
 import std.experimental.allocator;
@@ -59,7 +59,7 @@ class YamlNodePropertyAccessor : PropertyAccessor!(Node, Node) {
             return component[property];
         }
 
-        throw new NotFoundException("yaml tag " ~ component.tag ~ " doesn't have child " ~ property);
+        throw new NotFoundException("Yaml tag ${component} doesn't have child ${property}", property, component.tag);
     }
 
     /**
@@ -130,7 +130,7 @@ class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
             return component[property.to!size_t];
         }
 
-        throw new NotFoundException("yaml tag " ~ component.tag ~ " doesn't have child on index " ~ property);
+        throw new NotFoundException("Yaml tag ${component} doesn't have child on index ${property} ", property, component.tag);
     }
 
     /**

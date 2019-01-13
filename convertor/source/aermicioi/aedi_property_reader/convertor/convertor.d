@@ -41,6 +41,7 @@ import aermicioi.aedi_property_reader.convertor.setter;
 import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.convertor.traits;
 import aermicioi.aedi_property_reader.convertor.placeholder;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 import std.algorithm;
 import std.array;
 import std.traits;
@@ -274,7 +275,7 @@ interface Convertor {
     Returns:
         true if it is able to convert from, or false otherwise.
     **/
-    bool convertsFrom(TypeInfo from) @safe const nothrow pure ;
+    bool convertsFrom(TypeInfo from) @safe const nothrow pure;
 
     /**
     Check whether convertor is able to convert from.
@@ -290,7 +291,7 @@ interface Convertor {
     Returns:
         true if it is able to convert from, or false otherwise.
     **/
-    bool convertsFrom(in Object from) @safe const nothrow pure ;
+    bool convertsFrom(in Object from) @safe const nothrow pure;
 
     /**
     Check whether convertor is able to convert to.
@@ -305,7 +306,7 @@ interface Convertor {
     Returns:
         true if it is able to convert to, false otherwise.
     **/
-    bool convertsTo(TypeInfo to) @safe const nothrow pure ;
+    bool convertsTo(TypeInfo to) @safe const nothrow pure;
 
     /**
     Check whether convertor is able to convert to.
@@ -322,7 +323,42 @@ interface Convertor {
     Returns:
         true if it is able to convert to, false otherwise.
     **/
-    bool convertsTo(in Object to) @safe const nothrow pure ;
+    bool convertsTo(in Object to) @safe const nothrow pure;
+
+    /**
+    Check whether convertor is able to convert from type to type.
+
+    Check whether convertor is able to convert from type to type.
+    This set of methods should be the most precise way of determining
+    whether convertor is able to convert from type to type, since it
+    provides both components to the decision logic implemented by convertor
+    compared to the case with $(D_INLINECODE convertsTo) and $(D_INLINECODE convertsFrom).
+    Note that those methods are still useful when categorization or other
+    logic should be applied per original or destination type.
+
+    Params:
+        from = the original component or it's type to convert from
+        to = the destination component or it's type to convert to
+
+    Returns:
+        true if it is able to convert from component to destination component
+    **/
+    bool converts(TypeInfo from, TypeInfo to) @safe const nothrow;
+
+    /**
+    ditto
+    **/
+    bool converts(TypeInfo from, in Object to) @safe const nothrow;
+
+    /**
+    ditto
+    **/
+    bool converts(in Object from, TypeInfo to) @safe const nothrow;
+
+    /**
+    ditto
+    **/
+    bool converts(in Object from, in Object to) @safe const nothrow;
 
     /**
     Convert from component to component.
@@ -353,6 +389,178 @@ interface Convertor {
         allocator = allocator used to allocate converted component.
     **/
     void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const;
+}
+
+/**
+Default implementation of converts from method
+**/
+mixin template ConvertsFromMixin(FromType) {
+    @property {
+        /**
+        Get the type info of component that convertor can convert from.
+
+        Get the type info of component that convertor can convert from.
+        The method is returning the default type that it is able to convert,
+        though it is not necessarily limited to this type only. More generalistic
+        checks should be done by convertsFrom method.
+
+        Returns:
+            type info of component that convertor is able to convert.
+        **/
+        TypeInfo from() @safe const nothrow pure {
+            return typeid(FromType);
+        }
+    }
+
+    /**
+    Check whether convertor is able to convert from.
+
+    Check whether convertor is able to convert from.
+    The intent of method is to implement customized type checking
+    is not limited immediatly to supported default from component.
+
+    Params:
+        from = the type info of component that could potentially be converted by convertor.
+    Returns:
+        true if it is able to convert from, or false otherwise.
+    **/
+    bool convertsFrom(TypeInfo from) @safe const nothrow pure {
+        return from is this.from;
+    }
+
+    /**
+    Check whether convertor is able to convert from.
+
+    Check whether convertor is able to convert from.
+    The method will try to extract type info out of from
+    object and use for subsequent type checking.
+    The intent of method is to implement customized type checking
+    is not limited immediatly to supported default from component.
+
+    Params:
+        from = the type info of component that could potentially be converted by convertor.
+    Returns:
+        true if it is able to convert from, or false otherwise.
+    **/
+    bool convertsFrom(in Object from) @safe const nothrow pure {
+        return this.convertsFrom(from.identify);
+    }
+}
+
+/**
+Default implementation of converts to method
+**/
+mixin template ConvertsToMixin(ToType) {
+    @property {
+        /**
+        Get the type info of component that convertor is able to convert to.
+
+        Get the type info of component that convertor is able to convert to.
+        The method is returning the default type that is able to convert,
+        though it is not necessarily limited to this type only. More generalistic
+        checks should be done by convertsTo method.
+
+        Returns:
+            type info of component that can be converted to.
+        **/
+        TypeInfo to() @safe const nothrow pure {
+            return typeid(ToType);
+        }
+    }
+
+    /**
+    Check whether convertor is able to convert to.
+
+    Check whether convertor is able to convert to.
+    The intent of the method is to implement customized type checking
+    that is not limited immediatly to supported default to component.
+
+    Params:
+        to = type info of component that convertor could potentially convert to.
+
+    Returns:
+        true if it is able to convert to, false otherwise.
+    **/
+    bool convertsTo(TypeInfo to) @safe const nothrow pure {
+        return this.to is to;
+    }
+
+    /**
+    Check whether convertor is able to convert to.
+
+    Check whether convertor is able to convert to.
+    The method will try to extract type info out of to object and use
+    for subsequent type checking.
+    The intent of the method is to implement customized type checking
+    that is not limited immediatly to supported default to component.
+
+    Params:
+        to = type info of component that convertor could potentially convert to.
+
+    Returns:
+        true if it is able to convert to, false otherwise.
+    **/
+    bool convertsTo(in Object to) @safe const nothrow pure {
+        return this.convertsTo(to.identify);
+    }
+}
+
+/**
+Default implementation of converts method.
+**/
+mixin template ConvertsMixin() {
+    /**
+    Check whether convertor is able to convert from type to type.
+
+    Check whether convertor is able to convert from type to type.
+    This set of methods should be the most precise way of determining
+    whether convertor is able to convert from type to type, since it
+    provides both components to the decision logic implemented by convertor
+    compared to the case with $(D_INLINECODE convertsTo) and $(D_INLINECODE convertsFrom).
+    Note that those methods are still useful when categorization or other
+    logic should be applied per original or destination type.
+
+    Implementation:
+        This is default implementation of converts methods which delegate
+        the decision to $(D_INLINECODE convertsTo) and $(D_INLINECODE convertsFrom).
+
+    Params:
+        from = the original component or it's type to convert from
+        to = the destination component or it's type to convert to
+
+    Returns:
+        true if it is able to convert from component to destination component
+    **/
+    bool converts(TypeInfo from, TypeInfo to) @safe const nothrow {
+        return this.convertsFrom(from) && this.convertsTo(to);
+    }
+
+    /**
+    ditto
+    **/
+    bool converts(TypeInfo from, in Object to) @safe const nothrow {
+        return this.convertsFrom(from) && this.convertsTo(to);
+    }
+
+    /**
+    ditto
+    **/
+    bool converts(in Object from, TypeInfo to) @safe const nothrow {
+        return this.convertsFrom(from) && this.convertsTo(to);
+    }
+
+    /**
+    ditto
+    **/
+    bool converts(in Object from, in Object to) @safe const nothrow {
+        return this.convertsFrom(from) && this.convertsTo(to);
+    }
+}
+
+mixin template ConvertsFromToMixin(FromType, ToType) {
+    mixin ConvertsFromMixin!FromType;
+    mixin ConvertsToMixin!ToType;
+    mixin ConvertsMixin;
 }
 
 /**
@@ -435,6 +643,7 @@ mixin template EqualToHashToStringOpCmpMixin() {
 /**
 A convertor that is using functional convertor and destructor for conversion logic.
 **/
+@component
 class CallbackConvertor(alias convertor, alias destructor) : Convertor
     if (isConvertor!convertor.yes && isDestructor!destructor.yes) {
 
@@ -444,76 +653,7 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
 
     public {
 
-        @property {
-            /**
-            Get the type info of component that convertor can convert from.
-
-            Get the type info of component that convertor can convert from.
-            The method is returning the default type that it is able to convert,
-            though it is not necessarily limited to this type only. More generalistic
-            checks should be done by convertsFrom method.
-
-            Returns:
-                type info of component that convertor is able to convert.
-            **/
-            TypeInfo from() @safe nothrow pure const {
-                return typeid(Info.From);
-            }
-
-            /**
-            Get the type info of component that convertor is able to convert to.
-
-            Get the type info of component that convertor is able to convert to.
-            The method is returning the default type that is able to convert,
-            though it is not necessarily limited to this type only. More generalistic
-            checks should be done by convertsTo method.
-
-            Returns:
-                type info of component that can be converted to.
-            **/
-            TypeInfo to() @safe nothrow pure const {
-                return typeid(Info.To);
-            }
-        }
-
-        /**
-        Check whether convertor is able to convert from.
-
-        Params:
-            from = the type info of component that could potentially be converted by convertor.
-        Returns:
-            true if it is able to convert from, or false otherwise.
-        **/
-        bool convertsFrom(TypeInfo from) @safe const nothrow pure {
-            return typeid(Info.From) is from;
-        }
-
-        /**
-        ditto
-        **/
-        bool convertsFrom(in Object from) @safe const nothrow pure {
-            return this.convertsFrom(from.identify);
-        }
-
-        /**
-        Check whether convertor is able to convert to.
-
-        Params:
-            to = type info of component that convertor could potentially convert to.
-
-        Returns:
-            true if it is able to convert to, false otherwise.
-        **/
-        bool convertsTo(TypeInfo to) @safe const nothrow pure {
-            return typeid(Info.To) is to;
-        }
-
-        /**
-        ditto
-        **/
-        bool convertsTo(in Object to) @safe const nothrow pure {
-            return this.convertsTo(to.identify);
-        }
+        mixin ConvertsFromToMixin!(Info.From, Info.To);
 
         /**
         Convert from component to component.
@@ -611,6 +751,37 @@ class CallbackConvertor(alias convertor, alias destructor) : Convertor
         }
 
         mixin EqualToHashToStringOpCmpMixin!();
+    }
+}
+
+/**
+A callback convertor that uses a type guesser to infer the concrete type of component stored in FromType and
+check whether it is the same requested to convert to.
+**/
+@component
+@safe class TypeGuessCallbackConvertor(alias convert, alias destruct) : CallbackConvertor!(convert, destruct) {
+    import aermicioi.aedi_property_reader.json.type_guesser;
+    private {
+        TypeGuesser!(typeof(super).Info.From) guesser;
+    }
+
+    @autowired
+    this(TypeGuesser!(typeof(super).Info.From) guesser) {
+        this.guesser = guesser;
+    }
+
+    override bool converts(in Object from, TypeInfo to) @safe const nothrow {
+        try {
+
+            return super.converts(from, to) && (this.guesser.guess(from.unwrap!(typeof(super).Info.From)) is to);
+        } catch (Exception e) {
+            debug error("Encountered an exception during .converts call of convertor, ", e).n;
+            assert(false, "Encountered an exception during .converts call of convertor");
+        }
+    }
+
+    override bool converts(in Object from, in Object to) @safe const nothrow {
+        return this.converts(from, to.identify);
     }
 }
 
@@ -748,6 +919,8 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
         bool convertsTo(in Object to) @safe const nothrow pure  {
             return this.convertsTo(to.identify);
         }
+
+        mixin ConvertsMixin;
 
         /**
         Convert from component to component.
@@ -997,6 +1170,8 @@ class CombinedConvertorImpl : CombinedConvertor {
             return this.convertors.canFind!(c => c.convertsTo(to));
         }
 
+        mixin ConvertsMixin;
+
         /**
         Convert from component to component.
 
@@ -1124,6 +1299,8 @@ class NoOpConvertor : Convertor {
             return this.convertsTo(typeid(to));
         }
 
+        mixin ConvertsMixin;
+
         /**
         Convert from component to component.
 
@@ -1217,8 +1394,8 @@ Params:
 Returns:
     AdvisedConvertor(To, From) template ready to instantiate a callback convertor for To, and From types using convertor and destructor.
 **/
-template CallbackConvertorBuilder(alias convertor, alias destructor) {
-    class CallbackConvertorBuilder {
+template TypeGuessCallbackConvertorBuilder(alias convertor, alias destructor) {
+    class TypeGuessCallbackConvertorBuilder {
         bool throwOnFailure = true;
 
         this() {
@@ -1232,7 +1409,7 @@ template CallbackConvertorBuilder(alias convertor, alias destructor) {
         Convertor make(To, From)() {
             static if (isAble!(To, From)) {
 
-                return new CallbackConvertor!(convertor!(To, From), destructor!To);
+                return new CallbackConvertor!(convertor!(To, From), destructor!To)();
             } else {
 
                 if (this.throwOnFailure) {
@@ -1418,6 +1595,10 @@ Params:
 template AnyConvertorBuilder(Builders...)
     if (allSatisfy!(isConvertorBuilder, Builders)) {
 
+    template BuilderMakeParameters(To, From) {
+         alias BuilderMakeParameters(Builder) = Parameters!(Builder.make!(From, To));
+    }
+
     class AnyConvertorBuilder {
         bool throwOnFailure = true;
         Builders builders;
@@ -1427,7 +1608,7 @@ template AnyConvertorBuilder(Builders...)
             this.throwOnFailure = throwOnFailure;
         }
 
-        Convertor make(To, From)() {
+        Convertor make(To, From)(staticMap!(BuilderMakeParameters!(To, From), Builders) parameters) {
             if (!this.isAble!(To, From)) {
                 if (this.throwOnFailure) {
                     throw new Exception(this.cause!(To, From));
@@ -1440,7 +1621,17 @@ template AnyConvertorBuilder(Builders...)
 
             foreach (builder; builders) {
                 if (builder.isAble!(To, From)) {
-                    return builder.make!(To, From);
+                    Parameters!(typeof(builder.make!(To, From))) args;
+
+                    foreach (ref arg; args) {
+                        foreach (ref param; parameters) {
+                            static if (is(typeof(arg) == typeof(param))) {
+                                arg = param;
+                            }
+                        }
+                    }
+
+                    return builder.make!(To, From)(args);
                 }
             }
 

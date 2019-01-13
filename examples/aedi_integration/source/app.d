@@ -30,9 +30,13 @@ Authors:
 module app;
 
 import aermicioi.aedi;
+import aermicioi.aedi : AediNotFoundException = NotFoundException;
+import aermicioi.aedi.util.range : exceptions, filterByInterface;
 import aermicioi.aedi_property_reader;
 import std.stdio;
 import std.algorithm;
+import std.range;
+import std.array : array;
 import std.experimental.allocator;
 import std.conv;
 
@@ -175,44 +179,63 @@ class ElectricEngine : Engine {
     }
 }
 
-void drive(Car car, string name) {
+void drive(Car car) {
+    writeln("What a nice car, with following specs:");
+    writeln("Size:\t", car.size);
+    writeln("Color:\t", car.color);
+    writeln("Engine:\t", car.engine);
 
+    writeln("Door front left:\t", car.doors[0], "\t located at memory ", cast(void*) car.doors[0]);
+    writeln("Door front right:\t", car.doors[1], "\t located at memory ", cast(void*) car.doors[1]);
+    writeln("Door back left: \t", car.doors[2], "\t located at memory ", cast(void*) car.doors[2]);
+    writeln("Door back right:\t", car.doors[3], "\t located at memory ", cast(void*) car.doors[3]);
+
+    writeln("Tire front left:\t", car.tires[0], "\t located at memory ", cast(void*) car.tires[0]);
+    writeln("Tire front right:\t", car.tires[1], "\t located at memory ", cast(void*) car.tires[1]);
+    writeln("Tire back left: \t", car.tires[2], "\t located at memory ", cast(void*) car.tires[2]);
+    writeln("Tire back right:\t", car.tires[3], "\t located at memory ", cast(void*) car.tires[3]);
 }
 
 void main(string[] args) {
 
     auto c = container(
-        singleton,
+        singleton.typed,
         prototype,
-        argument,
-        env,
-        properd("car.properties"),
-        xml("car.xml"),
-        json("car.json"),
-        sdlang("car.sdlang"),
-        yaml("car.yaml")
-    );
+        values,
+        container(
+            container(
+                argument,
+                env,
+                properd("car.properties"),
+            ),
+            container(
+                xml("car.xml"),
+                json("car.json"),
+                sdlang("car.sdlang"),
+                yaml("car.yaml")
+            )
+        )
+    ).describing("Car manufacturing application");
 
-    foreach (subcontainer; c[2 .. 5]) {
-        with (subcontainer.configure) {
-            register!string("car.vendor");
-            register!double("car.weight");
-            register!ubyte("car.color.r");
-            register!ubyte("car.color.g");
-            register!ubyte("car.color.b");
+    foreach (subcontainer; c.decorated[3][0]) {
+        with (subcontainer.configure(c)) {
+            register!string("car.vendor").describe("car vendor", "vendor of constructed car");
+            register!string("tire.vendor").describe("tire vendor", "vendor of tires used in car").optional("good.tire");
+            register!double("car.weight").describe("car weight", "weight of constructoed car");
+            register!ubyte("car.color.r").optional(cast(ubyte) 255).describe("car red color", "");
+            register!ubyte("car.color.g").optional(cast(ubyte) 255).describe("car green color", "");
+            register!ubyte("car.color.b").optional(cast(ubyte) 255).describe("car blue color", "");
+            register!bool("help").optional(false).describe("Help information", "Display help information in console");
+		    register!bool("verbose").optional(false).describe("Verbose mode", "Display any issues in console");
         }
     }
 
-    foreach (subcontainer; c[5 .. $]) {
-        with (subcontainer.configure) {
-            register!string;
-            register!long;
-            register!double;
-            register!ubyte;
-            register!Door("car.door.front.left");
-            register!Door("car.door.front.right");
-            register!Door("car.door.back.left");
-            register!Door("car.door.back.right");
+    foreach (subcontainer; c.decorated[3][1]) {
+        with (subcontainer.configure(c)) {
+            register!Door("car.door.front.left").describe("front left door", "front left door of constructed car");
+            register!Door("car.door.front.right").describe("front right door", "front right door of constructed car");
+            register!Door("car.door.back.left").describe("back left door", "back left door of constructed car");
+            register!Door("car.door.back.right").describe("back right door", "back right door of constructed car");
             register!Window;
             register!Size("car.size");
             register!Color("car.color");
@@ -220,8 +243,8 @@ void main(string[] args) {
         }
     }
 
-    with (c[0].configure(c)) {
-        c[0].scan!app(c);
+    with (c.decorated[0].configure(c)) {
+        c.decorated[0].scan!app(c);
 
         register!(Engine, ElectricEngine);
         register!Color("car.color")
@@ -230,12 +253,46 @@ void main(string[] args) {
             .set!"b"("car.color.b".lref);
     }
 
-    with(c[1].configure) {
+    with(c.decorated[1].configure) {
         register!Tire
             .set!"pressure"(1.0)
             .set!"size"(17)
-            .set!"vendor"("good.tire");
+            .set!"vendor"("tire.vendor".lref);
     }
 
-    c.locate!Car.writeln;
+    if (c.locate!bool("help")) {
+        import std.getopt : defaultGetoptPrinter, Option;
+
+        defaultGetoptPrinter(
+            c.locate!(Describer!()).describe(null, c).title,
+            c.locate!(DescriptionsProvider!string)
+                .provide
+                .map!(description => Option(description.identity, text(description.title, "\t-\t", description.description)))
+                .array
+        );
+
+        return;
+    }
+
+    try {
+
+        c.locate!Car.drive;
+    } catch (Exception e) {
+        import std.getopt : defaultGetoptPrinter, Option;
+
+        // foreach (exception; e.exceptions.filterByInterface!AediNotFoundException) {
+        //     defaultGetoptPrinter(
+        //         text("Missing ", c.locate!(Describer!()).describe(exception.identity, null).title, " please provide it on command line, environment, or configuration file"),
+        //         c.locate!(Describer!()).describe(exception.identity, null)
+        //             .only
+        //             .map!(description => Option(description.identity, text(description.title, "\t-\t", description.description)))
+        //             .array
+        //     );
+        // }
+
+        // if (c.locate!bool("verbose")) {
+        //     throw e;
+        // }
+        throw e;
+    }
 }

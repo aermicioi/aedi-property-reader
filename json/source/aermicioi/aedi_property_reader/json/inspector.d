@@ -30,7 +30,7 @@ Authors:
 module aermicioi.aedi_property_reader.json.inspector;
 
 import aermicioi.aedi_property_reader.convertor.inspector;
-import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 import std.string;
 import std.conv;
 import std.json;

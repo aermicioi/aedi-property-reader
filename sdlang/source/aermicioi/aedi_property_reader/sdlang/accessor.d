@@ -31,7 +31,7 @@ module aermicioi.aedi_property_reader.sdlang.accessor;
 
 import sdlang.ast;
 import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi.exception.not_found_exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import taggedalgebraic : TaggedAlgebraic;
 import std.exception;
 import std.experimental.logger;
@@ -67,7 +67,7 @@ class SdlangTagPropertyAccessor : PropertyAccessor!(Tag, Tag) {
             return component.tags[property].front;
         }
 
-        throw new NotFoundException("Sdlang tag " ~ component.getFullName.toString ~ " doesn't have child " ~ property);
+        throw new NotFoundException("Sdlang tag ${component} doesn't have ${property} ", property, component.getFullName.toString);
     }
 
     /**
@@ -140,9 +140,7 @@ class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
             return component.tags[property.to!size_t];
         }
 
-        throw new NotFoundException(
-            "Sdlang tag " ~ component.getFullName.toString ~ " doesn't have child on index " ~ property
-        );
+        throw new NotFoundException("Sdlang tag ${component} doesn't have ${property} ", property, component.getFullName.toString);
     }
 
     /**
@@ -216,7 +214,7 @@ class SdlangAttributePropertyAccessor : PropertyAccessor!(Tag, Attribute) {
         }
 
         throw new NotFoundException(
-            "Sdlang tag " ~ component.getFullName.toString ~ " doesn't have attribute " ~ property
+            "Sdlang tag ${component} doesn't have attribute ${property}", property, component.getFullName.toString
         );
     }
 

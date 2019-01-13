@@ -73,7 +73,7 @@ Advised callback convertor with std.conv.to convertor and destructor.
 **/
 alias StdConvAdvisedConvertorBuilderFactory = (Convertor[] convertors = []) {
     return factoryAnyConvertorBuilder(
-        new CallbackConvertorBuilder!(convert, destruct),
+        new TypeGuessCallbackConvertorBuilder!(convert, destruct),
         MappingConvertorBuilderFactory(convertors),
         new MappingConvertorBuilder!(
             AssociativeArrayAccessorFactory,

@@ -34,7 +34,7 @@ import sdlang;
 import sdlang.ast;
 import std.algorithm;
 import aermicioi.aedi_property_reader.sdlang.accessor;
-import aermicioi.aedi.exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 
 /**
 Inspector for sdlang tags.

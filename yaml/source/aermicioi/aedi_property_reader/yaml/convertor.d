@@ -38,7 +38,7 @@ import aermicioi.aedi.factory;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.storage.wrapper;
 import aermicioi.aedi.storage.decorator;
-import aermicioi.aedi.exception;
+import aermicioi.aedi_property_reader.convertor.exception;
 import std.traits;
 import std.experimental.allocator;
 import dyaml;
@@ -53,7 +53,7 @@ public {
 
 alias YamlConvertorBuilderFactory = (Convertor[] convertors) {
     return factoryAnyConvertorBuilder(
-		new CallbackConvertorBuilder!(convert, destruct),
+		new TypeGuessCallbackConvertorBuilder!(convert, destruct),
     	new MappingConvertorBuilder!(
 			YamlAccessorFactory,
 			CompositeSetterFactory,
@@ -74,7 +74,7 @@ Params:
 void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (!is(To == enum) && !isAggregateType!To && !isSomeChar!To) {
 
-	enforce!InvalidCastException(node.convertsTo!To, text("Could not convert yaml ", dumper(node), " to ", typeid(To)));
+	enforce(node.convertsTo!To, new InvalidCastException("Could not convert ${from} to ${to} ", typeid(node), typeid(to)));
 
 	to = (cast() node).as!To;
 }
@@ -85,9 +85,9 @@ ditto
 void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (isSomeChar!Z && !is(To == enum)) {
 
-	enforce!InvalidCastException(
+	enforce(
 		node.isString,
-		text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a string")
+		new InvalidCastException("Could not convert ${from} to ${to}, ${from} is not a string", typeid(node), typeid(to))
 	);
 
 	to = std.conv.to!To((cast() node).as!(string));
@@ -99,9 +99,7 @@ ditto
 void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (isSomeChar!To && !is(To == enum)) {
 
-	enforce!InvalidCastException(
-		node.isString,
-		text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a string")
+	enforce(node.isString, new InvalidCastException("Could not convert ${from} to ${to}, ${from} is not a string", typeid(node), typeid(to))
 	);
 
 	to = (cast() node).as!string.to!char;
@@ -113,9 +111,7 @@ ditto
 void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (!isSomeString!To && !is(To == enum)) {
 
-	enforce!InvalidCastException(
-		node.isSequence,
-		text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a sequence")
+	enforce(node.isSequence, new InvalidCastException("Could not convert ${from} to ${to}, ${from} is not a sequence", typeid(node), typeid(to))
 	);
 
 	auto sequence = (cast() node).sequence;
@@ -132,7 +128,7 @@ ditto
 void convert(To : Z[K], From : Node, Z, K)(in From node, ref To to, RCIAllocator allocator = theAllocator)
 	if (!is(To == enum)) {
 
-	enforce(node.isMapping, text("Could not convert yaml ", dumper(node), " to ", typeid(To), " not a map"));
+	enforce(node.isMapping, new InvalidCastException("Could not convert ${from} to ${to}, ${from} is not a map", typeid(node), typeid(to)));
 
 	auto pairs = (cast() node).mapping;
 

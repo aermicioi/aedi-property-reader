@@ -29,7 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.yaml.type_guesser;
 
-import aermicioi.aedi_property_reader.core.type_guesser;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
 import dyaml;
 
 /**
@@ -47,7 +47,7 @@ class YamlTypeGuesser : TypeGuesser!Node {
         Returns:
             TypeInfo of underlying yaml node data
         **/
-        TypeInfo guess(Node serialized) {
+        TypeInfo guess(Node serialized) const @trusted {
 
             if (serialized.isInt) {
                 return typeid(long);
