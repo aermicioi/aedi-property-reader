@@ -29,10 +29,12 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.yaml.yaml;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.chaining_convertor : ByTypePricingStrategy;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.yaml.accessor;
 import aermicioi.aedi_property_reader.yaml.convertor;
@@ -45,21 +47,45 @@ import std.datetime : SysTime;
 import std.experimental.logger;
 import std.experimental.allocator;
 
-alias YamlDocumentContainer = AdvisedDocumentContainer!(
+auto YamlConvertors(
+    YamlConvertor yamlConvertor,
+    YamlNodePairsToAssociativeArrayConvertor yamlNodePairsToAssociativeArrayConvertor,
+    CombinedConvertor defaultConvertor,
+    ByTypePricingStrategy byTypePricingStrategy,
+    size_t byTypePricingStrategyPrice = 900
+) {
+    defaultConvertor.add(yamlConvertor);
+    defaultConvertor.add(yamlNodePairsToAssociativeArrayConvertor);
+
+    byTypePricingStrategy.add(typeid(Node[]), byTypePricingStrategyPrice);
+    static foreach (ToType; YamlConvertor.ToTypes) {
+        defaultConvertor.add(new RangeToArrayConvertor!(ToType[], Node[])(defaultConvertor));
+        byTypePricingStrategy.add(typeid(ToType[]), byTypePricingStrategyPrice);
+    }
+}
+
+alias YamlDocumentContainer = PolicyDocument!(
     Node,
     Node,
-    WithConvertorBuilder!YamlConvertorBuilderFactory,
-    WithConvertorsFor!(
-        long,
-        real,
-        ubyte[],
-        bool,
-        string,
-        SysTime
-    ),
-    WithConvertors!(
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.core.config,
+    )(),
+    WithInitializer!(
         StdConvStringPrebuiltConvertorsFactory
-    )
+    )(),
+    WithConvertorAggregation!CombinedConvertor(),
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.yaml.type_guesser,
+        aermicioi.aedi_property_reader.yaml.accessor,
+        aermicioi.aedi_property_reader.yaml.inspector,
+        aermicioi.aedi_property_reader.yaml.convertor,
+        aermicioi.aedi_property_reader.yaml.yaml
+    )(),
+    WithLocatorForUnregisteredComponents("yaml-document-locator"),
+    WithInitializer!(
+        YamlConvertors
+    )(),
+    WithDefaultRegisterers
 );
 
 /**
@@ -67,18 +93,12 @@ Create a convertor container with data source being yaml document.
 
 Params:
     value = source of data for container to use to construct components.
-    accessor = property accessing logic
-    guesser = type guesser based on held yaml value
     allocator = allocator used to allocate converted values
 Returns:
     JsonConvertorContainer
 **/
-auto yaml(Node value, PropertyAccessor!Node accessor, TypeGuesser!Node guesser, RCIAllocator allocator = theAllocator) {
-
-    YamlDocumentContainer container = new YamlDocumentContainer(value);
-    container.guesser = guesser;
-    container.accessor = accessor;
-    container.allocator = allocator;
+auto yaml(Node value) {
+    YamlDocumentContainer container = YamlDocumentContainer(value);
 
     return container;
 }
@@ -86,24 +106,9 @@ auto yaml(Node value, PropertyAccessor!Node accessor, TypeGuesser!Node guesser, 
 /**
 ditto
 **/
-auto yaml(Node value, TypeGuesser!Node guesser, RCIAllocator allocator = theAllocator) {
+auto yaml() {
 
-    return value.yaml(accessor, guesser, allocator);
-}
-
-/**
-ditto
-**/
-auto yaml(Node value, RCIAllocator allocator = theAllocator) {
-    return value.yaml(accessor, new YamlTypeGuesser, allocator);
-}
-
-/**
-ditto
-**/
-auto yaml(RCIAllocator allocator = theAllocator) {
-
-    return Node("").yaml(allocator);
+    return Node("").yaml();
 }
 
 /**
@@ -121,7 +126,7 @@ auto yaml(string pathOrData, bool returnEmpty = true) {
     try {
 
         if (pathOrData.exists) {
-            return yaml(Loader(pathOrData).load());
+            return yaml(Loader.fromFile(pathOrData).load());
         } else {
             return yaml(Loader.fromString(pathOrData.dup).load());
         }
@@ -137,13 +142,4 @@ auto yaml(string pathOrData, bool returnEmpty = true) {
             "Could not create yaml convertor container from file or content passed in pathOrData: " ~ pathOrData, e
         );
     }
-}
-
-package auto accessor() {
-    import aermicioi.aedi_property_reader.convertor.accessor : dsl;
-
-    return dsl(
-        new YamlNodePropertyAccessor(),
-        new YamlIntegerIndexAccessor()
-    );
 }

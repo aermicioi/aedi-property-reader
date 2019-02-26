@@ -29,6 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.arg.inspector;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.inspector;
 import std.algorithm;
 import std.range;
@@ -37,6 +38,7 @@ import std.string;
 /**
 Argument inspector that provides info about available properties in a command line field.
 **/
+@component
 class ArgumentInspector : Inspector!(const(string)[]) {
 
     /**

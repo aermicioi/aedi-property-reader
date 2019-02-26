@@ -41,6 +41,7 @@ import aermicioi.aedi_property_reader.convertor.std_conv : stdConvert = convert,
 import std.experimental.allocator;
 import std.exception;
 import std.conv;
+import std.typecons : Yes, No;
 
 struct Placeholder {
     int i;
@@ -69,12 +70,13 @@ unittest {
     Placeholder from = Placeholder(20, "suple string", 2.0, 40);
     Placeholder to;
 
-    auto mapper = new CompositeMapper!(Placeholder, Placeholder);
-    mapper.conversion = false;
-    mapper.setter = new CompositeSetter!Placeholder;
-    mapper.accessor = new CompositeAccessor!Placeholder;
-    mapper.fromInspector = new CompositeInspector!Placeholder;
-    mapper.toInspector = new CompositeInspector!Placeholder;
+    auto mapper = new CompositeMapper!(Placeholder, Placeholder)(
+        new CompositeSetter!Placeholder,
+        new CompositeAccessor!Placeholder,
+        new CompositeInspector!Placeholder,
+        new CompositeInspector!Placeholder
+    );
+    mapper.conversion = Yes.conversion;
 
     mapper.map(from, to);
 
@@ -82,8 +84,6 @@ unittest {
 }
 
 unittest {
-    auto builder = new TypeGuessCallbackConvertorBuilder!(stdConvert, stdDestruct);
-
     string[string] from = [
         "i": "10",
         "p": "sample string",
@@ -93,23 +93,26 @@ unittest {
 
     Placeholder to;
 
-    auto mapper = new CompositeMapper!(Placeholder, string[string]);
-    mapper.conversion = false;
-    mapper.setter = new CompositeSetter!Placeholder;
-    mapper.accessor = new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string]));
-    mapper.fromInspector = new AssociativeArrayInspector!string;
-    mapper.toInspector = new CompositeInspector!Placeholder;
+    auto mapper = new CompositeMapper!(Placeholder, string[string])(
+        new CompositeSetter!Placeholder,
+        new WrappingFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string])),
+        new AssociativeArrayInspector!string,
+        new CompositeInspector!Placeholder
+    );
+    mapper.convertor = new NoOpConvertor();
 
+    mapper.conversion = No.conversion;
     assertThrown!InvalidArgumentException(mapper.map(from, to));
-    mapper.conversion = true;
+
+    mapper.conversion = Yes.conversion;
     assertThrown!ConvertorException(mapper.map(from, to));
 
-    mapper.convertors = cast(Convertor[]) [
-        builder.make!(int, string)(),
-        builder.make!(string, string)(),
-        builder.make!(double, string)(),
-        builder.make!(long, string)(),
-    ];
+    mapper.convertor = new CombinedConvertorImpl(
+        new StdConvConvertor!(int, string)(),
+        new StdConvConvertor!(string, string)(),
+        new StdConvConvertor!(double, string)(),
+        new StdConvConvertor!(long, string)(),
+    );
     mapper.map(from, to);
 
     assert(to.i == from["i"].to!int);
@@ -119,129 +122,40 @@ unittest {
 }
 
 unittest {
-    auto builder = new TypeGuessCallbackConvertorBuilder!(stdConvert, stdDestruct);
     auto from = cast(Object) [
         "i": "10",
         "p": "sample string",
         "f": "1.0",
         "m": "20"
-    ].placeholder;
+    ].pack;
 
-    auto to = cast(Object) Placeholder().placeholder;
+    auto to = cast(Object) Placeholder().pack;
 
-    auto mapper = new CompositeMapper!(Object, Object);
-    mapper.conversion = false;
-    mapper.setter =
-        new RuntimeCompositeSetter!(Placeholder, Object)(new CompositeSetter!Placeholder);
-
-    mapper.accessor =
-        new RuntimeCompositeAccessor!(string[string], Object)
-            (new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string])));
-
-    mapper.fromInspector =
-        new RuntimeInspector!(string[string])
-            (new AssociativeArrayInspector!string);
-
-    mapper.toInspector = new RuntimeInspector!Placeholder(new CompositeInspector!Placeholder);
-
-    assertThrown!InvalidArgumentException(mapper.map(from, to));
-    mapper.conversion = true;
-    assertThrown!ConvertorException(mapper.map(from, to));
-
-    mapper.convertors = cast(Convertor[]) [
-        builder.make!(int, string)(),
-        builder.make!(string, string)(),
-        builder.make!(double, string)(),
-        builder.make!(long, string)(),
-    ];
-    mapper.map(from, to);
-
-    assert(to.unwrap!Placeholder.i == from.unwrap!(string[string])["i"].to!int);
-    assert(to.unwrap!Placeholder.p == from.unwrap!(string[string])["p"]);
-    assert(to.unwrap!Placeholder.f == from.unwrap!(string[string])["f"].to!double);
-    assert(to.unwrap!Placeholder.m == from.unwrap!(string[string])["m"].to!long);
-}
-
-unittest {
-    auto builder = new TypeGuessCallbackConvertorBuilder!(stdConvert, stdDestruct);
-    auto from = cast(Object) [
-        "i": "10",
-        "p": "sample string",
-        "f": "1.0",
-        "m": "20"
-    ].placeholder;
-
-    auto to = cast(Object) Placeholder().placeholder;
-
-    auto mapper = new RuntimeMapper;
-    mapper.conversion = true;
-    mapper.force = true;
-    mapper.convertors = cast(Convertor[]) [
-                builder.make!(int, string)(),
-                builder.make!(string, string)(),
-                builder.make!(double, string)(),
-                builder.make!(long, string)(),
-                builder.make!(string, int)(),
-                builder.make!(string, double)(),
-                builder.make!(string, long)(),
-            ];
-    mapper.factory = (
-        in PropertyAccessor!Object accessor,
-        in PropertySetter!Object setter,
-        in Inspector!Object from,
-        in Inspector!Object to
-    ) =>
-        (new CompositeMapper!(Object, Object))
-            .accessor(accessor)
-            .setter(setter)
-            .fromInspector(from)
-            .toInspector(to);
-    mapper.destructor = (Mapper!Object m) => destroy(m);
-
-    mapper.setters = cast(PropertySetter!Object[]) [
+    auto mapper = new CompositeMapper!(Object, Object)(
         new RuntimeCompositeSetter!(Placeholder, Object)(new CompositeSetter!Placeholder),
-        new RuntimeCompositeSetter!(string[string], Object)
-            (new RuntimeFieldSetter!(string[string], string)(new AssociativeArraySetter!string))
-    ];
-
-    mapper.accessors = cast(PropertyAccessor!Object[]) [
-        new RuntimeCompositeAccessor!(string[string], Object)(new RuntimeFieldAccessor!(string[string], string)
-            (new AssociativeArrayAccessor!(string[string]))),
-        new RuntimeCompositeAccessor!(Placeholder, Object)(new CompositeAccessor!Placeholder)
-    ];
-
-    mapper.inspectors = cast(Inspector!Object[]) [
+        new RuntimeCompositeAccessor!(string[string], Object)
+            (new WrappingFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string]))),
         new RuntimeInspector!(string[string])(new AssociativeArrayInspector!string),
         new RuntimeInspector!Placeholder(new CompositeInspector!Placeholder)
-    ];
+    );
+    mapper.convertor = new NoOpConvertor();
 
+    mapper.conversion = No.conversion;
+    assertThrown!InvalidArgumentException(mapper.map(from, to));
+
+    mapper.conversion = Yes.conversion;
+    assertThrown!ConvertorException(mapper.map(from, to));
+
+    mapper.convertor = new CombinedConvertorImpl(
+        new StdConvConvertor!(int, string)(),
+        new StdConvConvertor!(string, string)(),
+        new StdConvConvertor!(double, string)(),
+        new StdConvConvertor!(long, string)(),
+    );
     mapper.map(from, to);
 
     assert(to.unwrap!Placeholder.i == from.unwrap!(string[string])["i"].to!int);
     assert(to.unwrap!Placeholder.p == from.unwrap!(string[string])["p"]);
     assert(to.unwrap!Placeholder.f == from.unwrap!(string[string])["f"].to!double);
     assert(to.unwrap!Placeholder.m == from.unwrap!(string[string])["m"].to!long);
-
-    mapper.factory = (
-        in PropertyAccessor!Object accessor,
-        in PropertySetter!Object setter,
-        in Inspector!Object from,
-        in Inspector!Object to
-    ) =>
-        (new CompositeMapper!(Object, Object))
-            .accessor(accessor)
-            .setter(setter)
-            .fromInspector(from)
-            .toInspector(to);
-
-    auto cfrom = cast(Object) [
-        "a": "a"
-    ].placeholder;
-
-    mapper.map(to, cfrom);
-
-    assert(to.unwrap!Placeholder.i == cfrom.unwrap!(string[string])["i"].to!int);
-    assert(to.unwrap!Placeholder.p == cfrom.unwrap!(string[string])["p"]);
-    assert(to.unwrap!Placeholder.f == cfrom.unwrap!(string[string])["f"].to!double);
-    assert(to.unwrap!Placeholder.m == cfrom.unwrap!(string[string])["m"].to!long);
 }

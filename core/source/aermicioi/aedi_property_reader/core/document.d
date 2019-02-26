@@ -29,7 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.core.document;
 
-import aermicioi.aedi;
+import aermicioi.aedi : Container, AediAllocatorAware = AllocatorAware, component, autowired, AllocatorAwareMixin, AediNotFoundException = NotFoundException;
 import aermicioi.aedi_property_reader.convertor.exception : ConvertorException;
 import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.convertor.placeholder;
@@ -46,32 +46,27 @@ import std.experimental.logger;
 import std.traits : Unqual;
 
 /**
-An implementation of Container interface from aedi IoC providing access to
-components that are stored into a document.
+Locator for properties that weren't registered in container, however are present in the root document.
 
-An implementation of Container interface from aedi IoC providing access to
-components that are stored into a document where a document could be anything
-that is accessable by a PropertyAccessor implementation. Components stored in
-document will be converted according to convertor associated to property
-path from document.
+Since the type of the properties is not known at the runtime,
+this locator will employ a type guesser to guess the type of element
+it is requested from root document. If guessing fails, then raw type will
+be returned per type guesser semantics.
 **/
-@safe class DocumentContainer(DocumentType, FieldType = DocumentType) :
-    Container,
-    Storage!(Convertor, string),
-    AllocatorAware!(),
-    Convertor
+@component
+@safe class DocumentLocator(DocumentType) : Container, AediAllocatorAware!()
 {
-    mixin AllocatorAwareMixin!(typeof(this));
 
     private {
-        Convertor[string] convertorsById;
-        CombinedConvertor convertor_;
-        PropertyAccessor!(DocumentType, FieldType) accessor_;
-        TypeGuesser!FieldType guesser_;
-
-        TypeWrapper document_;
+        Convertor convertor_;
+        PropertyAccessor!(DocumentType, Object) accessor_;
+        TypeGuesser!Object guesser_;
         Object[string] components;
+
+        TypeWrapper document;
     }
+
+    mixin AllocatorAwareMixin!(typeof(this));
 
     public {
 
@@ -80,10 +75,12 @@ path from document.
 
         Params:
             document = document stored in container.
+            convertor = convertor storing any other one registered in document container.
         **/
-        this(DocumentType document) {
-            this.document = document;
-            this.convertor = new CombinedConvertorImpl();
+        @autowired
+        this(DocumentType document, RCIAllocator allocator = theAllocator) {
+            this.document = TypeWrapper(document);
+            this.allocator = allocator;
         }
 
         @property {
@@ -97,7 +94,8 @@ path from document.
             Returns:
                 typeof(this)
             **/
-            typeof(this) convertor(CombinedConvertor convertor) @safe nothrow pure {
+            @autowired
+            typeof(this) convertor(Convertor convertor) @safe nothrow pure {
                 this.convertor_ = convertor;
 
                 return this;
@@ -109,7 +107,7 @@ path from document.
             Returns:
                 CombinedConvertor
             **/
-            inout(CombinedConvertor) convertor() @safe nothrow pure inout {
+            inout(Convertor) convertor() @safe nothrow pure inout {
                 return this.convertor_;
             }
 
@@ -122,7 +120,8 @@ path from document.
             Returns:
                 typeof(this)
             **/
-            typeof(this) guesser(TypeGuesser!FieldType guesser) @safe nothrow pure {
+            @autowired
+            typeof(this) guesser(TypeGuesser!Object guesser) @safe nothrow pure {
                 this.guesser_ = guesser;
 
                 return this;
@@ -132,35 +131,10 @@ path from document.
             Get guesser
 
             Returns:
-                TypeGuesser!FieldType
+                TypeGuesser!Object
             **/
-            inout(TypeGuesser!FieldType) guesser() @safe nothrow pure inout {
+            inout(TypeGuesser!Object) guesser() @safe nothrow pure inout {
                 return this.guesser_;
-            }
-
-            /**
-            Set document
-
-            Params:
-                document = document representing the root of configuration
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) document(DocumentType document) @safe nothrow {
-                this.document_ = TypeWrapper(document);
-
-                return this;
-            }
-
-            /**
-            Get document
-
-            Returns:
-                DocumentType
-            **/
-            inout(DocumentType) document() @safe nothrow pure inout {
-                return this.document_.payload;
             }
 
             /**
@@ -171,7 +145,8 @@ path from document.
             Returns:
                 typeof(this)
             **/
-            typeof(this) accessor(PropertyAccessor!(DocumentType, FieldType) accessor) @safe nothrow pure {
+            @autowired
+            typeof(this) accessor(PropertyAccessor!(DocumentType, Object) accessor) @safe nothrow pure {
                 this.accessor_ = accessor;
 
                 return this;
@@ -181,85 +156,11 @@ path from document.
             Get accessor
 
             Returns:
-                PropertyAccessor!(DocumentType, FieldType)
+                PropertyAccessor!(DocumentType, Object)
             **/
-            inout(PropertyAccessor!(DocumentType, FieldType)) accessor() @safe nothrow pure inout {
+            inout(PropertyAccessor!(DocumentType, Object)) accessor() @safe nothrow pure inout {
                 return this.accessor_;
             }
-        }
-
-        /**
-		Save an element in Storage by key identity.
-
-		Params:
-			identity = identity of element in Storage.
-			element = element which is to be saved in Storage.
-
-		Return:
-			Storage
-		**/
-        typeof(this) set(Convertor element, string identity) {
-            this.convertorsById[identity] = element;
-            this.set(element);
-
-            return this;
-        }
-
-        /**
-        ditto
-        **/
-        typeof(this) set(Convertor convertor) {
-            this.convertor.add(convertor);
-
-            return this;
-        }
-
-        /**
-        Remove an element from Storage with identity.
-
-        Remove an element from Storage with identity. If there is no element by provided identity, then no action is performed.
-
-        Params:
-        	identity = the identity of element to be removed.
-
-    	Return:
-    		Storage
-        **/
-        typeof(this) remove(string identity) {
-            this.convertorsById.remove(identity);
-
-            return this;
-        }
-
-        /**
-        Sets up the internal state of container.
-
-        Sets up the internal state of container (Ex, for singleton container it will spawn all objects that locator contains).
-        **/
-        Container instantiate() @trusted {
-            foreach (identity, convertor; this.convertorsById) {
-                if (this.accessor.has(this.document, identity)) {
-                    this.get(identity);
-                }
-            }
-
-            return this;
-        }
-
-        /**
-        Destruct all managed components.
-
-        Destruct all managed components. The method denotes the end of container lifetime, and therefore destruction of all managed components
-        by it.
-        **/
-        Container terminate() @trusted {
-            foreach (identity, convertor; this.convertorsById) {
-                if (auto component = identity in this.components) {
-                    convertor.destruct(*component, this.allocator);
-                }
-            }
-
-            return this;
         }
 
         /**
@@ -277,53 +178,25 @@ path from document.
         Object get(string identity) @trusted {
             debug(trace) trace("Searching for \"", identity, '"');
 
-            Object converted;
+            if (identity in components) {
+                debug(trace) trace("Found already converted component, supplying it.");
 
-            if (auto peeked = identity in this.components) {
-                debug(trace) trace("Found already converted \"", identity, '"');
-
-                return *peeked;
+                return components[identity];
             }
 
-            if (!this.accessor.has(this.document, identity)) {
-                throw new NotFoundException(
+            if (!this.accessor.has(this.document.payload, identity)) {
+                throw new AediNotFoundException(
                     text("Could not find ${identity} in document of type ", typeid(DocumentType)), identity
                 );
             }
 
-            static if (is(FieldType : Object)) {
+            Object document = this.accessor.access(this.document.payload, identity);
 
-                FieldType document = this.accessor.access(this.document, identity);
-            } else {
-                import std.typecons : scoped;
-                auto document = scoped!(PlaceholderImpl!FieldType)(this.accessor.access(this.document, identity));
-            }
-
-            debug(trace) trace("Searching for suitable convertor for \"", identity, "\" of ", typeid(FieldType));
-
-            if (auto convertor = identity in this.convertorsById) {
-                if (convertor.to !is typeid(void)) {
-                    debug(trace) trace(
-                        "Found convertor for \"", identity, "\" commencing conversion to ", convertor.to
-                    );
-
-                    converted = (*convertor).convert(document, convertor.to, this.allocator);
-                    this.components[identity] = converted;
-                    return converted;
-                }
-            }
-
-            debug(trace) trace("No suitable convertor found, attempting to guess the desired type.");
-            static if (is(FieldType : Object)) {
-
-                TypeInfo guess = this.guesser.guess(document);
-            } else {
-
-                TypeInfo guess = this.guesser.guess(document.value);
-            }
+            debug(trace) trace("Attempting to guess the desired type.");
+            TypeInfo guess = this.guesser.guess(document);
 
             debug(trace) trace("Guessed ", guess, " type, commencing conversion");
-            return this.convert(document, guess, this.allocator);
+            return convertor.convert(document, guess, this.allocator);
         }
 
         /**
@@ -339,203 +212,30 @@ path from document.
     		bool true if an element by key is present in Locator.
         **/
         bool has(string identity) inout @trusted {
-            if (identity in this.components) {
+            return (identity in components) || this.accessor.has((cast(TypeWrapper) this.document).payload, identity);
+        }
 
-                return true;
+        /**
+        Sets up the internal state of container.
+
+        Sets up the internal state of container (Ex, for singleton container it will spawn all objects that locator contains).
+        **/
+        typeof(this) instantiate() {
+            return this;
+        }
+
+        /**
+        Destruct all managed components.
+
+        Destruct all managed components. The method denotes the end of container lifetime, and therefore destruction of all managed components
+        by it.
+        **/
+        typeof(this) terminate() @trusted {
+            foreach (id, component; this.components) {
+                this.convertor.destruct(null, component, allocator);
             }
 
-            return this.accessor.has((cast(TypeWrapper) this.document_).payload, identity);
-        }
-
-        @property {
-
-            /**
-            Get the type info of component that convertor can convert from.
-
-            Get the type info of component that convertor can convert from.
-            The method is returning the default type that it is able to convert,
-            though it is not necessarily limited to this type only. More generalistic
-            checks should be done by convertsFrom method.
-
-            Returns:
-                type info of component that convertor is able to convert.
-            **/
-            TypeInfo from() @safe const nothrow pure {
-                return typeid(FieldType);
-            }
-
-            /**
-            Get the type info of component that convertor is able to convert to.
-
-            Get the type info of component that convertor is able to convert to.
-            The method is returning the default type that is able to convert,
-            though it is not necessarily limited to this type only. More generalistic
-            checks should be done by convertsTo method.
-
-            Returns:
-                type info of component that can be converted to.
-            **/
-            TypeInfo to() @safe const nothrow pure {
-                return typeid(void);
-            }
-        }
-
-        /**
-        Check whether convertor is able to convert from.
-
-        Check whether convertor is able to convert from.
-        The intent of method is to implement customized type checking
-        is not limited immediatly to supported default from component.
-
-        Params:
-            from = the type info of component that could potentially be converted by convertor.
-        Returns:
-            true if it is able to convert from, or false otherwise.
-        **/
-        bool convertsFrom(TypeInfo from) @safe const nothrow pure  {
-            return this.convertor.convertsFrom(from);
-        }
-
-        /**
-        Check whether convertor is able to convert from.
-
-        Check whether convertor is able to convert from.
-        The method will try to extract type info out of from
-        object and use for subsequent type checking.
-        The intent of method is to implement customized type checking
-        is not limited immediatly to supported default from component.
-
-        Params:
-            from = the type info of component that could potentially be converted by convertor.
-        Returns:
-            true if it is able to convert from, or false otherwise.
-        **/
-        bool convertsFrom(in Object from) @safe const nothrow pure  {
-            return this.convertor.convertsFrom(from);
-        }
-
-        /**
-        Check whether convertor is able to convert to.
-
-        Check whether convertor is able to convert to.
-        The intent of the method is to implement customized type checking
-        that is not limited immediatly to supported default to component.
-
-        Params:
-            to = type info of component that convertor could potentially convert to.
-
-        Returns:
-            true if it is able to convert to, false otherwise.
-        **/
-        bool convertsTo(TypeInfo to) @safe const nothrow pure  {
-            return this.convertor.convertsTo(to);
-        }
-
-        /**
-        Check whether convertor is able to convert to.
-
-        Check whether convertor is able to convert to.
-        The method will try to extract type info out of to object and use
-        for subsequent type checking.
-        The intent of the method is to implement customized type checking
-        that is not limited immediatly to supported default to component.
-
-        Params:
-            to = type info of component that convertor could potentially convert to.
-
-        Returns:
-            true if it is able to convert to, false otherwise.
-        **/
-        bool convertsTo(in Object to) @safe const nothrow pure  {
-            return this.convertor.convertsTo(to);
-        }
-
-        /**
-        Check whether convertor is able to convert from type to type.
-
-        Check whether convertor is able to convert from type to type.
-        This set of methods should be the most precise way of determining
-        whether convertor is able to convert from type to type, since it
-        provides both components to the decision logic implemented by convertor
-        compared to the case with $(D_INLINECODE convertsTo) and $(D_INLINECODE convertsFrom).
-        Note that those methods are still useful when categorization or other
-        logic should be applied per original or destination type.
-
-        Implementation:
-            This is default implementation of converts methods which delegate
-            the decision to $(D_INLINECODE convertsTo) and $(D_INLINECODE convertsFrom).
-
-        Params:
-            from = the original component or it's type to convert from
-            to = the destination component or it's type to convert to
-
-        Returns:
-            true if it is able to convert from component to destination component
-        **/
-        bool converts(TypeInfo from, TypeInfo to) @safe const nothrow {
-            return this.convertor.converts(from, to);
-        }
-
-        /**
-        ditto
-        **/
-        bool converts(TypeInfo from, in Object to) @safe const nothrow {
-            return this.convertor.converts(from, to);
-        }
-
-        /**
-        ditto
-        **/
-        bool converts(in Object from, TypeInfo to) @safe const nothrow {
-            return this.convertor.converts(from, to);
-        }
-
-        /**
-        ditto
-        **/
-        bool converts(in Object from, in Object to) @safe const nothrow {
-            return this.convertor.converts(from, to);
-        }
-
-        /**
-        Convert from component to component.
-
-        Params:
-            from = original component that is to be converted.
-            to = destination object that will be constructed out for original one.
-            allocator = optional allocator that could be used to construct to component.
-        Throws:
-            ConvertorException when there is a converting error
-            InvalidArgumentException when arguments passed are not of right type or state
-        Returns:
-            Resulting converted component.
-        **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const @trusted {
-            return this.convertor.convert(from, to, allocator);
-        }
-
-        /**
-        Destroy component created using this convertor.
-
-        Destroy component created using this convertor.
-        Since convertor could potentially allocate memory for
-        converted component, only itself is containing history of allocation,
-        and therefore it is responsible as well to destroy and free allocated
-        memory with allocator.
-
-        Params:
-            converted = component that should be destroyed.
-            allocator = allocator used to allocate converted component.
-        **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const @trusted {
-            auto destructors = this.convertorsById.byValue.filter!(convertor => convertor.convertsTo(converted));
-
-            enforce!ConvertorException(
-                !destructors.empty,
-                text("Could not destroy ", converted.identify, ", no suitable convertor found.")
-            );
-
-            destructors.front.destruct(converted, allocator);
+            return this;
         }
     }
 
@@ -546,66 +246,6 @@ path from document.
         **/
         static struct TypeWrapper {
             DocumentType payload;
-        }
-    }
-}
-
-/**
-Marker interface that holds up an implementation of a convertor builder.
-Params:
-    ConvertorBuilderFactory = a factory (function(Convertor[] convertor)) that creates a convertor builder
-**/
-interface WithConvertorBuilder(alias ConvertorBuilderFactory) {
-
-}
-
-/**
-Marker interface that adds information of types to which document container should already have Convertors.
-**/
-interface WithConvertorsFor(ConvertibleTypes...) {
-
-}
-
-/**
-Marker interface that adds information on source types which document should be able to convert from.
-**/
-interface WithConvertorSources(SourceTypes...) {
-
-}
-
-/**
-Marker interface that adds prebuilt Convertors into document container.
-
-Params:
-    ConvertorsFactory = a factory (no arg function) that will create a list of Convertors
-**/
-interface WithConvertors(alias ConvertorsFactory) {
-
-}
-
-/**
-Marker interface that provides a configuration for component container.
-**/
-interface WithComponentPayload(alias payload) {
-
-}
-
-/**
-An implementation of document container that holds an advised convertor along the document for usage as default constructor for convertorsById
-in configuration api.
-**/
-class AdvisedDocumentContainer(DocumentType, FieldType, Interfaces...) :
-    DocumentContainer!(DocumentType, FieldType), AliasSeq!(Interfaces) {
-    public {
-
-        /**
-        Constructor for AdvisedDocumentContainer
-
-        Params:
-            document = document containing raw information.
-        **/
-        this(DocumentType document) {
-            super(document);
         }
     }
 }

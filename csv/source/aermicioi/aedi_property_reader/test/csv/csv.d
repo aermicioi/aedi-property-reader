@@ -31,16 +31,20 @@ module aermicioi.aedi_property_reader.csv.test.csv;
 
 import aermicioi.aedi_property_reader.csv;
 import aermicioi.aedi_property_reader.core;
+import aermicioi.aedi.storage.locator;
 import std.exception;
 
 unittest {
-	auto c = csv("float,integer,string\n" ~
+	auto document = csv("float,integer,string\n" ~
         "1.0,10,\"One hundred\"\n" ~
         "2.0,20,\"Two hundred\"\n");
 
-    with (c.configure) {
+    Locator!() c;
+    with (document.configure) {
         register!(string[string])("0");
         register!(string[string])("1");
+
+        c = container;
     }
 
     assert(c.locate!(string[string])("0") == ["float": "1.0", "integer": "10", "string": "One hundred"]);
@@ -49,12 +53,15 @@ unittest {
 
 unittest {
 	import std.path : dirName;
-	auto c = csv(dirName(__FILE__) ~ "/config.csv", false);
+	auto document = csv(dirName(__FILE__) ~ "/config.csv", false);
 
-	with (c.configure) {
+    Locator!() c;
+	with (document.configure) {
         register!(string[string])("0");
         register!(string[string])("1");
         register!(string[string])("2");
+
+        c = container;
     }
 
     assert(c.locate!(string[string])("0") == ["float": "1.0", "integer": "10", "string": "One hundred"]);
@@ -69,9 +76,11 @@ unittest {
 }
 
 unittest {
-	auto c = csv("first,second,third\n" ~
+	auto document = csv("first,second,third\n" ~
         "1.0,10,\"One hundred\"\n" ~
         "2.0,20,\"Two hundred\"\n");
+
+    Locator!() c;
 
 	static struct Placeholder {
 		float first;
@@ -79,9 +88,11 @@ unittest {
 		string third;
 	}
 
-	with (c.configure) {
+	with (document.configure) {
 		register!Placeholder("0");
 		register!Placeholder("1");
+
+        c = container;
     }
 
 	assert(c.locate!Placeholder("0") == Placeholder(1.0, 10, "One hundred"));

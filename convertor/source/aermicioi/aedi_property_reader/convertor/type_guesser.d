@@ -50,6 +50,28 @@ Interface for components that are able to guess the D type of serialized compone
 }
 
 /**
+A guesser that simply doesn't guess anything and just returns the SerializedType
+**/
+@safe class SimpleTypeGuesser(SerializedType) : TypeGuesser!SerializedType {
+
+    public {
+
+        /**
+        Guess the D type of serialized based on information available in it.
+
+        Params:
+            serialized = the component for which guesser will attempt to guess the type.
+
+        Returns:
+            TypeInfo guessed type
+        **/
+        TypeInfo guess(SerializedType serialized) const {
+            return typeid(SerializedType);
+        }
+    }
+}
+
+/**
 Guesser based on std.conv.to family of functions.
 
 Guesser based on std.conv.to family of functions. It will attempt to convert sequentially
@@ -80,7 +102,58 @@ to all ConvertableTypes until one succeeds, for which the typeinfo will be retur
                 }
             }
 
-            return typeid(SerializedType);
+            bugfix: return typeid(SerializedType); // Well without this magical label flow analysis thinks that code won't reach up to this point, which is untrue.
+        }
+    }
+}
+
+/**
+A type guesser that will attempt to downcast passed object to a Type from Types list and
+use particular type guesser on it.
+**/
+class DelegatingObjectTypeGuesser(Types...) : TypeGuesser!Object {
+    import std.meta : staticMap;
+    import aermicioi.aedi_property_reader.convertor.placeholder;
+
+    staticMap!(TypeGuesser, Types) guessers;
+
+    public {
+
+        /**
+        Constructor for delegating object type guesser
+
+        Params:
+            guessers = a list of guessers for this type guesser.
+        **/
+        this(typeof(this.guessers) guessers)
+        in {
+            import std.conv : text;
+            static foreach (guesser; guessers) {
+                assert(guesser !is null, text("Expected a guesser of type ", typeid(guesser), " not null"));
+            }
+        }
+        do {
+            this.guessers = guessers;
+        }
+
+        /**
+        Guess the D type of serialized based on eager attempts to convert serialized to one of ConvertableTypes.
+
+        Params:
+            serialized = the component for which guesser will attempt to guess the type.
+
+        Returns:
+            TypeInfo guessed type for which std.conv.to didn't fail.
+        **/
+        TypeInfo guess(Object serialized) const {
+            static foreach (index, Type; Types) {
+                if (serialized.identify is typeid(Type)) {
+
+                    return guessers[index].guess(serialized.unwrap!Type);
+                }
+            }
+
+            return typeid(Object);
         }
     }
 }

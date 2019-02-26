@@ -31,9 +31,11 @@ module aermicioi.aedi_property_reader.convertor.placeholder;
 
 import aermicioi.aedi : Wrapper;
 import aermicioi.aedi_property_reader.convertor.traits : n;
+import aermicioi.aedi_property_reader.convertor.convertor : Convertor;
 import std.experimental.allocator;
 import std.conv;
 import std.traits : Unqual;
+import std.typecons : scoped;
 
 /**
 Interface for objects that are aware of a type and can provide it.
@@ -46,13 +48,55 @@ interface TypeAware {
     Returns:
         TypeInfo stored in component.
     **/
-    TypeInfo type() const nothrow @property @nogc pure;
+    const(TypeInfo) type() const nothrow @property @nogc pure;
+}
+
+/**
+Interface for objects that are aware of original type from which containing value was created.
+**/
+interface OriginalTypeAware {
+
+    /**
+    Get the type of original component from which contained one was created/converted.
+
+    Returns:
+        TypeInfo of original component
+    **/
+    const(TypeInfo) original() const @property nothrow @nogc pure;
+}
+
+/**
+Interface for objects that are aware of convertor used to convert to destination type component stored in the implementor.
+**/
+interface ConvertorAware {
+
+    /**
+    Get the convertor used to convert component stored in implementor of this interface.
+
+    Returns:
+        Convertor used to convert component stored by implementor of this interface
+    **/
+    const(Convertor) convertor() const @property nothrow @nogc pure;
+}
+
+/**
+Interface for objects aware of allocator used in conversion of contained component.
+**/
+interface AllocatorAware {
+
+    /**
+    Get allocator used in conversion of component stored in implementor.
+
+    Returns:
+        Allocator used to convert component stored by implementor of this interface.
+    **/
+    inout(RCIAllocator) allocator() inout @property nothrow @nogc pure;
 }
 
 /**
 Interface for objects that can hold a value in.
 **/
-interface Placeholder(T) : TypeAware {
+interface Placeholder(T) {
 
     @property {
 
@@ -82,20 +126,31 @@ interface Placeholder(T) : TypeAware {
             return this.value(value);
         }
 
-        /**
-        Subtyping to stored value.
-        **/
-        alias value this;
     }
+}
+
+/**
+Interface for components that are able to destroy component contained in them using convertor, allocator, and original type converted from.
+**/
+interface Destroyable {
+
+    /**
+    Destroy contained component using convertor and additional information available.
+
+    Returns:
+        true if it was able to destroy, false otherwise.
+    **/
+    bool destruct() @safe nothrow;
 }
 
 /**
 Implementation of Placeholder!T.
 **/
-class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
+class PlaceholderImpl(T) : Placeholder!T, Wrapper!T, TypeAware, AllocatorAware {
 
     private {
         T payload;
+        RCIAllocator allocator_;
     }
 
     /**
@@ -104,44 +159,63 @@ class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
     Params:
         value = value that will be stored in.
     **/
-    this(ref T value) {
+    this(ref T value, RCIAllocator allocator = theAllocator) nothrow {
         this.payload = value;
+        this.allocator_ = allocator;
     }
 
-    this(ref const T value) const {
+    this(ref const T value, RCIAllocator allocator = theAllocator) nothrow const {
         this.payload = value;
+        this.allocator_ = allocator;
     }
 
-    this(ref immutable T value) immutable {
+    this(ref immutable T value, immutable RCIAllocator allocator) nothrow immutable {
         this.payload = value;
+        this.allocator_ = allocator;
     }
 
     /**
     ditto
     **/
-    this(T value) {
-        this(value);
-    }
-
-    this(const T value) const {
-        this.payload = value;
-    }
-
-    this(immutable T value) immutable {
-        this.payload = value;
+    this(T value, RCIAllocator allocator = theAllocator) nothrow {
+        this(value, allocator);
     }
 
     /**
-    Get the type of component that is stored in.
-
-    Returns:
-        TypeInfo of stored component.
+    ditto
     **/
-    TypeInfo type() const nothrow @property @nogc pure {
-        return typeid(T);
+    this(const T value, RCIAllocator allocator = theAllocator) nothrow const {
+        this(value, allocator);
+    }
+
+    /**
+    ditto
+    **/
+    this(immutable T value, immutable RCIAllocator allocator) nothrow immutable {
+        this(value, allocator);
     }
 
     @property {
+        /**
+        Get the type of component that is stored in.
+
+        Returns:
+            TypeInfo of stored component.
+        **/
+        TypeInfo type() const nothrow @nogc pure {
+            return typeid(T);
+        }
+
+        /**
+        Get allocator
+
+        Returns:
+            RCIAllocator
+        **/
+        inout(RCIAllocator) allocator() @safe nothrow pure inout {
+            return this.allocator_;
+        }
+
         /**
         Store value in component.
 
@@ -153,8 +227,9 @@ class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
         **/
         ref T value(ref T value) nothrow @safe {
             static if (!is(T == const) && !is(T == immutable)) {
+                import std.algorithm : move;
 
-                this.payload = value;
+                value.move(this.payload);
             }
 
             return this.payload;
@@ -173,32 +248,226 @@ class PlaceholderImpl(T) : Placeholder!T, Wrapper!T {
 }
 
 /**
+Implementation of Placeholder!T.
+**/
+class OriginalAwarePlaceholderImpl(T) : PlaceholderImpl!T, OriginalTypeAware {
+
+    private {
+        const TypeInfo original_;
+    }
+
+    /**
+    Constructor for placeholder accepting stored value.
+
+    Params:
+        value = value that will be stored in.
+    **/
+    this(ref T value, const TypeInfo original, RCIAllocator allocator = theAllocator) nothrow
+    in (original !is null, "Placeholder expects original type to be provided, not null.") {
+        super(value, allocator);
+        this.original_ = original;
+    }
+
+    this(ref const T value, const TypeInfo original, RCIAllocator allocator = theAllocator) nothrow const
+    in (original !is null, "Placeholder expects original type to be provided, not null.") {
+        super(value, allocator);
+        this.original_ = original;
+    }
+
+    this(ref immutable T value, immutable TypeInfo original, immutable RCIAllocator allocator) nothrow immutable
+    in (original !is null, "Placeholder expects original type to be provided, not null.") {
+        super(value, allocator);
+        this.original_ = original_;
+    }
+
+    /**
+    ditto
+    **/
+    this(T value, const TypeInfo original, RCIAllocator allocator = theAllocator) nothrow {
+        this(value, original, allocator);
+    }
+
+    /**
+    ditto
+    **/
+    this(const T value, const TypeInfo original, RCIAllocator allocator = theAllocator) nothrow const {
+        this(value, original, allocator);
+    }
+
+    /**
+    ditto
+    **/
+    this(immutable T value, immutable TypeInfo original, immutable RCIAllocator allocator) nothrow immutable {
+        this(value, original, allocator);
+    }
+
+    @property {
+
+        /**
+        Get the type of original component from which contained one was created/converted.
+
+        Returns:
+            TypeInfo of original component
+        **/
+        const(TypeInfo) original() const nothrow @nogc pure {
+            return this.original_;
+        }
+    }
+}
+
+/**
+Implementation of Placeholder!T.
+**/
+class ConvertorAndOriginalAwarePlaceholderImpl(T) : OriginalAwarePlaceholderImpl!T, ConvertorAware {
+
+    private {
+        const Convertor convertor_;
+    }
+
+    /**
+    Constructor for placeholder accepting stored value.
+
+    Params:
+        value = value that will be stored in.
+    **/
+    this(ref T value, const TypeInfo original, const Convertor convertor, RCIAllocator allocator = theAllocator) nothrow
+    in (convertor !is null, "Placeholder expects convertor of component to be provided, not null.") {
+        super(value, original, allocator);
+        this.convertor_ = convertor;
+    }
+
+    this(ref const T value, const TypeInfo original, const Convertor convertor, RCIAllocator allocator = theAllocator) nothrow const
+    in (convertor !is null, "Placeholder expects convertor of component to be provided, not null.") {
+        super(value, original, allocator);
+        this.convertor_ = convertor;
+    }
+
+    this(ref immutable T value, immutable TypeInfo original, immutable Convertor convertor, immutable RCIAllocator allocator) nothrow immutable
+    in (convertor !is null, "Placeholder expects convertor of component to be provided, not null.") {
+        super(value, original, allocator);
+        this.convertor_ = convertor_;
+    }
+
+    /**
+    ditto
+    **/
+    this(T value, const TypeInfo original, const Convertor convertor, RCIAllocator allocator = theAllocator) nothrow {
+        this(value, original, convertor, allocator);
+    }
+
+    /**
+    ditto
+    **/
+    this(const T value, const TypeInfo original, const Convertor convertor, RCIAllocator allocator = theAllocator) nothrow const {
+        this(value, original, convertor, allocator);
+    }
+
+    /**
+    ditto
+    **/
+    this(immutable T value, immutable TypeInfo original, immutable Convertor convertor, immutable RCIAllocator allocator) nothrow immutable {
+        this(value, original, convertor, allocator);
+    }
+
+    @property {
+
+        /**
+        Get the type of original component from which contained one was created/converted.
+
+        Returns:
+            TypeInfo of original component
+        **/
+        const(Convertor) convertor() const nothrow @nogc pure {
+            return this.convertor_;
+        }
+    }
+}
+
+/**
 Wrap up a value in a placeholding object.
 
 Params:
     value = value that will be wrapped in placeholding object
+    from = original type from which value was converted
+    convertor = convertor used in converting value out of from
     allocator = allocator used to allocate placeholding object
 
 Returns:
     Placeholder!T with value as content.
 **/
-auto placeholder(T)(auto ref T value, RCIAllocator allocator = theAllocator) @trusted {
-    static if (is(T : Object) || is(T : const Object) || is(T : immutable Object)) {
-        return value;
-    } else {
-        import std.traits : QualifierOf;
-        alias WithStorageOfT = QualifierOf!T;
-
-        return allocator.make!(WithStorageOfT!(PlaceholderImpl!T))(value);
-    }
+ConvertorAndOriginalAwarePlaceholderImpl!T pack(T, From)(auto ref T value, const From from, const Convertor convertor, RCIAllocator allocator = theAllocator) @trusted {
+    return allocator.make!(ConvertorAndOriginalAwarePlaceholderImpl!T)(value, from.identify, convertor, allocator);
 }
 
 /**
 ditto
 **/
-auto placeholderWithStorageClass(alias StorageType, T)(auto ref T value, RCIAllocator allocator = theAllocator) @trusted {
+OriginalAwarePlaceholderImpl!T pack(T, From)(auto ref T value, const From from, RCIAllocator allocator = theAllocator) @trusted {
+    return allocator.make!(OriginalAwarePlaceholderImpl!T)(value, from.identify, allocator);
+}
 
-    return placeholder!(StorageType!T)(cast(StorageType!T) value, allocator);
+/**
+ditto
+**/
+PlaceholderImpl!T pack(T)(auto ref T value, RCIAllocator allocator = theAllocator) @trusted {
+    return allocator.make!(PlaceholderImpl!T)(value, allocator);
+}
+
+/**
+ditto
+**/
+auto packWithStorageClass(alias StorageType, T)(auto ref T value, const TypeInfo from, const Convertor convertor, RCIAllocator allocator = theAllocator) @trusted {
+
+    return pack!(StorageType!T)(cast(StorageType!T) value, from, convertor, allocator);
+}
+
+/**
+ditto
+**/
+auto packWithStorageClass(alias StorageType, T)(auto ref T value, const TypeInfo from, RCIAllocator allocator = theAllocator) @trusted {
+
+    return pack!(StorageType!T)(cast(StorageType!T) value, from, allocator);
+}
+
+/**
+ditto
+**/
+auto packWithStorageClass(alias StorageType, T)(auto ref T value, RCIAllocator allocator = theAllocator) @trusted {
+
+    return pack!(StorageType!T)(cast(StorageType!T) value, allocator);
+}
+
+/**
+Wrap up a value in a placeholding object stored on stack instead of allocator.
+
+Params:
+    value = value that will be wrapped in placeholding object
+
+Returns:
+    scoped Placeholder!T with value as content.
+**/
+auto stored(T)(auto ref T value, const TypeInfo from, const Convertor convertor) {
+    import std.typecons : scoped;
+
+    return scoped!(ConvertorAndOriginalAwarePlaceholderImpl!T)(value, from, convertor, RCIAllocator());
+}
+
+/**
+ditto
+**/
+auto stored(T)(auto ref T value, const TypeInfo from) {
+    import std.typecons : scoped;
+
+    return scoped!(OriginalAwarePlaceholderImpl!T)(value, from, RCIAllocator());
+}
+
+/**
+ditto
+**/
+auto stored(T)(auto ref T value) {
+    import std.typecons : scoped;
+
+    return scoped!(PlaceholderImpl!T)(value, RCIAllocator());
 }
 
 /**
@@ -214,24 +483,113 @@ Params:
 Returns:
     T if it is rooted in Object, or Placeholder!T if it is not.
 **/
-auto unwrap(T)(inout(Object) object) @trusted nothrow pure {
+auto ref T unwrap(T)(inout(Object) object) @trusted nothrow {
+    static if (is(T : Object) || is(T : const Object) || is(T : immutable Object) || is(T : inout(Object))) {
+        {
+            auto downcasted = cast(T) object;
+
+            if (downcasted !is null) {
+                return downcasted;
+            }
+        }
+    }
+
+    {
+        auto downcasted = cast(Placeholder!T) object;
+
+        if (downcasted !is null) {
+            return downcasted.value;
+        }
+    }
+
+    assert(false, text(object.identify, " does not implement", typeid(T), ". inout(Object) cannot be extracted."));
+}
+
+/**
+ditto
+**/
+auto ref T unwrap(T : Placeholder!Z, Z)(T placeholder) @trusted nothrow {
+    return placeholder;
+}
+
+auto ref T unwrap(T : typeof(null))(inout(Object) object) {
+    if (object is null) {
+        return null;
+    }
+
+    Placeholder!T placeholder = cast(Placeholder!T) object;
+
+    if (placeholder !is null) {
+        return placeholder.value;
+    }
+
+    assert(false, text(object.identify, " is not of ", typeid(null)));
+}
+
+/**
+Downcast object to type T, or destructively unwrap it from Placeholder!T.
+
+Downcast object to type T, or destructively unwrap it from Placeholder!T.
+If T is rooted in Object, downcast will be performed, otherwise
+it is assumed that T is stored in Placeholder!T object, and therefore
+object is downcast to Placeholder!T it's value extracted and placeholder itself is
+disposed of.
+
+Params:
+    object = object from which to unwrap value of type T
+Returns:
+    T if it is rooted in Object, or Placeholder!T if it is not.
+**/
+T unpack(T)(Object object, RCIAllocator allocator = theAllocator) @trusted {
     import aermicioi.aedi_property_reader.convertor.traits : n;
-    static if (is(T : Object) || is(T : const Object) || is(T : immutable Object)) {
+    static if (is(T : Object) || is(T : const Object) || is(T : immutable Object) || is(T : inout(Object))) {
+        {
+            auto downcasted = cast(T) object;
 
-        return cast(T) object;
-    } else {
+            if (downcasted !is null) {
+                return downcasted;
+            }
+        }
+    }
 
-        auto wrapper = (cast(Placeholder!T) object);
+    {
+        auto downcasted = cast(Placeholder!T) object;
 
-        assert(
-            wrapper !is null,
-            text(
-                object.classinfo, " does not implement ", typeid(Placeholder!T),
-                " ", typeid(T), " content cannot be extracted"
-            )
-        ).n;
+        if (downcasted !is null) {
+            return downcasted.unpack;
+        }
+    }
 
-        return wrapper;
+    assert(false, text(object.identify, " does not implement", typeid(T), ". inout(Object) cannot be extracted."));
+}
+
+T unpack(T : typeof(null))(Object object, RCIAllocator allocator = theAllocator) @trusted {
+    import aermicioi.aedi_property_reader.convertor.traits : n;
+    if (object is null) {
+        return null;
+    }
+
+    {
+        auto downcasted = cast(Placeholder!T) object;
+
+        if (downcasted !is null) {
+            return downcasted.unpack;
+        }
+    }
+
+    assert(false, text(object.identify, " does not implement", typeid(T), ". inout(Object) cannot be extracted."));
+}
+
+/**
+ditto
+**/
+Z unpack(T : Placeholder!Z, Z)(T placeholder, RCIAllocator allocator = theAllocator) @trusted nothrow {
+    try {
+        scope(exit) allocator.dispose(placeholder);
+
+        return placeholder.value;
+    } catch (Exception e) {
+        throw new Error("Failed to dispose placeholder for a value", e);
     }
 }
 
@@ -249,7 +607,7 @@ Params:
 Returns:
     TypeInfo of stored type of object implements TypeAware, or classinfo of object itself.
 **/
-TypeInfo identify(T)(T object) @trusted nothrow @nogc pure
+const(TypeInfo) identify(T)(T object) @trusted nothrow @nogc
     if (is(T : Object) || is(T : const Object) || is(T : immutable Object)) {
 
     if (object is null) {
@@ -266,32 +624,263 @@ TypeInfo identify(T)(T object) @trusted nothrow @nogc pure
 }
 
 /**
-Get the type of component.
-
-Params:
-    component = the component for which to return the type.
-
-Returns:
-    TypeInfo the type of component
+ditto
 **/
-TypeInfo identify(T)(auto ref T component) nothrow @nogc @safe
+const(TypeInfo) identify(T)(auto ref T component) nothrow @nogc @safe
     if (!(is(T : Object) || is(T : const Object) || is(T : immutable Object))) {
     import std.stdio;
 
     return typeid(component);
 }
 
-struct MutableStorage(T) {
+/**
+ditto
+**/
+T identify(T : TypeInfo)(auto ref T typeinfo) nothrow @nogc @safe {
+    import std.stdio;
 
-    T payload;
-
-    this(T payload) {
-        this.payload = payload;
-    }
-
-    alias payload this;
+    return typeinfo;
 }
 
-auto mutableStorage(T)(T payload) {
-    return MutableStorage!T(payload);
+/**
+ditto
+**/
+T identify(T : const TypeInfo)(auto ref T typeinfo) nothrow @nogc @safe {
+    import std.stdio;
+
+    return typeinfo;
+}
+
+/**
+ditto
+**/
+T identify(T : immutable TypeInfo)(auto ref T typeinfo) nothrow @nogc @safe {
+    import std.stdio;
+
+    return typeinfo;
+}
+
+/**
+Identify the original type of converted component.
+
+Identify the original type of converted component.
+The object will be downcasted to OriginalTypeAware
+interface and if it succeeded original type will be
+returned. For non-object components typeid(void)
+will be returned as no OriginalTypeAware they could implement.
+
+Params:
+    object = converted component for which original type would need to be identified.
+Returns:
+    TypeInfo of original type from which current one was converted.
+**/
+const(TypeInfo) original(T)(T object) @trusted nothrow @nogc pure
+    if (is(T : Object) || is(T : const Object) || is(T : immutable Object)) {
+
+    if (object is null) {
+        return typeid(void);
+    }
+
+    OriginalTypeAware p = cast(OriginalTypeAware) object;
+
+    if (p !is null) {
+        return p.original;
+    }
+
+    return object.classinfo;
+}
+
+/**
+ditto
+**/
+TypeInfo original(T)(auto ref T component) nothrow @nogc @safe
+    if (!(is(T : Object) || is(T : const Object) || is(T : immutable Object))) {
+    import std.stdio;
+
+    return typeid(void);
+}
+
+/**
+ditto
+**/
+TypeInfo original(T : TypeInfo)(auto ref T typeinfo) nothrow @nogc @safe {
+    import std.stdio;
+
+    return typeid(void);
+}
+
+/**
+ditto
+**/
+const(TypeInfo) original(T : const TypeInfo)(auto ref T typeinfo) nothrow @nogc @safe {
+    import std.stdio;
+
+    return typeid(void);
+}
+
+/**
+ditto
+**/
+immutable(TypeInfo) original(T : immutable TypeInfo)(auto ref T typeinfo) nothrow @nogc @safe {
+    import std.stdio;
+
+    return typeid(void);
+}
+
+/**
+ditto
+**/
+const(TypeInfo) original(T)(T object, const TypeInfo from) @trusted nothrow @nogc pure {
+    auto result = object.original;
+
+    if (result is typeid(void)) {
+        return from;
+    }
+
+    return result;
+}
+
+/**
+Identify the convertor used to convert component.
+
+Identify the convertor used to convert component.
+The object will be downcasted to ConvertorAware
+interface and if it succeeded convertor used to
+convert component will be returned. For non-object
+components null will be returned as no convertor
+can be extracted from them.
+
+Params:
+    object = converted component for which used convertor would need to be identified.
+Returns:
+    Convertor used to convert to contained component.
+**/
+const(Convertor) convertorOf(T)(T object) @trusted nothrow @nogc pure
+    if (is(T : Object) || is(T : const Object) || is(T : immutable Object)) {
+
+    if (object !is null) {
+        ConvertorAware p = cast(ConvertorAware) object;
+
+        if (p !is null) {
+            return p.convertor;
+        }
+    }
+
+    return null;
+}
+
+/**
+ditto
+**/
+Convertor convertorOf(T)(auto ref T component) nothrow @nogc @safe
+    if (!(is(T : Object) || is(T : const Object) || is(T : immutable Object))) {
+    import std.stdio;
+
+    return null;
+}
+
+/**
+ditto
+**/
+Convertor convertorOf(T : Convertor)(auto ref T convertor) nothrow @nogc @safe {
+    import std.stdio;
+
+    return convertor;
+}
+
+/**
+ditto
+**/
+const(Convertor) convertorOf(T : const Convertor)(auto ref T convertor) nothrow @nogc @safe {
+    import std.stdio;
+
+    return convertor;
+}
+
+/**
+ditto
+**/
+immutable(Convertor) convertorOf(T : immutable Convertor)(auto ref T convertor) nothrow @nogc @safe {
+    import std.stdio;
+
+    return convertor;
+}
+
+/**
+Identify the allocator used to convert component.
+
+Identify the allocator used to convert component.
+The object will be downcasted to AllocatorAware
+interface and if it succeeded convertor used to
+convert component will be returned. For non-object
+components empty allocator will be returned as no convertor
+can be extracted from them.
+
+Params:
+    object = converted component for which used allocator would need to be identified.
+Returns:
+    RCIAllocator used in conversion process.
+**/
+RCIAllocator allocatorOf(T)(T object) @trusted nothrow @nogc pure
+    if (is(T : Object) || is(T : const Object) || is(T : immutable Object)) {
+
+    if (object !is null) {
+        AllocatorAware p = cast(AllocatorAware) object;
+
+        if (p !is null) {
+            return p.allocator;
+        }
+    }
+
+    return RCIAllocator(null);
+}
+
+/**
+ditto
+**/
+RCIAllocator allocatorOf(T)(auto ref T component) nothrow @nogc @safe
+    if (!(is(T : Object) || is(T : const Object) || is(T : immutable Object))) {
+    import std.stdio;
+
+    return RCIAllocator(null);
+}
+
+/**
+ditto
+**/
+RCIAllocator allocatorOf(T : RCIAllocator)(auto ref T allocator) nothrow @nogc @safe {
+    import std.stdio;
+
+    return allocator;
+}
+
+/**
+ditto
+**/
+const(RCIAllocator) allocatorOf(T : const Convertor)(auto ref T allocator) nothrow @nogc @safe {
+    import std.stdio;
+
+    return allocator;
+}
+
+/**
+ditto
+**/
+immutable(RCIAllocator) allocatorOf(T : immutable Convertor)(auto ref T allocator) nothrow @nogc @safe {
+    import std.stdio;
+
+    return allocator;
+}
+
+/**
+ditto
+**/
+RCIAllocator allocatorOf(T)(T object, RCIAllocator allocator) @trusted nothrow @nogc pure {
+    auto result = object.allocatorOf;
+
+    if (result.isNull) {
+        return allocator;
+    }
+
+    return result;
 }

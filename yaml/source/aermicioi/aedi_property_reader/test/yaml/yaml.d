@@ -36,14 +36,17 @@ import aermicioi.aedi_property_reader.core.core;
 import std.exception;
 
 unittest {
-	auto c = yaml("float: 1.0\ndouble: 2.0\nint: 10\nlong: 20\nstring: \"hello\"\narray: [\"ahoj\", \" \", \"world!\"]".dup, false);
+	auto document = yaml("float: 1.0\ndouble: 2.0\nint: 10\nlong: 20\nstring: \"hello\"\narray: [\"ahoj\", \" \", \"world!\"]".dup, false);
+	Locator!() c;
 
-    with (c.configure) {
+    with (document.configure) {
         property!(string)("string"); // Not testing it since factory takes arguments from
         property!(real)("float");
         property!(real)("double");
         property!(long)("long");
         property!(long)("int");
+
+		c = container;
     }
 
     assert(c.locate!string == "hello");
@@ -55,10 +58,13 @@ unittest {
 
 unittest {
 	import std.path : dirName;
-	auto x = yaml(dirName(__FILE__) ~ "/config.yaml", false);
+	auto document = yaml(dirName(__FILE__) ~ "/config.yaml", false);
+	Locator!() x;
 
-	with (x.configure) {
+	with (document.configure) {
 		property!double("double");
+
+		x = container;
 	}
 
 	assert(x.locate!double("double") == 1.0);
@@ -72,7 +78,7 @@ unittest {
 
 
 unittest {
-	auto c = yaml(q{
+	auto document = yaml(q{
 placeholder:
   f: 1.0
   d: 2.0
@@ -87,11 +93,7 @@ long: 20
 string: "hello"
 array: ["ahoj", " ", "world!"]
 }.dup, false);
-
-	import aermicioi.aedi_property_reader.convertor.inspector;
-	import aermicioi.aedi_property_reader.convertor.setter;
-	import aermicioi.aedi_property_reader.convertor.mapper;
-	import aermicioi.aedi_property_reader.core.traits;
+	Locator!() c;
 
 	static struct Placeholder {
 		float f;
@@ -102,13 +104,7 @@ array: ["ahoj", " ", "world!"]
 		string[] a;
 	}
 
-	import aermicioi.aedi_property_reader.yaml.inspector;
-	import dyaml;
-
-	auto t = YamlAccessorFactory!Node();
-	auto d = new YamlInspector;
-
-	with (c.configure) {
+	with (document.configure) {
 		property!Placeholder("placeholder");
 		property!(string[])("array");
 		property!(double)("double");
@@ -116,6 +112,8 @@ array: ["ahoj", " ", "world!"]
 		property!(long)("long");
 		property!(int)("int");
 		property!(string)("string");
+
+		c = container;
     }
 
 	assert(c.locate!Placeholder("placeholder") == Placeholder(1.0, 2.0, 10, 20, "hello", ["ahoj", " ", "world!"]));

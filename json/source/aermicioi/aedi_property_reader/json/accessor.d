@@ -29,6 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.json.accessor;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import std.json;
@@ -36,11 +37,23 @@ import std.exception;
 import std.conv : text, to;
 import std.experimental.allocator;
 import std.experimental.logger;
-import aermicioi.aedi_property_reader.core.traits : n;
+import aermicioi.aedi_property_reader.convertor.traits : n;
+
+@component
+@qualifier!(PropertyAccessor!JSONValue)
+auto jsonPropertyAccessor(JsonPropertyAccessor propertyAccessor, JsonIndexAccessor propertyIndexer) {
+    return dsl(propertyAccessor, propertyIndexer);
+}
+
+@component
+auto runtimeJsonPropertyAccessor(PropertyAccessor!JSONValue accessor) {
+    return new WrappingFieldAccessor!JSONValue(accessor);
+}
 
 /**
 Accessor allowing access through JSONValues that are associative arrays
 **/
+@component
 class JsonPropertyAccessor : PropertyAccessor!JSONValue {
 
     /**
@@ -113,6 +126,7 @@ class JsonPropertyAccessor : PropertyAccessor!JSONValue {
 /**
 Accessor allowing access to properties in a JSONValue array
 **/
+@component
 class JsonIndexAccessor : PropertyAccessor!JSONValue {
 
     /**

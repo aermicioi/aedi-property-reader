@@ -29,124 +29,41 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.arg.accessor;
 
-import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import std.algorithm;
 import std.array;
+import std.experimental.allocator;
 import std.string;
 import std.conv;
 import std.range;
-import std.experimental.allocator;
 
-/**
-Accessor filtering a list of strings out of strings that are not containing a command line property
-**/
-class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
+struct ArgumentsHolder {
+    string[][string] byKeyValues;
+    string[string] byKeyValue;
+    string[] byValue;
+}
 
-    private static struct Filter {
-        string property;
+@component
+class ArgumentAccessor : PropertyAccessor!(ArgumentsHolder, Object) {
 
-        const(string)[] component;
-        const(string)[] buff;
+    private {
+        PropertyAccessor!(string[][string], string[]) byKeyValuesAccessor;
+        PropertyAccessor!(string[string], string) byKeyValueAccessor;
+        PropertyAccessor!(string[], string) byValueAccessor;
+    }
 
-        nothrow {
-            this(const(string)[] component, string property) {
-                this.component = component;
-                this.property = property;
-                take(1);
-            }
-
-            Filter save() {
-                return this;
-            }
-
-            string front() {
-
-                return buff[0];
-            }
-
-            void popFront() {
-                if (buff.length > 1) {
-
-                    buff = buff.drop(1);
-                    return;
-                }
-
-                if (buff.length > 0) {
-
-                    buff = buff.drop(1);
-                    this.advance;
-                }
-            }
-
-            bool empty() {
-                return buff.empty && component.empty;
-            }
-
-            private void take(size_t amount = 1) {
-                buff = (component.length >= amount) ? component.take(amount) : component.take(component.length);
-                component = (component.length >= amount) ? component.drop(amount) : component.drop(component.length);
-            }
-
-            private void advance() {
-                while (!component.empty) {
-                    try {
-
-                        if (component.front.commonPrefix("--").equal("--")) {
-                            auto splitted = component.front.splitter("=");
-
-                            if ((splitted.front.strip('-') == property) && !splitted.take(1).empty) {
-                                take(1);
-                                return;
-                            }
-
-                            if (
-                                (component.length > 1) && (splitted.front.strip('-') == property) &&
-                                splitted.drop(1).front.commonPrefix("--").empty
-                            ) {
-                                take(2);
-                                return;
-                            }
-                        }
-
-                        if (component.front.commonPrefix("--").equal("-")) {
-
-                            if (
-                                (component.front.strip('-').equal(property)) || ((property.length == 1) &&
-                                component.front.strip('-').canFind(property))
-                            ) {
-                                take(1);
-                                return;
-                            }
-                        }
-
-                        if (
-                            !component.front.splitter("=").drop(1).empty &&
-                            component.front.splitter("=").front.equal(property)
-                        ) {
-                            take(1);
-                            return;
-                        }
-
-                        if (property.isNumeric) {
-                            immutable auto up = property.to!size_t;
-                            size_t current;
-
-                            auto count = component.countUntil!(c => c.commonPrefix("--").empty &&
-                                c.splitter("=").drop(1).empty && (current++ == up));
-                            component = component.drop(count);
-                            take(1);
-                            component = null;
-                            return;
-                        }
-
-                        component = component.empty ? component : component.drop(1);
-                    } catch (Exception e) {
-                        assert(false, text("Could not filter out command line arguments for ", property));
-                    }
-                }
-            }
-        }
+    @autowired
+    this(
+        PropertyAccessor!(string[][string], string[]) byKeyValuesAccessor,
+        PropertyAccessor!(string[string], string) byKeyValueAccessor,
+        PropertyAccessor!(string[], string) byValueAccessor
+    ) {
+        this.byKeyValuesAccessor = byKeyValuesAccessor;
+        this.byKeyValueAccessor = byKeyValueAccessor;
+        this.byValueAccessor = byValueAccessor;
     }
 
     /**
@@ -160,12 +77,21 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
      Returns:
          FieldType accessed property.
      **/
-    const(string)[] access(const(string)[] component, string property, RCIAllocator allocator = theAllocator) const {
-        if (property.empty) {
-            return component;
+    Object access(ArgumentsHolder component, string property, RCIAllocator allocator = theAllocator) const {
+        if (byValueAccessor.has(component.byValue, property, allocator)) {
+            return this.byValueAccessor.access(component.byValue, property, allocator).pack(allocator);
         }
 
-        return Filter(component, property).array;
+        if (byKeyValueAccessor.has(component.byKeyValue, property, allocator)) {
+            return this.byKeyValueAccessor.access(component.byKeyValue, property, allocator).pack(allocator);
+        }
+
+        if (byKeyValuesAccessor.has(component.byKeyValues, property, allocator)) {
+            return this.byKeyValuesAccessor.access(component.byKeyValues, property, allocator).pack(allocator);
+        }
+
+        import std.conv : to;
+        throw new NotFoundException("Can't find property ${property} argument list of ${component}", property, component.to!string);
     }
 
     /**
@@ -181,14 +107,11 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
      Returns:
          true if property is in component
      **/
-    bool has(in const(string)[] component, string property, RCIAllocator allocator = theAllocator) const nothrow {
+    bool has(ArgumentsHolder component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
 
-        if (component.length > 1) {
-
-            return !Filter(component, property).drop(1).empty;
-        }
-
-        return false;
+        return this.byValueAccessor.has(component.byValue, property, allocator) ||
+            this.byKeyValueAccessor.has(component.byKeyValue, property, allocator) ||
+            this.byKeyValuesAccessor.has(component.byKeyValues, property, allocator);
     }
 
     /**
@@ -206,7 +129,7 @@ class ArgumentAccessor : PropertyAccessor!(const(string)[]) {
      Returns:
          TypeInfo type information about passed component, or typeid(void) if component is not supported.
      **/
-    TypeInfo componentType(const(string)[] component) const nothrow {
-        return typeid(const(string)[]);
+    TypeInfo componentType(ArgumentsHolder component) const nothrow {
+        return typeid(ArgumentsHolder);
     }
 }

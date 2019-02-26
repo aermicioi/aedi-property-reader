@@ -41,33 +41,42 @@ unittest {
 		{
 			"string": "hello",
 			"array": ["hello", " ", "world!"],
+			"array2": "[\"hello\", \" \", \"world!\"]",
 			"float": 1.0,
 			"integer": 10
 		}
 	});
 
+	Locator!() locator;
     with (c.configure) {
-        property!(string)("string"); // Not testing it since factory takes arguments from
+        property!(string)("string");
         property!(string[])("array");
+        property!(string[])("array2");
         property!(float)("float");
         property!(size_t)("integer");
+
+		locator = container;
     }
 
-    assert(c.locate!(string)("string") == "hello");
-	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
-	assert(c.locate!float("float") == 1.0);
-	assert(c.locate!size_t("integer") == 10);
+    assert(locator.locate!(string)("string") == "hello");
+	assert(locator.locate!float("float") == 1.0);
+	assert(locator.locate!size_t("integer") == 10);
+	assert(locator.locate!(string[])("array") == ["hello", " ", "world!"]);
+	assert(locator.locate!(string[])("array2") == ["hello", " ", "world!"]);
 }
 
 unittest {
 	import std.path : dirName;
 	auto j = json(dirName(__FILE__) ~ "/config.json", false);
 
+	Locator!() locator;
 	with (j.configure) {
 		property!size_t("integer");
+
+		locator = container;
 	}
 
-	assert(j.locate!size_t("integer") == 10);
+	assert(locator.locate!size_t("integer") == 10);
 
 	assertNotThrown(json("unknown"));
 	assertThrown(json("unkown", false));
@@ -96,16 +105,16 @@ unittest {
 		long i;
 	}
 
+	Locator!() locator;
     with (c.configure) {
 		property!Placeholder("p");
 		property!(string[])("a");
 		property!(double)("f");
 		property!(long)("i");
 		property!(string)("s");
-    }
 
-	import std.stdio;
-	writeln(c.locate!Placeholder("p"));
+		locator = container;
+	}
 
-    assert(c.locate!Placeholder("p") == Placeholder("hello", ["hello", " ", "world!"], 1.0, 10));
+    assert(locator.locate!Placeholder("p") == Placeholder("hello", ["hello", " ", "world!"], 1.0, 10));
 }

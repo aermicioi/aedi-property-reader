@@ -96,7 +96,7 @@ interface Inspector(ComponentType, KeyType = string) {
 /**
 Associative array inspector.
 **/
-class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspector!(ComponentType[KeyType], KeyType) {
+class AssociativeArrayInspector(ValueType, KeyType = ValueType) : Inspector!(ValueType[KeyType], KeyType) {
 
     /**
     Identify the type of child field of component.
@@ -107,9 +107,9 @@ class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspec
     Returns:
         Type of field, or typeid(void) if field is not present in component
     **/
-    TypeInfo typeOf(ComponentType[KeyType] component, in KeyType property) const nothrow {
+    TypeInfo typeOf(ValueType[KeyType] component, in KeyType property) const nothrow {
 
-        return typeid(ComponentType);
+        return typeid(ValueType);
     }
 
     /**
@@ -124,8 +124,8 @@ class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspec
     Returns:
         Type info of component, or typeid(void) if component cannot be identified by inspector
     **/
-    TypeInfo typeOf(ComponentType[KeyType] component) const nothrow {
-        return typeid(ComponentType[KeyType]);
+    TypeInfo typeOf(ValueType[KeyType] component) const nothrow {
+        return typeid(ValueType[KeyType]);
     }
 
     /**
@@ -138,7 +138,7 @@ class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspec
     Returns:
         true if field is present either in readonly, or writeonly form (has getters and setters).
     **/
-    bool has(ComponentType[KeyType] component, in KeyType property) const nothrow {
+    bool has(ValueType[KeyType] component, in KeyType property) const nothrow {
         return (property in component) !is null;
     }
 
@@ -151,7 +151,7 @@ class AssociativeArrayInspector(ComponentType, KeyType = ComponentType) : Inspec
     Returns:
         an arary of property identities.
     **/
-    KeyType[] properties(ComponentType[KeyType] component) const nothrow {
+    KeyType[] properties(ValueType[KeyType] component) const nothrow {
         import std.array : array;
 
         return component.byKey.array;
@@ -313,7 +313,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
             debug(trace) error("Failed to unwrap tagged component ", component, " due to ", e, " returning void").n;
         }
 
-        return typeid(void);
+        // return typeid(void);
     }
 
     /**
@@ -349,7 +349,7 @@ class TaggedInspector(Tagged : TaggedAlgebraic!(Union), Type, Union) : Inspector
             debug(trace) error("Failed to unwrap tagged component ", component, " due to ", e).n;
         }
 
-        return typeid(void);
+        // return typeid(void);
     }
 
     /**

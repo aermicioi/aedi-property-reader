@@ -204,12 +204,8 @@ class CompositeSetter(ComponentType) : PropertySetter!(ComponentType, Object, st
     **/
     void set(T)(ref ComponentType component, T field, string property, RCIAllocator allocator = theAllocator) const {
         import std.experimental.allocator : theAllocator, dispose;
-        auto wrapped = field.placeholder(theAllocator);
+        auto wrapped = field.stored;
         this.set(component, wrapped, property);
-
-        static if (!is(T : Object)) {
-            theAllocator.dispose(wrapped);
-        }
     }
 
     /**
@@ -340,8 +336,7 @@ class RuntimeCompositeSetter(Type, FieldType = Type, KeyType = string) : Propert
             InvalidArgumentException when value or composite is not what was expected
         **/
         void set(ref Object composite, FieldType field, KeyType key, RCIAllocator allocator = theAllocator) const {
-            auto placeholder = composite.unwrap!Type;
-            this.setter.set(placeholder, field, key);
+            this.setter.set(composite.unwrap!Type, field, key);
         }
 
         /**

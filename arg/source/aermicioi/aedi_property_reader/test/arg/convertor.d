@@ -30,15 +30,12 @@ Authors:
 module aermicioi.aedi_property_reader.test.arg.convertor;
 
 import aermicioi.aedi_property_reader.arg.convertor;
+import aermicioi.aedi_property_reader.arg.accessor : ArgumentsHolder;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import std.exception;
 
 unittest {
-    enum Colorful {
-        yes,
-        no
-    }
-
-    immutable string[] args = [
+    string[] args = [
         "command",
         "--integer=29192",
         "--double=1.0"	,
@@ -53,37 +50,23 @@ unittest {
         "--array=second one",
     ];
 
-    int i;
-    double d;
-    bool b;
-    Colorful c;
-    string[string] as;
-    string s;
-    string t;
-    string[] sd;
-    wstring w;
-    dstring ds;
-    char[] charr;
-    wchar[] wcharr;
-    dchar[] dcharr;
+    ArgumentArrayToAssociativeArray convertor = new ArgumentArrayToAssociativeArray();
 
-    ["", "--integer=29192"].convert!int(i);
-    ["", "--double=1.0"].convert!double(d);
-    ["", "--boolean=true"].convert!bool(b);
-    ["", "--string=\"str\""].convert!string(s);
-    ["", "--string=\"str\""].convert!wstring(w);
-    ["", "--string=\"str\""].convert!dstring(ds);
-    ["", "--string=\"str\""].convert(charr);
-    ["", "--string=\"str\""].convert(wcharr);
-    ["", "--string=\"str\""].convert(dcharr);
-    ["", "--enum=yes"].convert!Colorful(c);
-    ["", "--assoc-array=test=t", "--assoc-array=pest=p"].convert!(string[string])(as);
-    ["", "--array=second one", "--array=third one"].convert!(string[])(sd);
+    ArgumentsHolder result = convertor.convert(args.stored, typeid(ArgumentsHolder)).unpack!(ArgumentsHolder);
 
-    assert(i == 29_192);
-    assert(d == 1.0);
-    assert(b == true);
-    assert(c == Colorful.yes);
-    assert(as == ["pest" : "p", "test" : "t"]);
-    assert(sd == ["second one", "third one"]);
+    assert(result.byValue == args);
+
+    assert(result.byKeyValue == [
+        "integer": "29192",
+        "double": "1.0",
+        "boolean": "true",
+        "enum": "yes",
+        "string": "\"str\"",
+    ]);
+
+    import std.stdio; result.byKeyValues.writeln;
+    assert(result.byKeyValues == [
+        "assoc-array": ["beta=0.5", "true"],
+        "array": ["first one", "second one"]
+    ]);
 }

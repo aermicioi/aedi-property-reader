@@ -29,8 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.convertor.traits;
 
-import std.traits;
-import std.conv;
+import std.traits : functionAttributes, variadicFunctionStyle, Variadic, FunctionAttribute, arity;
 
 /**
 Tests if field is property getter.
@@ -92,15 +91,22 @@ template match(alias predicate, Types...) {
 /**
 Well, it's a nothrow wrapper usable for logger to allow logging in nothrow functions.
 **/
-void n(T)(lazy T value) nothrow {
+T n(T)(lazy T value) nothrow {
     try {
-        value();
-    } catch (Exception e) {
+        static if (is(T == void)) {
 
+            value();
+        } else {
+
+            return value();
+        }
+    } catch (Exception e) {
+        assert(false, "An exception was thrown where it wasn't expected to.");
     }
 }
 
-public {
-    enum isD(T, X) = is(T : X);
+enum isD(T, X) = is(T : X);
 
+interface PureSafeNothrowToString {
+    string toString() @safe pure nothrow;
 }

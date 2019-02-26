@@ -29,17 +29,38 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.yaml.accessor;
 
-import dyaml;
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.traits : n;
+import dyaml;
 import std.exception;
-import std.experimental.logger;
 import std.experimental.allocator;
-import aermicioi.aedi_property_reader.core.traits : n;
+import std.experimental.logger;
+
+@component
+@qualifier!(PropertyAccessor!(Node, Node))
+auto accessor(
+    YamlNodePropertyAccessor propertyAccessor,
+    YamlIntegerIndexAccessor indexAccessor,
+    Convertor defaultConvertor
+) {
+    return dsl!(Node, Node, string)(
+        propertyAccessor,
+        new KeyConvertingAccessor!(Node, Node, string, size_t)(indexAccessor, defaultConvertor)
+    );
+}
+
+@component
+auto runtimeFieldAccessor(PropertyAccessor!(Node, Node) propertyAccessor) {
+    return new WrappingFieldAccessor!(Node, Node)(propertyAccessor);
+}
 
 /**
 An accessor allowing access to child yaml nodes of a parent yaml node by their name
 **/
+@component
 class YamlNodePropertyAccessor : PropertyAccessor!(Node, Node) {
 
     /**
@@ -109,7 +130,8 @@ class YamlNodePropertyAccessor : PropertyAccessor!(Node, Node) {
 /**
 An accessor allowing access to child yaml nodes of a parent yaml node by their index
 **/
-class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
+@component
+class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node, size_t) {
 
     /**
      Get a property out of component
@@ -122,15 +144,15 @@ class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
      Returns:
          FieldType accessed property.
      **/
-    Node access(Node component, in string property, RCIAllocator allocator = theAllocator) const {
+    Node access(Node component, in size_t property, RCIAllocator allocator = theAllocator) const {
 
         if (this.has(component, property)) {
-            import std.conv : to;
 
-            return component[property.to!size_t];
+            return component[property];
         }
 
-        throw new NotFoundException("Yaml tag ${component} doesn't have child on index ${property} ", property, component.tag);
+        import std.conv : to;
+        throw new NotFoundException("Yaml tag ${component} doesn't have child on index ${property} ", property.to!string, component.tag);
     }
 
     /**
@@ -146,12 +168,9 @@ class YamlIntegerIndexAccessor : PropertyAccessor!(Node, Node) {
      Returns:
          true if property is in component
      **/
-    bool has(in Node component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
+    bool has(in Node component, in size_t property, RCIAllocator allocator = theAllocator) const nothrow {
         try {
-            import std.string : isNumeric;
-            import std.conv : to;
-
-            return property.isNumeric && component.isSequence && (property.to!size_t < component.length);
+            return component.isSequence && (property < component.length);
         } catch (Exception e) {
 
             debug(trace) error("Failed to check property ", property, " existence due to ", e).n;

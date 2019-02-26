@@ -29,12 +29,19 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.yaml.type_guesser;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import dyaml;
+
+@component
+auto runtimeGuesser(TypeGuesser!Node guesser) {
+    return new DelegatingObjectTypeGuesser!Node(guesser);
+}
 
 /**
 Type guesser for yaml elements
 **/
+@component
 class YamlTypeGuesser : TypeGuesser!Node {
 
     public {

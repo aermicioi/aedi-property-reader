@@ -137,3 +137,45 @@ class FailingConvertorFactory(ToType) : ConvertorFactory!(string, ToType) {
         }
     }
 }
+
+static struct Placeholder {
+    float f;
+    double d;
+    int i;
+    long l;
+    string s;
+    string[] a;
+}
+
+auto properties(T)(T policyDocument) {
+
+    Container locator;
+    with (policyDocument.configure) {
+        property!Placeholder("placeholder");
+		property!(int)("int");
+        property!(real)("real");
+		property!(long)("long");
+        property!(size_t)("integer");
+        property!(float)("float");
+		property!(double)("double");
+        property!(string)("string");
+		property!(string[])("array");
+
+		locator = container;
+    }
+	assert(locator.locate!int == 10);
+	assert(locator.locate!long == 20);
+	assert(locator.locate!ubyte("guessable-ubyte") == 10);
+	assert(locator.locate!double == 2.0);
+	assert(locator.locate!real("real") == 3.0);
+	assert(locator.locate!(string[])("array") == ["hello", " ", "world!"]);
+	assert(locator.locate!(string[])("guessable-array") == ["guessed hello", " ", "world!"]);
+	assert(locator.locate!size_t("integer") == 10);
+	assert(locator.locate!float("float") == 1.0);
+	assert(locator.locate!float("guessable-float") == 1.0);
+    assert(locator.locate!string("string") == "hello");
+    assert(locator.locate!string("guessable-string") == "guessed hello");
+	assert(locator.locate!Placeholder("placeholder") == Placeholder(1.0, 2.0, 10, 20, "hello", ["ahoj", " ", "world!"]));
+
+    return policyDocument;
+}

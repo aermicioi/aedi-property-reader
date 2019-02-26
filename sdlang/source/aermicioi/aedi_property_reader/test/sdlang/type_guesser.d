@@ -30,18 +30,60 @@ Authors:
 module aermicioi.aedi_property_reader.sdlang.test.type_guesser;
 
 import sdlang;
+import std.datetime;
 import aermicioi.aedi_property_reader.sdlang.type_guesser;
-import aermicioi.aedi_property_reader.sdlang.accessor : SdlangElement;
 
 unittest {
 
-    SdlangTypeGuesser guesser = new SdlangTypeGuesser();
+    TagTypeGuesser tagGuesser = new TagTypeGuesser();
+    AttributeTypeGuesser attributeGuesser = new AttributeTypeGuesser();
 
-    Tag root = parseSource(q{
-        first 10 "tuttu" name="test" {
-            second "is not used"
-        }
-    });
-    assert(guesser.guess(SdlangElement(root.tags["first"].front)) is typeid(int));
-    assert(guesser.guess(SdlangElement(root.tags["first"].front.attributes["name"].front)) is typeid(string));
+	Tag root = parseSource(q{
+		nullable null
+        bool true
+        int 1
+        long 2L
+        float 3.0f
+        double 4.0
+        real 5.0BD
+        string "string"
+        dchar 'c'
+		date-full 2015/12/06 12:00:00-UTC
+		date-local 2015/12/06 12:00:00.000
+		date 2015/12/06
+		duration 12:14:34
+		ubyte-array [c3RyaW5n]
+
+		attribute nullable=null bool=true int=1 long=2L float=3.0f double=4.0 real=5.0BD string="string" dchar='c' date-full=2015/12/06 12:00:00-UTC date-local=2015/12/06 12:00:00.000 date=2015/12/06 duration=12:14:34 ubyte-array=[c3RyaW5n]
+	});
+
+	assert(tagGuesser.guess(root.tags["nullable"].front) is typeid(null));
+	assert(tagGuesser.guess(root.tags["bool"].front) is typeid(bool));
+	assert(tagGuesser.guess(root.tags["int"].front) is typeid(int));
+	assert(tagGuesser.guess(root.tags["long"].front) is typeid(long));
+	assert(tagGuesser.guess(root.tags["float"].front) is typeid(float));
+	assert(tagGuesser.guess(root.tags["double"].front) is typeid(double));
+	assert(tagGuesser.guess(root.tags["real"].front) is typeid(real));
+	assert(tagGuesser.guess(root.tags["string"].front) is typeid(string));
+	assert(tagGuesser.guess(root.tags["dchar"].front) is typeid(dchar));
+	assert(tagGuesser.guess(root.tags["date"].front) is typeid(Date));
+	assert(tagGuesser.guess(root.tags["date-local"].front) is typeid(DateTimeFrac));
+	assert(tagGuesser.guess(root.tags["date-full"].front) is typeid(SysTime));
+	assert(tagGuesser.guess(root.tags["duration"].front) is typeid(Duration));
+	assert(tagGuesser.guess(root.tags["ubyte-array"].front) is typeid(ubyte[]));
+
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["nullable"].front) is typeid(null));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["bool"].front) is typeid(bool));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["int"].front) is typeid(int));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["long"].front) is typeid(long));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["float"].front) is typeid(float));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["double"].front) is typeid(double));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["real"].front) is typeid(real));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["string"].front) is typeid(string));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["dchar"].front) is typeid(dchar));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["date"].front) is typeid(Date));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["date-local"].front) is typeid(DateTimeFrac));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["date-full"].front) is typeid(SysTime));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["duration"].front)is typeid(Duration));
+	assert(attributeGuesser.guess(root.tags["attribute"].front.attributes["ubyte-array"].front) is typeid(ubyte[]));
 }

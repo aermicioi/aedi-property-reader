@@ -48,8 +48,8 @@ unittest {
     Node node = Loader.fromString("- \"Joe\"\n- \"Moe\"".dup).load;
     auto accessor = new YamlIntegerIndexAccessor;
 
-    assert(accessor.has(node, "1"));
-    assert(accessor.access(node, "1").as!string == "Moe");
-    assert(!accessor.has(node, "2"));
-    assertThrown!NotFoundException(accessor.access(node, "2"));
+    assert(accessor.has(node, 1));
+    assert(accessor.access(node, 1).as!string == "Moe");
+    assert(!accessor.has(node, 2));
+    assertThrown!NotFoundException(accessor.access(node, 2));
 }

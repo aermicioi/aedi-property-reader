@@ -29,6 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.json.json;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.json.accessor;
@@ -40,19 +41,50 @@ import aermicioi.aedi_property_reader.json.type_guesser;
 import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
-import aermicioi.aedi_property_reader.convertor.std_conv;
+import aermicioi.aedi_property_reader.convertor.std_conv : StdConvStringPrebuiltConvertorsFactory;
 import std.json;
+import std.typecons;
 import std.experimental.allocator;
 import std.experimental.logger;
 
-alias JsonDocumentContainer = AdvisedDocumentContainer!(
+auto JsonConvertors(JsonConvertor convertor, CombinedConvertor combined) {
+    combined.add(convertor);
+};
+
+auto JsonArrayConvertors(CombinedConvertor convertor) {
+    import std.meta : AliasSeq;
+
+    static foreach (FromType; AliasSeq!(JSONValue[])) {
+        static foreach (ToType; AliasSeq!(ScalarArrayConvertibleTypes, StringArrayConvertibleTypes)) {
+            convertor.add(new RangeToArrayConvertor!(ToType, FromType)(convertor));
+        }
+    }
+};
+
+alias JsonDocumentContainer = PolicyDocument!(
     JSONValue,
     JSONValue,
-    WithConvertorBuilder!JsonConvertorBuilderFactory,
-	WithConvertorsFor!DefaultConvertibleTypes,
-    WithConvertors!(
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.core.config,
+        aermicioi.aedi_property_reader.json.type_guesser,
+        aermicioi.aedi_property_reader.json.accessor,
+        aermicioi.aedi_property_reader.json.setter,
+        aermicioi.aedi_property_reader.json.inspector,
+        aermicioi.aedi_property_reader.json.convertor,
+        aermicioi.aedi_property_reader.json.json
+    )(),
+    WithConvertorAggregation!CombinedConvertor(),
+    WithLocatorForUnregisteredComponents("json-document-locator"),
+    WithInitializer!(
         StdConvStringPrebuiltConvertorsFactory
-    )
+    )(),
+    WithInitializer!(
+        JsonConvertors
+    )(),
+    WithInitializer!(
+        JsonArrayConvertors
+    )(),
+    WithDefaultRegisterers
 );
 
 /**
@@ -67,42 +99,12 @@ Returns:
     JsonConvertorContainer
 **/
 auto json(
-    JSONValue value,
-    PropertyAccessor!JSONValue accessor,
-    TypeGuesser!JSONValue guesser,
-    RCIAllocator allocator = theAllocator
+    JSONValue value = JSONValue()
 ) {
 
-    JsonDocumentContainer container = new JsonDocumentContainer(value);
-    container.guesser = guesser;
-    container.accessor = accessor;
-    container.allocator = allocator;
+    JsonDocumentContainer container = JsonDocumentContainer(value);
 
     return container;
-}
-
-/**
-ditto
-**/
-auto json(JSONValue value, TypeGuesser!JSONValue guesser, RCIAllocator allocator = theAllocator) {
-
-    return value.json(accessor, guesser, allocator);
-}
-
-/**
-ditto
-**/
-auto json(JSONValue value, RCIAllocator allocator = theAllocator) {
-
-    return value.json(accessor, new JsonTypeGuesser, allocator);
-}
-
-/**
-ditto
-**/
-auto json(RCIAllocator allocator = theAllocator) {
-
-    return JSONValue().json(allocator);
 }
 
 /**
@@ -143,8 +145,4 @@ auto json(string pathOrData, bool returnEmpty = true) {
             e
         );
     }
-}
-
-private auto accessor() {
-    return dsl(new JsonPropertyAccessor, new JsonIndexAccessor);
 }

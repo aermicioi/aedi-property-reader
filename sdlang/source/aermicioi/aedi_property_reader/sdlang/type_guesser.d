@@ -29,15 +29,16 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.sdlang.type_guesser;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.sdlang.accessor;
 import sdlang.ast;
 
 /**
-Sdlang data type guesser
+ditto
 **/
-class SdlangTypeGuesser : TypeGuesser!SdlangElement {
-
+@component
+class TagTypeGuesser : TypeGuesser!Tag {
     public {
 
         /**
@@ -49,21 +50,36 @@ class SdlangTypeGuesser : TypeGuesser!SdlangElement {
         Returns:
             TypeInfo of contained data
         **/
-        TypeInfo guess(SdlangElement serialized) const {
+        TypeInfo guess(Tag serialized) const {
 
-            final switch (serialized.kind) {
-                case SdlangElement.Kind.tag: {
-                    if ((cast(Tag) serialized).values.length > 0) {
-                        return (cast(Tag) serialized).values[0].type;
-                    }
-
-                    return typeid(Tag);
-                }
-                case SdlangElement.Kind.attribute: {
-
-                    return (cast(Attribute) serialized).value.type;
-                }
+            if (serialized.values.length > 0) {
+                return serialized.values[0].type;
             }
+
+            return typeid(Tag);
+        }
+    }
+}
+
+/**
+ditto
+**/
+@component
+class AttributeTypeGuesser : TypeGuesser!Attribute {
+    public {
+
+        /**
+        Guess type of underlying sdlang element
+
+        Params:
+            serialized = sdlang element for which to find desired type
+
+        Returns:
+            TypeInfo of contained data
+        **/
+        TypeInfo guess(Attribute serialized) const {
+
+            return serialized.value.type;
         }
     }
 }

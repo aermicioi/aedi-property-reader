@@ -36,14 +36,16 @@ import aermicioi.aedi_property_reader.core.core;
 import std.exception;
 
 unittest {
-	auto c = properd("float= 1.0\ndouble= 2.0\nint= 10\nlong= 20\nstring=hello\narray= [\"ahoj\", \" \", \"world!\"]", false);
-
-    with (c.configure) {
+	auto document = properd("float= 1.0\ndouble= 2.0\nint= 10\nlong= 20\nstring=hello\narray= [\"ahoj\", \" \", \"world!\"]", false);
+	Locator!() c;
+    with (document.configure) {
         property!(string)("string"); // Not testing it since factory takes arguments from
         property!(real)("float");
         property!(real)("double");
         property!(long)("long");
         property!(long)("int");
+
+		c = container;
     }
 
     assert(c.locate!string == "hello");
@@ -55,10 +57,13 @@ unittest {
 
 unittest {
 	import std.path : dirName;
-	auto x = properd(dirName(__FILE__) ~ "/config.properties", false);
+	auto document = properd(dirName(__FILE__) ~ "/config.properties", false);
+	Locator!() x;
 
-	with (x.configure) {
+	with (document.configure) {
 		property!double("double");
+
+		x = container;
 	}
 
 	assert(x.locate!double("double") == 1.0);

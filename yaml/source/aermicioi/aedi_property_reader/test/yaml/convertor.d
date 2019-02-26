@@ -31,41 +31,40 @@ module aermicioi.aedi_property_reader.test.yaml.convertor;
 
 import std.exception;
 import dyaml;
-import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
-import aermicioi.aedi_property_reader.convertor.exception : InvalidCastException;
+import aermicioi.aedi_property_reader.convertor.exception;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import aermicioi.aedi_property_reader.yaml.convertor;
+import aermicioi.aedi_property_reader.yaml.type_guesser;
 
 unittest {
-	enum Colorful : string {
-    	affirmative = "aa",
-        negative = "bb"
-    }
+    YamlConvertor convertor = new YamlConvertor(new YamlTypeGuesser);
 
-    int i;
-    double d;
-    bool b;
-    Colorful c;
-	char ch;
-	char[] charr;
-    string[string] as;
-    string s;
-    string t;
-    string[] sd;
+    assert(convertor.convert(Loader.fromString((cast(char[]) "true").dup).load.pack, typeid(bool)).unpack!(bool) == true);
+    assert(convertor.convert(Loader.fromString((cast(char[]) "29192").dup).load.pack, typeid(long)).unpack!(long) == 29192);
+    assert(convertor.convert(Loader.fromString((cast(char[]) "1.0").dup).load.pack, typeid(real)).unpack!(real) == 1.0);
+    assert(convertor.convert(Loader.fromString((cast(char[]) "!!binary c3RyaW5n").dup).load.pack, typeid(ubyte[])).unpack!(ubyte[]) == cast(ubyte[]) "string");
+    assert(convertor.convert(Loader.fromString((cast(char[]) "second one").dup).load.pack, typeid(string)).unpack!(string) == "second one");
+    assert(convertor.convert(Loader.fromString((cast(char[]) "[\"second one\", \"third one\"]").dup).load.pack, typeid(Node[])).unpack!(Node[]) == [
+        Loader.fromString((cast(char[]) "\"second one\"").dup).load,
+        Loader.fromString((cast(char[]) "\"third one\"").dup).load
+    ]);
 
-    Loader.fromString((cast(char[]) "29192").dup).load.convert!int(i);
-    Loader.fromString((cast(char[]) "\'a\'").dup).load.convert!char(ch);
-    Loader.fromString((cast(char[]) "1.0").dup).load.convert!double(d);
-    Loader.fromString((cast(char[]) "true").dup).load.convert!bool(b);
-    Loader.fromString((cast(char[]) "affirmative").dup).load.convert!Colorful(c);
-    Loader.fromString((cast(char[]) "test: \"t\"\npest: \"p\"").dup).load.convert!(string[string])(as);
-    Loader.fromString((cast(char[]) "[\"second one\", \"third one\"]").dup).load.convert!(string[])(sd);
-    Loader.fromString((cast(char[]) "\"second one\"").dup).load.convert(s);
-    Loader.fromString((cast(char[]) "\"second one\"").dup).load.convert(charr);
+    Node.Pair[] mapping = [
+        Node.Pair(
+            Loader.fromString((cast(char[]) "\"test\"").dup).load,
+            Loader.fromString((cast(char[]) "\"t\"").dup).load,
+        ),
+        Node.Pair(
+            Loader.fromString((cast(char[]) "\"pest\"").dup).load,
+            Loader.fromString((cast(char[]) "\"p\"").dup).load,
+        )
+    ];
 
-    assert(i == 29192);
-    assert(d == 1.0);
-    assert(b == true);
-    assert(c == Colorful.affirmative);
-    assert(as == ["test" : "t", "pest" : "p"]);
-    assert(sd == ["second one", "third one"]);
+    assert(convertor.convert(Loader.fromString((cast(char[]) "test: \"t\"\npest: \"p\"").dup).load.pack, typeid(Node.Pair[])).unpack!(Node.Pair[]) == mapping);
+
+    YamlNodePairsToAssociativeArrayConvertor associativeArrayConvertor = new YamlNodePairsToAssociativeArrayConvertor();
+    assert(associativeArrayConvertor.convert(mapping.pack, typeid(Node[Node])).unpack!(Node[Node]) == [
+        mapping[0].key: mapping[0].value,
+        mapping[1].key: mapping[1].value
+    ]);
 }

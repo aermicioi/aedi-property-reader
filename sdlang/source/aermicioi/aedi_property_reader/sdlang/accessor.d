@@ -30,24 +30,48 @@ Authors:
 module aermicioi.aedi_property_reader.sdlang.accessor;
 
 import sdlang.ast;
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor : Convertor;
 import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.traits : n;
 import taggedalgebraic : TaggedAlgebraic;
 import std.exception;
 import std.experimental.logger;
 import std.experimental.allocator;
-import aermicioi.aedi_property_reader.core.traits : n;
 
-private union SdlangElementUnion {
-    Tag tag;
-    Attribute attribute;
+@component
+auto runtimeAccessor(
+    SdlangTagPropertyAccessor propertyAccessor,
+    SdlangIntegerIndexAccessor indexAccessor,
+    SdlangAttributePropertyAccessor attributeAccessor,
+    Convertor defaultConvertor
+) {
+    return new WrappingComponentAccessor!(Tag, Object)(
+        dsl(
+            new AggregatePropertyAccessor!(Object, Object)(
+                new UnwrappingComponentAccessor!(Tag, Object)(
+                    new WrappingFieldAccessor!(Tag, Tag)(propertyAccessor)
+                ),
+                new UnwrappingComponentAccessor!(Tag, Object)(
+                    new WrappingFieldAccessor!(Tag, Attribute)(attributeAccessor)
+                )
+            ),
+            new UnwrappingComponentAccessor!(Tag, Object)(
+                new WrappingFieldAccessor!(Tag, Tag)(
+                    new KeyConvertingAccessor!(Tag, Tag, string, size_t)(
+                        indexAccessor, defaultConvertor
+                    )
+                )
+            )
+        )
+    );
 }
-
-alias SdlangElement = TaggedAlgebraic!(SdlangElementUnion);
 
 /**
 Accessor allowing to access child tags from a sdlang tag by their name.
 **/
+@component
 class SdlangTagPropertyAccessor : PropertyAccessor!(Tag, Tag) {
 
     /**
@@ -119,7 +143,8 @@ class SdlangTagPropertyAccessor : PropertyAccessor!(Tag, Tag) {
 /**
 Accessor allowing access to child tags by their index.
 **/
-class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
+@component
+class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag, size_t) {
 
     /**
      Get a property out of component
@@ -132,15 +157,15 @@ class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
      Returns:
          FieldType accessed property.
      **/
-    Tag access(Tag component, in string property, RCIAllocator allocator = theAllocator) const {
+    Tag access(Tag component, in size_t property, RCIAllocator allocator = theAllocator) const {
+        import std.conv : to;
 
         if (this.has(component, property)) {
-            import std.conv : to;
 
-            return component.tags[property.to!size_t];
+            return component.tags[property];
         }
 
-        throw new NotFoundException("Sdlang tag ${component} doesn't have ${property} ", property, component.getFullName.toString);
+        throw new NotFoundException("Sdlang tag ${component} doesn't have ${property} ", property.to!string, component.getFullName.toString);
     }
 
     /**
@@ -156,20 +181,13 @@ class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
      Returns:
          true if property is in component
      **/
-    bool has(in Tag component, in string property, RCIAllocator allocator = theAllocator) const nothrow {
+    bool has(Tag component, in size_t property, RCIAllocator allocator = theAllocator) const nothrow {
         try {
-            import std.string : isNumeric;
-            import std.conv : to;
 
-            return (component !is null) &&
-                property.isNumeric &&
-                ((cast(Tag) component).tags.length > property.to!size_t);
+            return component.tags.length > property;
         } catch (Exception e) {
-
-            debug(trace) error("Failed to check property ", property, " existence due to ", e).n;
+            throw new Error("Accessing tags of a sdlang tag for length checking threw an error", e);
         }
-
-        return false;
     }
 
     /**
@@ -195,6 +213,7 @@ class SdlangIntegerIndexAccessor : PropertyAccessor!(Tag, Tag) {
 /**
 Accessor for sdlang tag attributes.
 **/
+@component
 class SdlangAttributePropertyAccessor : PropertyAccessor!(Tag, Attribute) {
     /**
      Get a property out of component

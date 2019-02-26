@@ -40,17 +40,37 @@ import aermicioi.aedi_property_reader.convertor.type_guesser;
 import lproperd = properd;
 import std.experimental.logger;
 import std.experimental.allocator;
+import aermicioi.aedi.configurer.annotation.annotation;
 
-alias ProperdDocumentContainer = AdvisedDocumentContainer!(
+alias ProperdDocumentContainer = PolicyDocument!(
     string[string],
     string,
-    WithConvertorBuilder!StdConvAdvisedConvertorBuilderFactory,
-	WithConvertorsFor!DefaultConvertibleTypes,
-    WithConvertors!(
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.core.config,
+        aermicioi.aedi_property_reader.properd.properd,
+    )(),
+    WithInitializer!(
         StdConvStringPrebuiltConvertorsFactory
-    )
+    )(),
+    WithConvertorAggregation!CombinedConvertor(),
+    WithLocatorForUnregisteredComponents("properd-document-locator"),
+    WithDefaultRegisterers
 );
 
+@component
+auto runtimeTypeGuesser(TypeGuesser!string guesser) {
+    return new DelegatingObjectTypeGuesser!string(guesser);
+}
+
+@component
+auto propertyAccessor() {
+    return new AssociativeArrayAccessor!(string[string]);
+}
+
+@component
+auto runtimePropertyAccessor(PropertyAccessor!(string[string], string) accessor) {
+    return new WrappingFieldAccessor!(string[string], string)(accessor);
+}
 /**
 Create a convertor container with data source being properd document.
 
@@ -64,15 +84,9 @@ Returns:
 **/
 auto properd(
     string[string] value,
-    PropertyAccessor!(string[string], string) accessor,
-    TypeGuesser!string guesser,
-    RCIAllocator allocator = theAllocator
 ) {
 
-    ProperdDocumentContainer container = new ProperdDocumentContainer(value);
-    container.guesser = guesser;
-    container.accessor = accessor;
-    container.allocator = allocator;
+    ProperdDocumentContainer container = ProperdDocumentContainer(value);
 
     return container;
 }
@@ -80,24 +94,9 @@ auto properd(
 /**
 ditto
 **/
-auto properd(string[string] value, TypeGuesser!string guesser, RCIAllocator allocator = theAllocator) {
+auto properd() {
 
-    return value.properd(accessor, guesser, allocator);
-}
-
-/**
-ditto
-**/
-auto properd(string[string] value, RCIAllocator allocator = theAllocator) {
-    return value.properd(accessor, new StringToScalarConvTypeGuesser, allocator);
-}
-
-/**
-ditto
-**/
-auto properd(RCIAllocator allocator = theAllocator) {
-
-    return (cast(string[string]) null).properd(allocator);
+    return (cast(string[string]) null).properd;
 }
 
 /**
@@ -134,7 +133,9 @@ auto properd(string pathOrData, bool returnEmpty = true) {
     }
 }
 
-private auto accessor() {
+@component
+@qualifier!(PropertyAccessor!(string[string]))
+auto accessor() {
     import aermicioi.aedi_property_reader.convertor.accessor : AssociativeArrayAccessor;
 
     return new AssociativeArrayAccessor!(string[string]);

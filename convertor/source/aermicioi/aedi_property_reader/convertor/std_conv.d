@@ -29,9 +29,15 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.convertor.std_conv;
 
-import std.conv : to;
+import std.conv : to, ConvException, text;
+import std.exception : enforce;
+import std.typecons : Flag, Yes;
+import std.traits : isSomeString;
 import std.experimental.allocator;
 import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.exception : ConvertorException;
+import aermicioi.aedi_property_reader.convertor.placeholder;
+import aermicioi.aedi_property_reader.convertor.mapper;
 import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.convertor.setter;
 import aermicioi.aedi_property_reader.convertor.inspector;
@@ -63,43 +69,179 @@ void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
 }
 
 public {
-    enum AssociativeArrayAccessorFactory(T) = () => new AssociativeArrayAccessor!(T[]);
-    enum AssociativeArrayInspectorFactory(T) = () => new AssociativeArrayInspector!T;
-    enum AssociativeArraySetterFactory(T) = () => new AssociativeArraySetter!T;
+    alias AssociativeArrayAccessorFactory(T) = AssociativeArrayAccessor!(T[]);
+    alias AssociativeArrayInspectorFactory(T) = AssociativeArrayInspector!T;
+    alias AssociativeArraySetterFactory(T) = AssociativeArraySetter!T;
 }
 
-/**
-Advised callback convertor with std.conv.to convertor and destructor.
-**/
-alias StdConvAdvisedConvertorBuilderFactory = (Convertor[] convertors = []) {
-    return factoryAnyConvertorBuilder(
-        new TypeGuessCallbackConvertorBuilder!(convert, destruct),
-        MappingConvertorBuilderFactory(convertors),
-        new MappingConvertorBuilder!(
-            AssociativeArrayAccessorFactory,
-            CompositeSetterFactory,
-            CompositeInspectorFactory,
-            AssociativeArrayInspectorFactory
-        )(convertors, true, true, true, true)
-    );
-};
+class StdConvConvertor(To, From) : Convertor {
 
-alias StdConvStringPrebuiltConvertorsFactory = () {
-    Convertor[] convertors;
+    mixin ConvertsFromToMixin!(From, To) DefaultImplementation;
+    mixin EqualToHashToStringOpCmpMixin;
 
+    /**
+    ditto
+    **/
+    bool converts(in Object from, const TypeInfo to) @safe const nothrow {
+        if (DefaultImplementation.converts(from, to)) {
+            try {
+                cast(void) from.unwrap!From.to!To;
+                return true;
+            } catch (Exception e) {
+
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+    ditto
+    **/
+    bool converts(in Object from, in Object to) @safe const nothrow {
+        return this.converts(from, to.identify);
+    }
+
+    /**
+    Convert from component to component.
+
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when there is a converting error
+        InvalidArgumentException when arguments passed are not of right type or state
+    Returns:
+        Resulting converted component.
+    **/
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator) const {
+        enforce!ConvertorException(this.converts(from, to), text("Cannot convert ", from.identify, " to ", to, " expected origin of ", this.from, " and destination of ", this.to, ", or the input contains wrong information which does not match destination type."));
+
+        return from.unwrap!From.to!To.pack(from, this, allocator);
+    }
+
+    /**
+    Destroy component created using this convertor.
+
+    Destroy component created using this convertor.
+    Since convertor could potentially allocate memory for
+    converted component, only itself is containing history of allocation,
+    and therefore it is responsible as well to destroy and free allocated
+    memory with allocator.
+
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    **/
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+        enforce!ConvertorException(this.destroys(from, converted), text("Cannot destroy component of type ", to, " expected type of ", this.to));
+
+        auto unpacked = converted.unpack!To;
+        destroy(unpacked);
+    }
+}
+
+class StringStripperConvertor(StringType) : Convertor
+    if (isSomeString!StringType) {
+
+    mixin ConvertsFromToMixin!(StringType, StringType) DefaultImplementation;
+    mixin EqualToHashToStringOpCmpMixin;
+
+    /**
+    Convert from component to component.
+
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when there is a converting error
+        InvalidArgumentException when arguments passed are not of right type or state
+    Returns:
+        Resulting converted component.
+    **/
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator) const {
+        import std.string : strip;
+        enforce!ConvertorException(this.converts(from, to), text("Cannot convert ", from.identify, " to ", to, " expected origin of ", this.from, " and destination of ", this.to));
+
+        return from.unwrap!StringType.strip.pack(from, this, allocator);
+    }
+
+    /**
+    Destroy component created using this convertor.
+
+    Destroy component created using this convertor.
+    Since convertor could potentially allocate memory for
+    converted component, only itself is containing history of allocation,
+    and therefore it is responsible as well to destroy and free allocated
+    memory with allocator.
+
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    **/
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+        enforce!ConvertorException(this.destroys(from, converted), text("Cannot destroy component of type ", to, " expected type of ", this.to));
+
+        auto unpacked = converted.unpack!StringType;
+    }
+}
+
+auto StdConvStringPrebuiltConvertorsFactory(CombinedConvertor defaultConvertor, Flag!"trimStringForNumbers" trimStringForNumbers = Yes.trimStringForNumbers) {
     import std.meta;
 
-    static foreach (FromType; AliasSeq!(ScalarConvertibleTypes, StringConvertibleTypes)) {
+    if (trimStringForNumbers) {
+        import std.string : strip;
+        import aermicioi.aedi_property_reader.convertor.chaining_convertor : ChainedConvertor;
+        static foreach (FromType; StringConvertibleTypes) {
+            static foreach (ToType; AliasSeq!(ScalarConvertibleTypes)) {
+                defaultConvertor.add(
+                    new ChainedConvertor(
+                        new StringStripperConvertor!FromType,
+                        new StdConvConvertor!(ToType, FromType)
+                    )
+                );
+            }
+        }
+    } else {
+        static foreach (FromType; StringConvertibleTypes) {
+            static foreach (ToType; ScalarConvertibleTypes) {
+                defaultConvertor.add(new StdConvConvertor!(ToType, FromType));
+            }
+        }
+    }
+
+    static foreach (FromType; StringConvertibleTypes) {
+        static foreach (ToType; StringConvertibleTypes) {
+            defaultConvertor.add(new StdConvConvertor!(ToType, FromType));
+        }
+    }
+
+    static foreach (FromType; ScalarConvertibleTypes) {
         static foreach (ToType; AliasSeq!(ScalarConvertibleTypes, StringConvertibleTypes)) {
-            convertors ~= new CallbackConvertor!(convert!(ToType, FromType), destruct!ToType)();
+            defaultConvertor.add(new StdConvConvertor!(ToType, FromType));
         }
     }
 
     static foreach (FromType; AliasSeq!(StringConvertibleTypes, ScalarArrayConvertibleTypes)) {
         static foreach (ToType; AliasSeq!(StringConvertibleTypes, ScalarArrayConvertibleTypes)) {
-            convertors ~= new CallbackConvertor!(convert!(ToType, FromType), destruct!ToType)();
+            defaultConvertor.add(new StdConvConvertor!(ToType, FromType));
         }
     }
 
-    return convertors;
+    static foreach (FromType; AliasSeq!(StringConvertibleTypes, StringArrayConvertibleTypes)) {
+        static foreach (ToType; AliasSeq!(StringConvertibleTypes, StringArrayConvertibleTypes)) {
+            defaultConvertor.add(new StdConvConvertor!(ToType, FromType));
+        }
+    }
+
+    static foreach (FromType; AliasSeq!(StringConvertibleTypes, MapConvertibleTypes)) {
+        static foreach (ToType; AliasSeq!(StringConvertibleTypes, MapConvertibleTypes)) {
+            defaultConvertor.add(new StdConvConvertor!(ToType, FromType));
+        }
+    }
+
+    defaultConvertor.add(new RangeToArrayConvertor!(dstring[], string[])(defaultConvertor));
 };

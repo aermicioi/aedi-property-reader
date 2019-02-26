@@ -30,6 +30,8 @@ Authors:
 module aermicioi.aedi_property_reader.xml.accessor;
 
 import std.xml;
+import aermicioi.aedi.configurer.annotation.annotation;
+import aermicioi.aedi_property_reader.convertor.convertor : Convertor;
 import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import taggedalgebraic : TaggedAlgebraic;
@@ -39,18 +41,46 @@ import std.array;
 import std.conv : to;
 import std.experimental.logger;
 import std.experimental.allocator;
-import aermicioi.aedi_property_reader.core.traits : n;
+import aermicioi.aedi_property_reader.convertor.traits : n;
 
-private union XmlElementUnion {
-    string attribute;
-    Element element;
+@component wrappingXmlAccessor(
+    XmlElementPropertyAccessor xmlElementPropertyAccessor,
+    XmlElementIndexAccessor xmlElementIndexAccessor,
+    XmlAttributePropertyAccessor xmlAttributePropertyAccessor,
+    Convertor defaultConvertor
+) {
+    return new WrappingComponentAccessor!(Element, Object)(
+        dsl(
+            new AggregatePropertyAccessor!(Object, Object)(
+                new UnwrappingComponentAccessor!(Element, Object)(
+                    new WrappingFieldAccessor!(Element, Element)(xmlElementPropertyAccessor)
+                ),
+                new UnwrappingComponentAccessor!(Element, Object)(
+                    new WrappingFieldAccessor!(Element, string)(xmlAttributePropertyAccessor)
+                )
+            ),
+            new UnwrappingComponentAccessor!(Element, Object)(
+                new WrappingFieldAccessor!(Element, Item)(
+                    new KeyConvertingAccessor!(Element, Item, string, size_t)(xmlElementIndexAccessor, defaultConvertor)
+                )
+            )
+        )
+    );
 }
 
-alias XmlElement = TaggedAlgebraic!XmlElementUnion;
+@component xmlAccessor(
+    XmlElementPropertyAccessor xmlElementPropertyAccessor,
+) {
+    return dsl(
+            xmlElementPropertyAccessor,
+            xmlElementPropertyAccessor
+    );
+}
 
 /**
 An accessor allowing access to child xml elements out of a parent element by their name
 **/
+@component
 class XmlElementPropertyAccessor : PropertyAccessor!Element {
 
     /**
@@ -86,7 +116,7 @@ class XmlElementPropertyAccessor : PropertyAccessor!Element {
      Returns:
          true if property is in component
      **/
-    bool has(in Element component, string property, RCIAllocator allocator = theAllocator) const nothrow {
+    bool has(Element component, string property, RCIAllocator allocator = theAllocator) const nothrow {
         return (component !is null) && component.elements.canFind!(e => e.tag.name == property);
     }
 
@@ -113,7 +143,8 @@ class XmlElementPropertyAccessor : PropertyAccessor!Element {
 /**
 An accessor allowing access of child xml elements by their index in parent element
 **/
-class XmlElementIndexAccessor : PropertyAccessor!Element {
+@component
+class XmlElementIndexAccessor : PropertyAccessor!(Element, Item, size_t) {
 
     /**
      Get a property out of component
@@ -126,15 +157,15 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
      Returns:
          FieldType accessed property.
      **/
-    Element access(Element component, in string property, RCIAllocator allocator = theAllocator) const {
+    Item access(Element component, in size_t property, RCIAllocator allocator = theAllocator) const {
 
         if (this.has(component, property)) {
             import std.conv : to;
 
-            return component.elements[property.to!size_t];
+            return component.items[property];
         }
 
-        throw new NotFoundException("Xml tag ${component} doesn't have child on index ${property}", property, component.to!string);
+        throw new NotFoundException("Xml tag ${component} doesn't have child on index ${property}", property.to!string, component.to!string);
     }
 
     /**
@@ -150,18 +181,8 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
      Returns:
          true if property is in component
      **/
-    bool has(in Element component, string property, RCIAllocator allocator = theAllocator) const nothrow {
-        try {
-            import std.string : isNumeric;
-            import std.conv : to;
-
-            return (component !is null) && property.isNumeric && (component.elements.length > property.to!size_t);
-        } catch (Exception e) {
-
-            debug(trace) error("Failed to check property ", property, " existence due to ", e).n;
-        }
-
-        return false;
+    bool has(Element component, in size_t property, RCIAllocator allocator = theAllocator) const nothrow {
+        return (component !is null) && (component.elements.length > property);
     }
 
     /**
@@ -187,6 +208,7 @@ class XmlElementIndexAccessor : PropertyAccessor!Element {
 /**
 Xml element attribute property accessor
 **/
+@component
 class XmlAttributePropertyAccessor : PropertyAccessor!(Element, string) {
     /**
      Get a property out of component

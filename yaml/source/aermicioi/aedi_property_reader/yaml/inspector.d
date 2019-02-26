@@ -29,6 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.yaml.inspector;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.inspector;
 import dyaml;
 import std.algorithm;
@@ -37,6 +38,7 @@ import std.range;
 /**
 Inspector for xml elements.
 **/
+@component
 class YamlInspector : Inspector!Node {
 
     /**
@@ -107,9 +109,9 @@ class YamlInspector : Inspector!Node {
     **/
     string[] properties(Node component) const nothrow {
         try {
-
+            import std.algorithm : map;
             if (component.isMapping) {
-                return component.mappingKeys!string.array;
+                return component.get!(Node.Pair[]).map!(pair => pair.key.get!string).array;
             }
         } catch (Exception e) {
 

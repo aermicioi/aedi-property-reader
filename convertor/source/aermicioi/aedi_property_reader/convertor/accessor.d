@@ -30,6 +30,7 @@ Authors:
 module aermicioi.aedi_property_reader.convertor.accessor;
 
 import aermicioi.aedi.storage.allocator_aware;
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import aermicioi.aedi_property_reader.convertor.exception : InvalidCastException;
 import aermicioi.aedi_property_reader.convertor.exception;
@@ -177,7 +178,7 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
 
                 if (accessor.has(component, property)) {
 
-                    return accessor.access(component, property);
+                    return accessor.access(component, property, allocator);
                 }
             }
 
@@ -202,7 +203,7 @@ class AggregatePropertyAccessor(ComponentType, FieldType = ComponentType, KeyTyp
 
             foreach (accessor; this.accessors) {
 
-                if (accessor.has(component, property)) {
+                if (accessor.has(component, property, allocator)) {
                     return true;
                 }
             }
@@ -339,15 +340,15 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
 
             auto identities = path.splitter(this.separator);
 
-            MutableStorage!ComponentType* current =  theAllocator.make!(MutableStorage!ComponentType)(component);
-            scope(exit) theAllocator.dispose(current);
+            auto current = component.pack;
+            scope(exit) current.unpack;
 
             foreach (identity; identities) {
 
-                if (this.accessor.has(*current, identity)) {
+                if (this.accessor.has(current.value, identity)) {
 
-                    MutableStorage!ComponentType* field = theAllocator.make!(MutableStorage!ComponentType)(this.accessor.access(*current, identity));
-                    theAllocator.dispose(current);
+                    auto field = this.accessor.access(current.value, identity, allocator).pack;
+                    current.unpack;
                     current = field;
                 } else {
 
@@ -357,7 +358,7 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
                 }
             }
 
-            return (*current).payload;
+            return current.value;
         }
 
         /**
@@ -380,17 +381,17 @@ class PropertyPathAccessor(ComponentType, FieldType = ComponentType, KeyType = s
 
                 auto identities = path.splitter(this.separator);
 
-                MutableStorage!(ComponentType)* current =  theAllocator.make!(MutableStorage!(ComponentType))(component);
-                scope(exit) theAllocator.dispose(current);
+                auto current = component.pack;
+                scope(exit) current.unpack;
 
                 foreach (identity; identities) {
-                    if (!this.accessor.has(*current, identity)) {
+                    if (!this.accessor.has(current.value, identity, allocator)) {
                         return false;
                     }
 
-                    if (this.accessor.has(*current, identity)) {
-                        MutableStorage!(ComponentType)* field = theAllocator.make!(MutableStorage!(ComponentType))(this.accessor.access(*current, identity));
-                        theAllocator.dispose(current);
+                    if (this.accessor.has(current.value, identity, allocator)) {
+                        auto field = this.accessor.access(current.value, identity, allocator).pack;
+                        current.unpack;
                         current = field;
                     }
                 }
@@ -577,17 +578,17 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
             return this.indexer_;
         }
 
-    /**
-     Get a property out of component
+        /**
+        Get a property out of component
 
-     Params:
-         component = a component which has some properties identified by property.
-     Throws:
-         NotFoundException in case when no requested property is available.
-         InvalidArgumentException in case when passed arguments are somehow invalid for use.
-     Returns:
-         FieldType accessed property.
-     **/
+        Params:
+            component = a component which has some properties identified by property.
+        Throws:
+            NotFoundException in case when no requested property is available.
+            InvalidArgumentException in case when passed arguments are somehow invalid for use.
+        Returns:
+            FieldType accessed property.
+        **/
         FieldType access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
             import std.experimental.allocator : make, theAllocator, dispose;
             enforce(this.has(component, path), new NotFoundException(text("Property ${property} not found in ${component}"), path.to!string, component.to!string));
@@ -598,8 +599,8 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
                 text("Malformed indexed property ", path, ", no property part found")
             );
 
-            MutableStorage!FieldType* property = theAllocator.make!(MutableStorage!FieldType)(this.accessor.access(component, splitted.front));
-            scope(exit) theAllocator.dispose(property);
+            auto property = this.accessor.access(component, splitted.front, allocator).pack;
+            scope(exit) property.unpack;
 
             splitted.popFront;
             enforce!InvalidArgumentException(
@@ -613,28 +614,27 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
                     text("Malformed indexed property ", path, ", no closing ] found")
                 );
 
-                MutableStorage!FieldType* field = theAllocator.make!(MutableStorage!FieldType)(this.indexer.access(*property, identity.dropBack(1)));
-                theAllocator.dispose(property);
-
+                auto field = this.indexer.access(property.value, identity.dropBack(1)).pack;
+                property.unpack;
                 property = field;
             }
 
-            return *property;
+            return property.value;
         }
 
-    /**
-     Check if requested property is present in component.
+        /**
+        Check if requested property is present in component.
 
-     Check if requested property is present in component.
-     The method could have allocation side effects due to the fact that
-     it is not restricted in calling access method of the accessor.
+        Check if requested property is present in component.
+        The method could have allocation side effects due to the fact that
+        it is not restricted in calling access method of the accessor.
 
-     Params:
-         component = component which is supposed to have property
-         property = speculated property that is to be tested if it is present in component
-     Returns:
-         true if property is in component
-     **/
+        Params:
+            component = component which is supposed to have property
+            property = speculated property that is to be tested if it is present in component
+        Returns:
+            true if property is in component
+        **/
         bool has(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const nothrow {
             import std.experimental.allocator : make, theAllocator, dispose;
 
@@ -650,12 +650,12 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
                     return false;
                 }
 
-                if (!this.accessor.has(component, splitted.front)) {
+                if (!this.accessor.has(component, splitted.front, allocator)) {
                     return false;
                 }
 
-                MutableStorage!FieldType* property = theAllocator.make!(MutableStorage!FieldType)(this.accessor.access(component, splitted.front));
-                scope(exit) theAllocator.dispose(property);
+                auto property = this.accessor.access(component, splitted.front, allocator).pack;
+                scope(exit) property.unpack;
 
                 splitted.popFront;
                 if (splitted.empty) {
@@ -667,13 +667,12 @@ class ArrayIndexedPropertyAccessor(ComponentType, FieldType = ComponentType, Key
                         return false;
                     }
 
-                    if (!this.indexer.has(*property, identity.dropBack(1))) {
+                    if (!this.indexer.has(property.value, identity.dropBack(1), allocator)) {
                         return false;
                     }
 
-                    MutableStorage!FieldType* field = theAllocator.make!(MutableStorage!FieldType)(this.indexer.access(*property, identity.dropBack(1)));
-                    theAllocator.dispose(property);
-
+                    auto field = this.indexer.access(property.value, identity.dropBack(1)).pack;
+                    property.unpack;
                     property = field;
                 }
 
@@ -808,7 +807,7 @@ class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType =
         FieldType access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
             enforce!InvalidArgumentException(this.valid(path), text("Not found or malformed ticked property ", path));
 
-            return this.accessor.access(component, path.drop(1).dropBack(1));
+            return this.accessor.access(component, path.drop(1).dropBack(1), allocator);
         }
 
     /**
@@ -828,7 +827,7 @@ class TickedPropertyAccessor(ComponentType, FieldType = ComponentType, KeyType =
 
             try {
 
-                return this.valid(path) && this.accessor.has(component, path.strip(this.tick));
+                return this.valid(path) && this.accessor.has(component, path.strip(this.tick), allocator);
             } catch (Exception e) {
 
                 debug(trace) error("Failed to check if ticked property exists due to: ", e).n;
@@ -954,7 +953,7 @@ class TaggedElementPropertyAccessorWrapper(
         Tagged access(Tagged component, in KeyType property, RCIAllocator allocator = theAllocator) const
         {
             if (this.has(component, property)) {
-                return Tagged(this.accessor.access(cast(X) component, property));
+                return Tagged(this.accessor.access(cast(X) component, property, allocator));
             }
 
             import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
@@ -984,7 +983,7 @@ class TaggedElementPropertyAccessorWrapper(
                     static if (mixin("is(typeof(Y." ~ e ~ ") : X)")) {
                         if (mixin("component.Kind." ~ e ~ " == component.kind")) {
 
-                            return this.accessor.has(cast(X) component, property);
+                            return this.accessor.has(cast(X) component, property, allocator);
                         }
 
                         return false;
@@ -1048,7 +1047,7 @@ auto taggedAccessor(Tagged, T : PropertyAccessor!(Composite, Field, Key), Compos
 /**
 Implements logic for accessing associative arrays.
 **/
-
+@component
 class AssociativeArrayAccessor(ComponentType : Type[Key], Type, Key) : PropertyAccessor!(ComponentType, Type, Key) {
     public {
 
@@ -1111,6 +1110,7 @@ class AssociativeArrayAccessor(ComponentType : Type[Key], Type, Key) : PropertyA
 /**
 Accessor implementing array access.
 **/
+@component
 class ArrayAccessor(ComponentType : Type[], Type) : PropertyAccessor!(ComponentType, Type, size_t) {
 
     public {
@@ -1181,6 +1181,7 @@ ImplSpec:
     of either associative array or dynamic array in order to access the contents of them. The return type is as well a
     variant that must be able to store associative's array field, or arrays elements.
 **/
+@component
 class VariantAccessor(
     ComponentType,
     FieldType = ComponentType,
@@ -1237,7 +1238,7 @@ class VariantAccessor(
                 true if property is in component
             **/
             bool has(ComponentType component, KType key, RCIAllocator allocator = theAllocator) const nothrow {
-                return this.has(component, Unqual!KeyType(key));
+                return this.has(component, Unqual!KeyType(key), allocator);
             }
         }
 
@@ -1434,7 +1435,7 @@ template RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyT
 
                 enforce(this.has(component, path), new NotFoundException("Could not find property ${property} in ${component}", path.to!string, component.to!string));
 
-                return this.accessor.access(component.unwrap!ComponentType, path);
+                return this.accessor.access(component.unwrap!ComponentType, path, allocator);
             }
 
             /**
@@ -1483,11 +1484,13 @@ template RuntimeCompositeAccessor(ComponentType, FieldType = ComponentType, KeyT
 
         private {
             bool isValidComponent(WithComponentStorageClass!Object component) const nothrow {
+                bool result = component.identify is typeid(ComponentType);
+
                 static if (is(ComponentType : Object) || is(ComponentType : const Object) || is(ComponentType : immutable Object)) {
-                    return (component.identify is typeid(Unqual!ComponentType));
-                } else {
-                    return (component.identify is typeid(ComponentType));
+                    result = result || (component.identify is typeid(Unqual!ComponentType));
                 }
+
+                return result;
             }
         }
     }
@@ -1503,11 +1506,11 @@ ImplSpec:
     The accessor itself is not responsible for deallocation of placeholders that it returned. As a consequence
     no components should point to placeholders allocated by this accessor.
 **/
-template RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = string) {
+template WrappingFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = string) {
 
     private alias WithStorageOfFieldType = QualifierOf!FieldType;
 
-    class RuntimeFieldAccessor :
+    class WrappingFieldAccessor :
         PropertyAccessor!(ComponentType, WithStorageOfFieldType!Object, KeyType) {
         import aermicioi.aedi_property_reader.convertor.placeholder : identify, unwrap;
 
@@ -1564,10 +1567,10 @@ template RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType 
                 FieldType accessed property.
             **/
             WithStorageOfFieldType!Object access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
-                import aermicioi.aedi_property_reader.convertor.placeholder : placeholder;
+                import aermicioi.aedi_property_reader.convertor.placeholder : pack;
                 enforce(this.has(component, path), new NotFoundException("Could not find property ${property}in ${component}", path.to!string, component.to!string));
 
-                return this.accessor.access(component, path).placeholder(cast() allocator);
+                return cast(WithStorageOfFieldType!Object) this.accessor.access(component, path, allocator).pack(allocator);
             }
 
             /**
@@ -1585,7 +1588,7 @@ template RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType 
             **/
             bool has(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const nothrow {
 
-                return this.accessor.has(component, path);
+                return this.accessor.has(component, path, allocator);
             }
 
             /**
@@ -1612,6 +1615,379 @@ template RuntimeFieldAccessor(ComponentType, FieldType = ComponentType, KeyType 
 }
 
 /**
+An accessor that erases component type's.
+
+ImplSpec:
+    The accessor will simply upcast any property field to Object if they are rooted in Object class, otherwise
+    it will allocate a Placeholder!FieldType for returned value and return it erased up to Object class. As such
+    it is advised to use an allocator that will dispose automatically it's contents once they are not required.
+    The accessor itself is not responsible for deallocation of placeholders that it returned. As a consequence
+    no components should point to placeholders allocated by this accessor.
+**/
+template WrappingComponentAccessor(ComponentType, FieldType = ComponentType, KeyType = string) {
+
+    private alias WithStorageOfFieldType = QualifierOf!FieldType;
+
+    class WrappingComponentAccessor : PropertyAccessor!(ComponentType, FieldType, KeyType) {
+        import aermicioi.aedi_property_reader.convertor.placeholder : identify, unwrap;
+
+        private {
+            PropertyAccessor!(Object, FieldType, KeyType) accessor_;
+        }
+
+        public {
+
+            /**
+            Constructor for runtime field accessor.
+
+            Params:
+                accessor = accessor used to access fields out of component that are to be type erased on return.
+            **/
+            this(PropertyAccessor!(Object, FieldType, KeyType) accessor) {
+                this.accessor = accessor;
+            }
+
+            /**
+            Set accessor
+
+            Params:
+                accessor = underlying accessor working on unwrapped element
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) accessor(PropertyAccessor!(Object, FieldType, KeyType) accessor) @safe nothrow pure
+            in (accessor !is null, "Expected non null reference to an accessor.") {
+                this.accessor_ = accessor;
+
+                return this;
+            }
+
+            /**
+            Get accessor
+
+            Returns:
+                PropertyAccessor!(ComponentType, FieldType, KeyType)
+            **/
+            inout(PropertyAccessor!(Object, FieldType, KeyType)) accessor() @safe nothrow pure inout {
+                return this.accessor_;
+            }
+
+            /**
+            Get a property out of component
+
+            Params:
+                component = a component which has some properties identified by property.
+            Throws:
+                NotFoundException in case when no requested property is available.
+                InvalidArgumentException in case when passed arguments are somehow invalid for use.
+            Returns:
+                FieldType accessed property.
+            **/
+            FieldType access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
+                import aermicioi.aedi_property_reader.convertor.placeholder : pack;
+                enforce(this.has(component, path), new NotFoundException("Could not find property ${property}in ${component}", path.to!string, component.to!string));
+
+                auto temporary = component.stored;
+                return this.accessor.access(temporary, path, allocator);
+            }
+
+            /**
+            Check if requested property is present in component.
+
+            Check if requested property is present in component.
+            The method could have allocation side effects due to the fact that
+            it is not restricted in calling access method of the accessor.
+
+            Params:
+                component = component which is supposed to have property
+                property = speculated property that is to be tested if it is present in component
+            Returns:
+                true if property is in component
+            **/
+            bool has(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const nothrow {
+
+                auto temporary = component.pack;
+                scope(exit) temporary.unpack!ComponentType;
+
+                return this.accessor.has(temporary, path, allocator);
+            }
+
+            /**
+            Identify the type of supported component.
+
+            Identify the type of supported component. It returns type info of component
+            if it is supported by accessor, otherwise it will return typeid(void) denoting that
+            the type isn't supported by accessor. The accessor is not limited to returning the type
+            info of passed component, it can actually return type info of super type or any type
+            given the returned type is implicitly convertible or castable to ComponentType.
+
+            Params:
+                component = the component for which accessor should identify the underlying type
+
+            Returns:
+                TypeInfo type information about passed component, or typeid(void) if component is not supported.
+            **/
+            TypeInfo componentType(ComponentType component) const nothrow {
+
+                auto temporary = component.pack;
+                scope(exit) temporary.unpack!ComponentType;
+                return this.accessor.componentType(temporary);
+            }
+
+        }
+    }
+}
+
+/**
+An accessor that downcasts or unwraps passed component.
+
+ImplSpec:
+    The accessor will simply upcast any property field to Object if they are rooted in Object class, otherwise
+    it will allocate a Placeholder!FieldType for returned value and return it erased up to Object class. As such
+    it is advised to use an allocator that will dispose automatically it's contents once they are not required.
+    The accessor itself is not responsible for deallocation of placeholders that it returned. As a consequence
+    no components should point to placeholders allocated by this accessor.
+**/
+template UnwrappingComponentAccessor(ComponentType, FieldType = ComponentType, KeyType = string) {
+
+    private alias WithStorageOfFieldType = QualifierOf!FieldType;
+
+    class UnwrappingComponentAccessor :
+        PropertyAccessor!(Object, FieldType, KeyType) {
+        import aermicioi.aedi_property_reader.convertor.placeholder : identify, unwrap;
+
+        private {
+            PropertyAccessor!(ComponentType, FieldType, KeyType) accessor_;
+        }
+
+        public {
+
+            /**
+            Constructor for runtime component accessor.
+
+            Params:
+                accessor = accessor used to access fields out of component that are to be type erased on return.
+            **/
+            this(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) {
+                this.accessor = accessor;
+            }
+
+            /**
+            Set accessor
+
+            Params:
+                accessor = underlying accessor working on unwrapped element
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) accessor(PropertyAccessor!(ComponentType, FieldType, KeyType) accessor) @safe nothrow pure
+                in (accessor !is null, "Expected non null reference to an accessor.") {
+                this.accessor_ = accessor;
+
+                return this;
+            }
+
+            /**
+            Get accessor
+
+            Returns:
+                PropertyAccessor!(ComponentType, FieldType, KeyType)
+            **/
+            inout(PropertyAccessor!(ComponentType, FieldType, KeyType)) accessor() @safe nothrow pure inout {
+                return this.accessor_;
+            }
+
+            /**
+            Get a property out of component
+
+            Params:
+                component = a component which has some properties identified by property.
+            Throws:
+                NotFoundException in case when no requested property is available.
+                InvalidArgumentException in case when passed arguments are somehow invalid for use.
+            Returns:
+                FieldType accessed property.
+            **/
+            FieldType access(Object component, in KeyType path, RCIAllocator allocator = theAllocator) const {
+                import aermicioi.aedi_property_reader.convertor.placeholder : pack;
+                enforce(this.has(component, path), new NotFoundException("Could not find property ${property} in ${component}", path.to!string, component.to!string));
+
+                return this.accessor.access(component.unwrap!ComponentType, path, allocator);
+            }
+
+            /**
+            Check if requested property is present in component.
+
+            Check if requested property is present in component.
+            The method could have allocation side effects due to the fact that
+            it is not restricted in calling access method of the accessor.
+
+            Params:
+                component = component which is supposed to have property
+                property = speculated property that is to be tested if it is present in component
+            Returns:
+                true if property is in component
+            **/
+            bool has(Object component, in KeyType path, RCIAllocator allocator = theAllocator) const nothrow {
+
+                return
+                    (component.identify is typeid(ComponentType)) &&
+                    this.accessor.has(component.unwrap!ComponentType, path, allocator);
+            }
+
+            /**
+            Identify the type of supported component.
+
+            Identify the type of supported component. It returns type info of component
+            if it is supported by accessor, otherwise it will return typeid(void) denoting that
+            the type isn't supported by accessor. The accessor is not limited to returning the type
+            info of passed component, it can actually return type info of super type or any type
+            given the returned type is implicitly convertible or castable to ComponentType.
+
+            Params:
+                component = the component for which accessor should identify the underlying type
+
+            Returns:
+                TypeInfo type information about passed component, or typeid(void) if component is not supported.
+            **/
+            TypeInfo componentType(Object component) const nothrow {
+                if (component.identify is typeid(ComponentType)) {
+
+                    return this.accessor.componentType(component.unwrap!ComponentType);
+                }
+
+                return typeid(void);
+            }
+        }
+    }
+}
+
+/**
+An accessor that downcasts or unwraps resulting field.
+
+ImplSpec:
+    The accessor will simply upcast any property field to Object if they are rooted in Object class, otherwise
+    it will allocate a Placeholder!FieldType for returned value and return it erased up to Object class. As such
+    it is advised to use an allocator that will dispose automatically it's contents once they are not required.
+    The accessor itself is not responsible for deallocation of placeholders that it returned. As a consequence
+    no components should point to placeholders allocated by this accessor.
+**/
+template UnwrappingFieldAccessor(ComponentType, FieldType = ComponentType, KeyType = string) {
+
+    private alias WithStorageOfFieldType = QualifierOf!FieldType;
+
+    class UnwrappingFieldAccessor :
+        PropertyAccessor!(ComponentType, FieldType, KeyType) {
+        import aermicioi.aedi_property_reader.convertor.placeholder : identify, unwrap;
+
+        private {
+            PropertyAccessor!(ComponentType, Object, KeyType) accessor_;
+        }
+
+        public {
+
+            /**
+            Constructor for runtime component accessor.
+
+            Params:
+                accessor = accessor used to access fields out of component that are to be type erased on return.
+            **/
+            this(PropertyAccessor!(ComponentType, Object, KeyType) accessor) {
+                this.accessor = accessor;
+            }
+
+            /**
+            Set accessor
+
+            Params:
+                accessor = underlying accessor working on unwrapped element
+
+            Returns:
+                typeof(this)
+            **/
+            typeof(this) accessor(PropertyAccessor!(ComponentType, Object, KeyType) accessor) @safe nothrow pure
+                in (accessor !is null, "Expected non null reference to an accessor.") {
+                this.accessor_ = accessor;
+
+                return this;
+            }
+
+            /**
+            Get accessor
+
+            Returns:
+                PropertyAccessor!(ComponentType, FieldType, KeyType)
+            **/
+            inout(PropertyAccessor!(ComponentType, Object, KeyType)) accessor() @safe nothrow pure inout {
+                return this.accessor_;
+            }
+
+            /**
+            Get a property out of component
+
+            Params:
+                component = a component which has some properties identified by property.
+            Throws:
+                NotFoundException in case when no requested property is available.
+                InvalidArgumentException in case when passed arguments are somehow invalid for use.
+            Returns:
+                FieldType accessed property.
+            **/
+            FieldType access(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const {
+                import aermicioi.aedi_property_reader.convertor.placeholder : pack;
+                enforce(this.has(component, path), new NotFoundException("Could not find property ${property} in ${component}", path.to!string, component.to!string));
+
+                return this.accessor.access(component, path, allocator).unpack!FieldType(allocator);
+            }
+
+            /**
+            Check if requested property is present in component.
+
+            Check if requested property is present in component.
+            The method could have allocation side effects due to the fact that
+            it is not restricted in calling access method of the accessor.
+
+            Params:
+                component = component which is supposed to have property
+                property = speculated property that is to be tested if it is present in component
+            Returns:
+                true if property is in component
+            **/
+            bool has(ComponentType component, in KeyType path, RCIAllocator allocator = theAllocator) const nothrow {
+
+                return this.accessor.has(component, path, allocator);
+            }
+
+            /**
+            Identify the type of supported component.
+
+            Identify the type of supported component. It returns type info of component
+            if it is supported by accessor, otherwise it will return typeid(void) denoting that
+            the type isn't supported by accessor. The accessor is not limited to returning the type
+            info of passed component, it can actually return type info of super type or any type
+            given the returned type is implicitly convertible or castable to ComponentType.
+
+            Params:
+                component = the component for which accessor should identify the underlying type
+
+            Returns:
+                TypeInfo type information about passed component, or typeid(void) if component is not supported.
+            **/
+            TypeInfo componentType(ComponentType component) const nothrow {
+                if (component.identify is typeid(ComponentType)) {
+
+                    return this.accessor.componentType(component);
+                }
+
+                return typeid(void);
+            }
+        }
+    }
+}
+
+/**
 Accessor that allows access to fields and properties of a component of Type.
 
 ImplSpec:
@@ -1620,6 +1996,7 @@ ImplSpec:
     that allocator used in the accessor to be disposable after accessing of components was done. As a consequence
     no components should point to placeholders allocated by this accessor.
 **/
+@component
 template CompositeAccessor(Type) {
 
     private  {
@@ -1627,13 +2004,20 @@ template CompositeAccessor(Type) {
 
         static if (is(Type == const)) {
 
-            alias modifier = (FunctionAttribute attr) => attr & FunctionAttribute.const_;
+            auto modifier(FunctionAttribute attr) {
+                return attr & FunctionAttribute.const_;
+            }
+
         } else static if (is(Type == immutable)) {
 
-            alias modifier = (FunctionAttribute attr) => attr & FunctionAttribute.immutable_;
+            auto modifier(FunctionAttribute attr) {
+                return attr & FunctionAttribute.immutable_;
+            }
         } else {
 
-            alias modifier = (FunctionAttribute attr) => (attr & (FunctionAttribute.const_ | FunctionAttribute.immutable_)) == FunctionAttribute.none;
+            auto modifier(FunctionAttribute attr) {
+                return (attr & (FunctionAttribute.const_ | FunctionAttribute.immutable_)) == FunctionAttribute.none;
+            }
         }
     }
 
@@ -1663,8 +2047,8 @@ template CompositeAccessor(Type) {
                         if (member == property) {
                             static if (isField!(Type, member)) {
 
-                                return (__traits(getMember, component, member))
-                                    .placeholderWithStorageClass!WithStorageClassOfType(cast() allocator);
+                                return cast(WithStorageClassOfType!Object) (__traits(getMember, component, member))
+                                    .packWithStorageClass!WithStorageClassOfType(allocator);
                             } else static if(isSomeFunction!(__traits(getMember, component, member))) {
 
                                 static foreach(overload; __traits(getOverloads, Type, member)) {
@@ -1675,9 +2059,8 @@ template CompositeAccessor(Type) {
                                             (functionAttributes!overload & FunctionAttribute.inout_)
                                         )
                                     ) {
-
-                                        return (__traits(getMember, component, member))
-                                            .placeholderWithStorageClass!WithStorageClassOfType(cast() allocator);
+                                        return cast(WithStorageClassOfType!Object) (__traits(getMember, component, member))
+                                            .packWithStorageClass!WithStorageClassOfType(allocator);
                                     }
                                 }
                             }
@@ -1754,7 +2137,9 @@ template CompositeAccessor(Type) {
 }
 
 /**
-Accessor that converts input property identity of InputKeyType converts to ConvertedKeyType, and then uses it to access the ComponentType using decorated convertor
+Accessor that converts input property identity of InputKeyType converts to ConvertedKeyType, and then uses it to access the ComponentType using decorated convertor.
+
+Notice: const InputKeyType must decay to mutable InputKeyType in order for conversion to work properly, as most convertors do not support const values.
 **/
 class KeyConvertingAccessor
     (ComponentType, FieldType = ComponentType, InputKeyType = string, ConvertedKeyType = InputKeyType) :
@@ -1791,16 +2176,16 @@ class KeyConvertingAccessor
             typeof(this)
         **/
         typeof(this) convertor(Convertor convertor) @safe pure {
-            enforce!ConvertorException(
+            enforce(
                 convertor.convertsTo(typeid(ConvertedKeyType)) &&
                 convertor.convertsFrom(typeid(InputKeyType)),
-                text(
+                new InvalidArgumentException(text(
                     "Invalid convertor provided for converting accessor key. Convertor capable converting from ",
                     typeid(InputKeyType), " to ",
-                    typeid(ConvertedKeyType), " is required. Got convertor capable to convert from ",
+                    typeid(ConvertedKeyType), " is required. Got convertor ", convertor, " capable to convert from ",
                     convertor.from, " to ",
                     convertor.to
-                )
+                ))
             );
             this.convertor_ = convertor;
 
@@ -1856,11 +2241,14 @@ class KeyConvertingAccessor
             FieldType accessed property.
         **/
         FieldType access(ComponentType component, in InputKeyType property, RCIAllocator allocator = theAllocator) const {
-            auto wrapped = (cast() property).placeholder;
-            Object key = convertor.convert(wrapped, typeid(ConvertedKeyType));
-            scope(exit) (cast() convertor).destruct(key); // TODO find a proper way to retain constness while extracting type info from methods
+            InputKeyType modifiable = property;
 
-            return this.accessor.access(component, key.unwrap!ConvertedKeyType);
+            auto wrapped = modifiable.stored;
+            Object key = convertor.convert(wrapped, typeid(ConvertedKeyType));
+            scope(exit) convertor.destruct(typeid(InputKeyType), key, allocator);
+
+
+            return this.accessor.access(component, key.unwrap!ConvertedKeyType, allocator);
         }
 
         /**
@@ -1878,15 +2266,24 @@ class KeyConvertingAccessor
         **/
         bool has(ComponentType component, in InputKeyType property, RCIAllocator allocator = theAllocator) const nothrow {
             try {
-                Object key = convertor.convert((cast() property).placeholder, typeid(ConvertedKeyType)); // TODO find a proper way to retain constness while extracting type info from methods
-                scope(exit) convertor.destruct(key);
+                Object key;
+                scope(exit) if (key !is null) convertor.destruct(typeid(InputKeyType), key, allocator);
 
-                return this.accessor.has(component, key.unwrap!ConvertedKeyType);
+                InputKeyType modifiable = property;
+                auto temporary = modifiable.stored;
 
+                try {
+                    key = convertor.convert(temporary, typeid(ConvertedKeyType), allocator); // TODO find a proper way to retain constness while extracting type info from methods
+
+                } catch (ConvertorException e) {
+                    info("Attempting to convert input key ", typeid(InputKeyType), " to type of ", typeid(ConvertedKeyType), " ended in an exception, returning false.");
+                    return false;
+                }
+
+                return this.accessor.has(component, key.unwrap!ConvertedKeyType, allocator);
             } catch (Exception e) {
 
-                error(text("Failed to check for existence of property due to ", e)).n;
-                return false;
+                throw new Error("Checking for existence of property has thrown an unexpected exception", e);
             }
         }
 
@@ -1945,6 +2342,44 @@ auto dsl
                         accessor,
                     ),
                     indexer
+                )
+            )
+        )
+    );
+}
+
+/**
+Creates a dlang dsl language for accessing properties out of a ComponentType.
+
+The difference compared to a simple dsl is the fact that runtimeDsl will operate
+with erased components (components with erased type), which incurs some additional
+cost of creating temporaries to hide component type.
+
+Params:
+    accessor = accessor used to access property like values
+    indexer = accessor used to access indexed like values
+
+Returns:
+    PropertyPathAccessor!(ComponentType, FieldType, KeyType) with dsl like configuration.
+**/
+auto runtimeDsl(ComponentType, FieldType, KeyType)
+    (
+        PropertyAccessor!(ComponentType, FieldType, KeyType) accessor,
+        PropertyAccessor!(ComponentType, FieldType, KeyType) indexer
+    )
+{
+    return new WrappingComponentAccessor!(ComponentType, FieldType, KeyType)(
+        new UnwrappingFieldAccessor!(Object, FieldType, KeyType)(
+            dsl(
+                new UnwrappingComponentAccessor!(ComponentType, Object, KeyType)(
+                    new WrappingFieldAccessor!(ComponentType, FieldType, KeyType)(
+                        accessor
+                    )
+                ),
+                new UnwrappingComponentAccessor!(ComponentType, Object, KeyType)(
+                    new WrappingFieldAccessor!(ComponentType, FieldType, KeyType)(
+                        indexer
+                    )
                 )
             )
         )

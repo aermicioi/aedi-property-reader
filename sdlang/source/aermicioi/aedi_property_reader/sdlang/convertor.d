@@ -29,321 +29,206 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.sdlang.convertor;
 
-import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.exception;
 import aermicioi.aedi_property_reader.convertor.inspector;
+import aermicioi.aedi_property_reader.convertor.mapper;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import aermicioi.aedi_property_reader.sdlang.accessor;
 import aermicioi.aedi_property_reader.sdlang.inspector;
-import aermicioi.aedi_property_reader.convertor.exception : InvalidCastException;
-import aermicioi.aedi_property_reader.sdlang.accessor : SdlangElement;
-import sdlang.ast;
 import sdlang;
+import sdlang.ast;
+import sdlang.token;
 import std.conv;
 import std.traits;
 import std.meta;
+import std.exception : enforce;
 import std.experimental.allocator;
 
-public {
-	import aermicioi.aedi_property_reader.sdlang.sdlang : accessor;
-	enum SdlangAccessorFactory(From : SdlangElement) = () => new RuntimeFieldAccessor!SdlangElement(accessor());
-	enum SdlangAccessorFactory(From : Tag) = () => new RuntimeFieldAccessor!Tag(dsl(
-		new SdlangTagPropertyAccessor, new SdlangTagPropertyAccessor
-	));
+@component
+class TagConvertor : Convertor {
 
-	enum SdlangInspectorFactory(From : SdlangElement) =
-		() => new TaggedInspector!(SdlangElement, Tag)(new SdlangTagInspector);
-	enum SdlangInspectorFactory(From : Tag) = () => new SdlangTagInspector;
-}
+	mixin FromMixin!Tag;
+	mixin ToMixin!(AliasSeq!(ValueTypes, Value[]));
 
-alias SdlangConvertorBuilderFactory = (Convertor[] convertors) {
-	return factoryAnyConvertorBuilder(
-		new TypeGuessCallbackConvertorBuilder!(convert, destruct),
-		new MappingConvertorBuilder!(
-			SdlangAccessorFactory,
-			CompositeSetterFactory,
-			CompositeInspectorFactory,
-			SdlangInspectorFactory
-		)(convertors, true, true, true, true),
-	);
-};
+	mixin ConvertsFromToMixin DefaultConvertsImplementation;
+	mixin EqualToHashToStringOpCmpMixin;
 
-/**
-Convert from sdlang element to destination type.
+	/**
+    ditto
+    **/
+    bool converts(in Object from, const TypeInfo to) @safe const nothrow {
+		if (DefaultConvertsImplementation.converts(from, to)) {
 
-Params:
-	from = sdlang element to convert from
-	to = storage for destination type
-	allocator = optional allocator used to allocate required memory
-
-Throws:
-	ConvertorException if not possible
-**/
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && !isNumeric!To && !isSomeChar!To && !isSomeString!To) {
-
-	try {
-
-		to = (cast() from).expectValue!To;
-	} catch (ValueNotFoundException e) {
-
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-	}
-}
-
-/**
-ditto
-**/
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && isNumeric!To && isFloatingPoint!To) {
-
-	try {
-
-		static if (is(typeof((cast() from).expectValue!To))) {
-
-			to = (cast() from).expectValue!To;
-		} else {
-
-			static foreach(Numeric; AliasSeq!(real, double, float)) {
-				foreach (value; (cast() from).values) {
-					if (value.type is typeid(Numeric)) {
-						to = (cast() from).expectValue!Numeric.to!To;
-						return;
-					}
+			foreach (value; from.unwrap!Tag.values) {
+				if (value.type is to) {
+					return true;
 				}
 			}
 
-			throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to));
-		}
-	} catch (ValueNotFoundException e) {
-
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-	}
-}
-
-/**
-ditto
-**/
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && isNumeric!To && !isFloatingPoint!To) {
-
-	try {
-
-		static if (is(typeof((cast() from).expectValue!To))) {
-
-			to = (cast() from).expectValue!To;
-		} else {
-
-			static foreach(Numeric; AliasSeq!(long, int)) {
-				foreach (value; (cast() from).values) {
-					if (value.type is typeid(Numeric)) {
-						to = (cast() from).expectValue!Numeric.to!To;
-						return;
-					}
-				}
-			}
-
-			throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to));
-		}
-	} catch (ValueNotFoundException e) {
-
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-	}
-}
-
-/**
-ditto
-**/
-void convert(To : E[], From : Tag, E)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && !is(To : ubyte[]) && !isSomeString!To) {
-
-	import std.variant : VariantException;
-	to = allocator.makeArray!E(from.values.length);
-
-	foreach (index, ref value; to) {
-		try {
-
-			value = from.values[index].get!E;
-		} catch (VariantException e) {
-
-			throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-		}
-	}
-}
-
-/**
-ditto
-**/
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && isSomeChar!To) {
-
-	try {
-
-		to = (cast() from).expectValue!string.to!To;
-	} catch (ValueNotFoundException e) {
-
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-	}
-}
-
-/**
-ditto
-**/
-void convert(To : T[], From : Tag, T)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && isSomeChar!T) {
-
-	try {
-
-		to = (cast() from).expectValue!string.to!To;
-	} catch (ValueNotFoundException e) {
-
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-	}
-}
-
-/**
-ditto
-**/
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && !isNumeric!To && !isSomeChar!To) {
-	import std.variant : VariantException;
-
-	try {
-		to = cast(To) from.value.get!To;
-
-	} catch (VariantException e) {
-
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-	}
-}
-
-/**
-ditto
-**/
-void convert(To : T[], From : Attribute, T)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && isSomeChar!T) {
-	import std.variant : VariantException;
-
-	try {
-		to = cast(To) from.value.get!string.to!To;
-
-	} catch (VariantException e) {
-
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-	}
-}
-
-/**
-ditto
-**/
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && !isNumeric!To && isSomeChar!To) {
-	import std.variant : VariantException;
-
-	try {
-		to = cast(To) from.value.get!string.to!To;
-
-	} catch (VariantException e) {
-
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-	}
-}
-
-/**
-ditto
-**/
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && isNumeric!To && isFloatingPoint!To) {
-	import std.variant : VariantException;
-
-	try {
-		static foreach (Numeric; AliasSeq!(real, double, float)) {
-			if (from.value.type is typeid(Numeric)) {
-
-				to = cast(To) from.value.get!Numeric.to!To;
-				return;
+			if (to is typeid(Value[])) {
+				return true;
 			}
 		}
 
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to));
-	} catch (VariantException e) {
+		return false;
+    }
 
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-	}
-}
+    /**
+    ditto
+    **/
+    bool converts(in Object from, in Object to) @safe const nothrow {
+        return this.converts(from, to.identify);
+    }
 
-/**
-ditto
-**/
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && isNumeric!To && !isFloatingPoint!To) {
-	import std.variant : VariantException;
+	/**
+    Convert from component to component.
 
-	try {
-		static foreach (Numeric; AliasSeq!(long, int)) {
-			if (from.value.type is typeid(Numeric)) {
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when there is a converting error
+        InvalidArgumentException when arguments passed are not of right type or state
+    Returns:
+        Resulting converted component.
+    **/
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator) const {
+		enforce!ConvertorException(
+			this.converts(from, to),
+			text("Cannot convert ", from.identify, " to type of ", to, " expected origin type of ", this.from, " and destination types of ", this.to)
+		);
 
-				to = cast(To) from.value.get!Numeric.to!To;
-				return;
+		static foreach (ToType; ValueTypes) {
+			if (to is typeid(ToType)) {
+				return from.unwrap!Tag.expectValue!ToType.pack(from, this, allocator);
 			}
 		}
 
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to));
-	} catch (VariantException e) {
-
-		throw new InvalidCastException("Could not convert value from ${from} to ${to} value", typeid(from), typeid(to), e);
-	}
-}
-
-/**
-ditto
-**/
-void convert(To, From : Tag)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (is(To == enum)) {
-	string temp;
-    from.convert!string(temp, allocator);
-    to = temp.to!To;
-	temp.destruct(allocator);
-}
-
-/**
-ditto
-**/
-void convert(To, From : Attribute)(in From from, ref To to, RCIAllocator allocator = theAllocator)
-	if (is(To == enum)) {
-	string temp;
-    from.convert!string(temp, allocator);
-    to = temp.to!To;
-	temp.destruct(allocator);
-}
-
-/**
-ditto
-**/
-void convert(To, From : SdlangElement)
-	(in From from, ref To to, RCIAllocator allocator = theAllocator) {
-
-	final switch (from.kind) {
-		case SdlangElement.Kind.tag: {
-			(cast(const(Tag)) from).convert(to, allocator);
-			return;
+		if (to is typeid(Value[])) {
+			return from.unwrap!Tag.values.pack(from, this, allocator);
 		}
 
-		case SdlangElement.Kind.attribute: {
-			(cast(const(Attribute)) from).convert(to, allocator);
-			return;
+		assert(false, "Code flow should not get here");
+	}
+
+    /**
+    Destroy component created using this convertor.
+
+    Destroy component created using this convertor.
+    Since convertor could potentially allocate memory for
+    converted component, only itself is containing history of allocation,
+    and therefore it is responsible as well to destroy and free allocated
+    memory with allocator.
+
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    Return:
+        true if component is destroyed, false otherwise
+    **/
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+		enforce!ConvertorException(
+			this.destroys(from, converted),
+			text("Cannot destroy ", converted.identify, ". The value was probably not converted by this convertor")
+		);
+
+		static foreach (ToType; ValueTypes) {
+			if (converted.identify is typeid(ToType)) {
+				converted.unpack!ToType(allocator);
+			}
+		}
+
+		if (converted.identify is (typeid(Value[]))) {
+			converted.unpack!(Value[])(allocator);
 		}
 	}
 }
 
-/**
-Destroy components that are allocated from sdlang elements
+@component
+class AttributeConvertor : Convertor {
 
-Params:
-	to = component to be destroyed
-	allocator = used to allocate component
-**/
-void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
+	mixin FromMixin!Attribute;
+	mixin ToMixin!ValueTypes;
 
-	destroy(to);
-	to = To.init;
+	mixin ConvertsFromToMixin DefaultConvertsImplementation;
+	mixin EqualToHashToStringOpCmpMixin;
+
+	/**
+    ditto
+    **/
+    bool converts(in Object from, const TypeInfo to) @safe const nothrow {
+		if (DefaultConvertsImplementation.converts(from, to)) {
+
+			return from.unwrap!Attribute.value.type is to;
+		}
+
+		return false;
+    }
+
+    /**
+    ditto
+    **/
+    bool converts(in Object from, in Object to) @safe const nothrow {
+        return this.converts(from, to.identify);
+    }
+
+	/**
+    Convert from component to component.
+
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when there is a converting error
+        InvalidArgumentException when arguments passed are not of right type or state
+    Returns:
+        Resulting converted component.
+    **/
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator) const {
+		enforce!ConvertorException(
+			this.converts(from, to),
+			text("Cannot convert ", from.identify, " to type of ", to, " expected origin type of ", this.from, " and destination types of ", this.to)
+		);
+
+		static foreach (ToType; ValueTypes) {
+			if (to is typeid(ToType)) {
+				return from.unwrap!Attribute.value.get!ToType.pack(from, this, allocator);
+			}
+		}
+
+		assert(false, "Code flow should not reach this point");
+	}
+
+    /**
+    Destroy component created using this convertor.
+
+    Destroy component created using this convertor.
+    Since convertor could potentially allocate memory for
+    converted component, only itself is containing history of allocation,
+    and therefore it is responsible as well to destroy and free allocated
+    memory with allocator.
+
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    Return:
+        true if component is destroyed, false otherwise
+    **/
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+		enforce!ConvertorException(
+			this.destroys(from, converted),
+			text("Cannot destroy ", converted.identify, ". The value was probably not converted by this convertor")
+		);
+
+		static foreach (ToType; ValueTypes) {
+			if (converted.identify is typeid(ToType)) {
+				converted.unpack!ToType(allocator);
+			}
+		}
+	}
 }

@@ -29,6 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.json.setter;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.setter;
 import aermicioi.aedi_property_reader.convertor.exception;
 import std.json;
@@ -36,6 +37,7 @@ import std.exception;
 import std.conv : text;
 import std.experimental.allocator;
 
+@component
 class JsonObjectSetter : PropertySetter!(JSONValue, JSONValue) {
 
     /**
@@ -74,6 +76,7 @@ class JsonObjectSetter : PropertySetter!(JSONValue, JSONValue) {
     }
 }
 
+@component
 class JsonArraySetter : PropertySetter!(JSONValue, JSONValue, size_t) {
 
     /**

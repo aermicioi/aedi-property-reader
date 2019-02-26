@@ -30,28 +30,28 @@ Authors:
 module aermicioi.aedi_property_reader.core.test.document;
 
 import aermicioi.aedi : locate, NotFoundException;
-import aermicioi.aedi_property_reader.core.document : DocumentContainer;
-import aermicioi.aedi_property_reader.convertor.type_guesser : StringToScalarConvTypeGuesser;
-import aermicioi.aedi_property_reader.convertor.accessor : AssociativeArrayAccessor;
-import aermicioi.aedi_property_reader.convertor.convertor : TypeGuessCallbackConvertorBuilder;
-import aermicioi.aedi_property_reader.convertor.std_conv : convert, destruct;
+import aermicioi.aedi_property_reader.core.document : DocumentLocator;
+import aermicioi.aedi_property_reader.convertor.type_guesser : StringToScalarConvTypeGuesser, DelegatingObjectTypeGuesser;
+import aermicioi.aedi_property_reader.convertor.accessor : AssociativeArrayAccessor, WrappingFieldAccessor;
+import aermicioi.aedi_property_reader.convertor.convertor : CombinedConvertorImpl;
+import aermicioi.aedi_property_reader.convertor.std_conv : StdConvConvertor;
 import std.experimental.allocator;
 import std.exception;
 
 unittest {
-    auto builder = new TypeGuessCallbackConvertorBuilder!(convert, destruct);
 
-    DocumentContainer!(string[string], string) document = new DocumentContainer!(string[string], string)([
+    DocumentLocator!(string[string]) document = new DocumentLocator!(string[string])([
         "foo": "foofoo",
         "moo": "10"
     ]);
 
-    document.guesser = new StringToScalarConvTypeGuesser;
-    document.accessor = new AssociativeArrayAccessor!(string[string]);
+    document.guesser = new DelegatingObjectTypeGuesser!string(new StringToScalarConvTypeGuesser);
+    document.accessor = new WrappingFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string]));
+    document.convertor = new CombinedConvertorImpl(
+        new StdConvConvertor!(long, string),
+        new StdConvConvertor!(string, string)
+    );
     document.allocator = theAllocator;
-
-    document.set(builder.make!(long, string)(), "long");
-    document.set(builder.make!(string, string)(), "string");
 
     assert(document.has("foo"));
     assert(!document.has("coo"));

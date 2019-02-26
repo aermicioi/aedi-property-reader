@@ -29,14 +29,21 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.xml.inspector;
 
+import aermicioi.aedi.configurer.annotation.annotation : component;
 import aermicioi.aedi_property_reader.convertor.inspector;
 import std.xml;
 import std.algorithm;
 import std.range;
 
+@component
+auto runtimeXmlInspector(Inspector!Element inspector) {
+    return new RuntimeInspector!Element(inspector);
+}
+
 /**
 Inspector for xml elements.
 **/
+@component
 class XmlInspector : Inspector!Element {
 
     /**

@@ -29,55 +29,26 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.xml.type_guesser;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.xml.accessor;
 import std.xml;
 
-/**
-Type guesser of data in xml elements
-**/
-class XmlTypeGuesser : TypeGuesser!XmlElement {
+@component
+auto delegatingObjectTypeGuesser(
+    TypeGuesser!Element elementGuesser,
+    TypeGuesser!string attributeGuesser
+) {
+    return new DelegatingObjectTypeGuesser!(Element, string)(elementGuesser, attributeGuesser);
+}
 
-    private {
-        TypeGuesser!string guesser_;
-    }
+/**
+ditto
+**/
+@component
+class ElementTypeGuesser : TypeGuesser!Element {
 
     public {
-
-        /**
-        Construct XmlTypeGuesser
-
-        Params:
-            guesser = string type guesser for xml attributes
-        **/
-        this(TypeGuesser!string guesser) {
-            this.guesser = guesser;
-        }
-
-        /**
-        Set guesser
-
-        Params:
-            guesser = string based guesser of types
-
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) guesser(TypeGuesser!string guesser) @safe nothrow pure {
-            this.guesser_ = guesser;
-
-            return this;
-        }
-
-        /**
-        Get guesser
-
-        Returns:
-            TypeGuesser!string
-        **/
-        inout(TypeGuesser!string) guesser() @safe nothrow pure inout {
-            return this.guesser_;
-        }
 
         /**
         Guess type of underlying xml element or attribute
@@ -88,17 +59,21 @@ class XmlTypeGuesser : TypeGuesser!XmlElement {
         Returns:
             TypeInfo of contained element
         **/
-        TypeInfo guess(XmlElement serialized) const @trusted {
+        TypeInfo guess(Element serialized) const @trusted {
+            import std.algorithm : all;
+            import std.meta : AliasSeq;
 
-            final switch (serialized.kind) {
-                case XmlElement.Kind.attribute: {
-                    return guesser.guess(cast(string) serialized);
-                }
+            if (serialized.items.all!(item => (() @trusted => cast(Text) item)() !is null)) {
+                return typeid(string);
+            }
 
-                case XmlElement.Kind.element: {
-                    return guesser.guess((cast(Element) serialized).text);
+            static foreach (Type; AliasSeq!(CData, ProcessingInstruction, Element)) {
+                if (serialized.items.all!(item => (() @trusted => cast(Type) item)() !is null)) {
+                    return typeid(Type[]);
                 }
             }
+
+            return typeid(Item[]);
         }
     }
 }

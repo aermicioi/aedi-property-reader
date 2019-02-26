@@ -89,7 +89,7 @@ class NotFoundException : ConvertorException {
      */
     @nogc @safe pure nothrow this(
         string msg,
-        string identity,
+        string property,
         string component,
         string file = __FILE__,
         size_t line = __LINE__,
@@ -105,7 +105,7 @@ class NotFoundException : ConvertorException {
     **/
     @nogc @safe pure nothrow this(
         string msg,
-        string identity,
+        string property,
         string component,
         Throwable next,
         string file = __FILE__,

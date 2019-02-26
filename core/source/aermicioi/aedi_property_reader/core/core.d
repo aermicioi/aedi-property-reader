@@ -29,85 +29,90 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.core.core;
 
+import aermicioi.aedi;
+import aermicioi.aedi : load = configure;
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.convertor.chaining_convertor;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.convertor.mapper;
-import aermicioi.aedi_property_reader.core.document :
-	DocumentContainerImpl = DocumentContainer,
-	WithConvertorBuilder,
-	WithConvertorsFor,
-	WithConvertorSources,
-	WithConvertors;
+import aermicioi.aedi_property_reader.core.document : DocumentLocator;
 import std.meta;
 import std.traits;
 import std.experimental.logger;
+import std.experimental.allocator;
 import std.exception;
 
 /**
 Configuration context for a property
 **/
-struct PropertyContext(Type, DocumentContainer) {
+struct PropertyContext(Type, Context) {
 	string path;
-	Convertor[] convertors;
-	DocumentContainer container;
-	Locator!() locator;
+	Context context;
 }
 
 /**
 Configuration context that is providing a nice api to add convertors into a container for a document.
 **/
-struct DocumentContainerBuilder
-	(DocumentContainer : DocumentContainerImpl!(DocumentType, FieldType), ConvertorBuilder, DocumentType, FieldType)
-	if (is(DocumentContainer : Storage!(Convertor, string))) {
+struct DocumentContainerBuilder(PolicyDocument : Marker!(DocumentTypeArg, FieldTypeArg, PoliciesArg), alias Marker, DocumentTypeArg, FieldTypeArg, PoliciesArg...) {
+
+	alias Policies = PoliciesArg;
+	alias FieldType = FieldTypeArg;
+	alias DocumentType = DocumentTypeArg;
+
+	Convertor[] convertors;
 
 	/**
-	Builder used to constructo convertors for configured properties.
+	Storage for common document components
 	**/
-	ConvertorBuilder builder;
-
-	/**
-	Configured container.
-	**/
-    DocumentContainer container;
+	Storage!(ObjectFactory, string) storage;
 
 	/**
 	Locator useable in registering properties.
 	**/
-	Locator!() locator;
+	AggregateContainer container;
+
+	/**
+	Root document from which components will be extracted
+	**/
+	DocumentType document;
+
+	/**
+	Allocator used to construct and destruct components.
+	**/
+	RCIAllocator allocator;
 
 	/**
 	Constructor for DocumentContainerBuilder
 
 	Params:
 		container = to configure
-		builder = convertor builder used to create convertors for properties
 	**/
-	this(DocumentContainer container, ConvertorBuilder builder, CombinedConvertor convertor, Locator!() locator) {
-		this.container = container;
-		this.builder = builder;
-		this.container.convertor = convertor;
-		this.locator = locator;
+	this(PolicyDocument policyDocument, RCIAllocator allocator = theAllocator) {
+		auto storage = singleton.typed.deffered.gcRegistered;
+		this.allocator = allocator;
 
-		static if (is(DocumentContainer : WithConvertorsFor!Types, Types...)) {
-			static foreach (Type; Types) {
-				this.register!(Type, Type);
-			}
+		this.container = aggregate(
+			storage, "singleton"
+		);
+
+		this.storage = storage;
+		this.document = policyDocument.document;
+
+		with(storage.load(container)) {
+			register(this.document);
 		}
 
-		static if (is(DocumentContainer : WithConvertors!ConvertorsFactory, alias ConvertorsFactory)) {
-			foreach (prebuilt; ConvertorsFactory()) {
-				this.register(prebuilt, prebuilt.to.toString);
-			}
+		static foreach (Policy; Policies) {
+			Policy.initialize(this);
 		}
 	}
 
 	/**
 	ditto
 	**/
-    alias container this;
+    alias document this;
 
 	/**
 	Associate a convertor to a field in document that has property path, to be used for conversion.
@@ -116,40 +121,21 @@ struct DocumentContainerBuilder
 		To = the type of destination component that convertor should yield
 		path = property path for a field in document.
 	**/
-    PropertyContext!(To, DocumentContainer) register(To)(string path) {
+	PropertyContext!(To, typeof(this)) register(To, From)(string path) {
 
-		static if (is(DocumentContainer : WithConvertorSources!SourceTypes, SourceTypes...)) {} else {
-			alias SourceTypes = AliasSeq!();
+		static foreach (Policy; Policies) {
+			Policy.register!(To, From)(this, path);
 		}
 
-		PropertyContext!(To, DocumentContainer) context = PropertyContext!(To, DocumentContainer)(path, null, container, locator);
+		return PropertyContext!(To, typeof(this))(path, this);
+    }
 
-		debug(trace) trace(
-			"Injecting convertor for ",
-			path,
-			" in document container to convert to ",
-			typeid(To),
-			" using ",
-			builder
-		);
+	/**
+	ditto
+	**/
+    PropertyContext!(To, typeof(this)) register(To)(string path) {
 
-		context.convertors ~= this.register(builder.make!(To, FieldType), path).convertors;
-
-		static foreach (From; SourceTypes) {
-
-			debug(trace) trace(
-				"Injecting convertor for ",
-				typeid(From),
-				" in document container to convert to ",
-				typeid(To),
-				" using ",
-				builder
-			);
-
-			context.convertors ~= this.register(builder.make!(To, From)).convertors;
-		}
-
-		return context;
+		return register!(To, FieldType)(path);
     }
 
 	/**
@@ -158,7 +144,7 @@ struct DocumentContainerBuilder
 	Params:
 		To = the type of destination component that convertor should yield
 	**/
-    PropertyContext!(To, DocumentContainer) register(To)() {
+    PropertyContext!(To, typeof(this)) register(To)() {
 
         return this.register!(To, To);
     }
@@ -170,7 +156,7 @@ struct DocumentContainerBuilder
 		Iface = interface for which the convertor is bound to.
 		To = the type of destination component that convertor should yield
 	**/
-    PropertyContext!(To, DocumentContainer) register(Iface, To : Iface)() {
+    PropertyContext!(To, typeof(this)) register(Iface, To : Iface)() {
         import std.traits : fullyQualifiedName;
 
         return this.register!To(fullyQualifiedName!Iface);
@@ -186,19 +172,41 @@ struct DocumentContainerBuilder
 	Returns:
 		typeof(this)
 	**/
-	PropertyContext!(void, DocumentContainer) register(Convertor convertor, string path) {
-		this.container.set(convertor, path);
+	PropertyContext!(void, typeof(this)) register(Convertor convertor, string path, const TypeInfo to) {
+		import aermicioi.aedi_property_reader.convertor.accessor;
+		import aermicioi.aedi_property_reader.convertor.placeholder : pack;
 
-		return PropertyContext!(void, DocumentContainer)(path, [convertor], container, locator);
-	}
+		static foreach (Policy; Policies) {
+			Policy.register(this, convertor, path, to);
+		}
 
-	/**
-	ditto
-	**/
-	PropertyContext!(void, DocumentContainer) register(Convertor convertor) {
-		this.container.set(convertor);
+		with (storage.load(container)) {
+			register!Object(path)
+				.factoryMethod(
+					function Object (
+						RCIAllocator allocator,
+						DocumentType root,
+						PropertyAccessor!(DocumentType, Object) accessor,
+						Convertor convertor,
+						const TypeInfo to,
+						string path
+					) {
+						import aermicioi.aedi_property_reader.convertor.placeholder : stored;
+						return convertor.convert(accessor.access(root, path), to, allocator);
+					},
+					this.allocator,
+					lref!DocumentType,
+					lref!(PropertyAccessor!(DocumentType, Object)),
+					convertor,
+					to,
+					path
+				)
+				.destructor((RCIAllocator allocator, ref Object component, Convertor convertor) => convertor.destruct(null, component, allocator), convertor);
+		}
 
-		return PropertyContext!(void, DocumentContainer)(null, [convertor], container, locator);
+		convertors ~= convertor;
+
+		return PropertyContext!(void, typeof(this))(path, this);
 	}
 
     alias property = register;
@@ -209,45 +217,15 @@ Take a document container and create a configuration context for it.
 
 Params:
 	container = container for which configuration context is created.
-	builder = builder used to construct convertors used by container.
-	convertor = convertor used to resolve conversion chain from origin to destination type.
 	locator = locator used in registration and construction of properties.
+	storage = storage for document elements.
 
 Returns:
 	DocumentContainerBuilder(DocumentContainer, AdvisedConvertor, DocumentType, FieldType) a configuration context
 **/
-auto configure(DocumentContainerType, ConvertorBuilderType)(
-	DocumentContainerType container,
-	ConvertorBuilderType builder,
-	CombinedConvertor convertor = new CombinedConvertorImpl(),
-	Locator!() locator = null
-) if (!is(ConvertorBuilderType : Locator!())) {
-    return DocumentContainerBuilder!(DocumentContainerType, ConvertorBuilderType)(container, builder, convertor, locator);
-}
+auto configure(PolicyDocument)(PolicyDocument document, RCIAllocator allocator = theAllocator) {
 
-/**
-ditto
-**/
-auto configure(DocumentContainer : WithConvertorBuilder!ConvertorBuilderFactory, alias ConvertorBuilderFactory)(
-		DocumentContainer container,
-		CombinedConvertor convertor = new CombinedConvertorImpl(),
-		Locator!() locator = null
-	) {
-
-	return DocumentContainerBuilder!(DocumentContainer, ReturnType!ConvertorBuilderFactory)
-		(container, ConvertorBuilderFactory([container]), convertor, locator);
-}
-
-/**
-ditto
-**/
-auto configure(DocumentContainer : WithConvertorBuilder!ConvertorBuilderFactory, alias ConvertorBuilderFactory)(
-		DocumentContainer container,
-		Locator!() locator
-	) {
-
-	return DocumentContainerBuilder!(DocumentContainer, ReturnType!ConvertorBuilderFactory)
-		(container, ConvertorBuilderFactory([container]), new CombinedConvertorImpl(), locator);
+	return DocumentContainerBuilder!PolicyDocument(document, allocator);
 }
 
 /**
@@ -256,10 +234,10 @@ Register a description for property.
 See:
 	Aedi framework $(D_INLINECODE .describe) component configuration method.
 **/
-Context describe(Context : PropertyContext!(To, DocumentContainer), DocumentContainer, To)(Context context, string title, string description)
-	in(context.locator !is null, "Component locator is missing. It is required for proper functioning") {
+Context describe(Context : PropertyContext!(To, RegistrationContext), RegistrationContext, To)(Context context, string title, string description)
+	in(context.context.container !is null, "Component locator is missing. It is required for proper functioning") {
 	import aermicioi.aedi : IdentityDescriber, locate;
-	context.locator.locate!(IdentityDescriber!())().register(context.path, title, description);
+	context.container.locate!(IdentityDescriber!())().register(context.path, title, description);
 
 	return context;
 }
@@ -274,13 +252,380 @@ Params:
 Returns:
 	Configuration context
 **/
-Context optional(Context : PropertyContext!(To, DocumentContainer), DocumentContainer, To)(Context context, auto ref To value)
-	in(context.locator !is null, "Component locator is missing. It is required for fetching default values storage.") {
+Context optional(Context : PropertyContext!(To, RegistrationContext), RegistrationContext, To)(Context context, auto ref To value)
+	in(context.context.container !is null, "Component locator is missing. It is required for fetching default values storage.") {
 	import aermicioi.aedi : ValueContainer, locate, configure;
 
-	with (context.locator.locate!ValueContainer.configure) {
+	with (context.container.locate!ValueContainer.configure) {
 		register(value, context.path);
 	}
 
 	return context;
+}
+
+/**
+Policy that adds information of types to which document container should already have Convertors.
+**/
+struct WithConvertorsFor(ConvertibleTypes...) {
+
+    void initialize(Context)(ref Context context) {
+        static foreach (Type; ConvertibleTypes) {
+            context.register!(Type, Type);
+        }
+    }
+
+    void register(To, From, Context)(ref Context context, string path) {}
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+/**
+Policy that adds convertors for additional source/origin types for registered one.
+**/
+struct WithConvertorSources(SourceTypes...) {
+
+    void initialize(Context)(ref Context context) {}
+
+    void register(To, From, Context)(ref Context context, string path) {
+		static foreach (OtherOriginType; SourceTypes) {
+			static if (is(From == OtherOriginType)) {
+				enum checked = true;
+			}
+		}
+
+		static if (!is(typeof(checked))) {
+
+			static foreach (OtherOriginType; SourceTypes) {
+
+				context.register!(To, OtherOriginType)(path);
+			}
+		}
+    }
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+/**
+Marker interface that runs initializer of configuration context.
+
+Params:
+    Initializer = an initializer of context.
+**/
+struct WithInitializer(alias Initializer) {
+
+    void initialize(Context)(ref Context context) {
+		import aermicioi.aedi.configurer.annotation.component_scan : prepare;
+
+		Parameters!Initializer params;
+		prepare!Initializer(context.container, params);
+
+		Initializer(params);
+    }
+
+    void register(To, From, Context)(ref Context context, string path) {}
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+/**
+Marker interface that provides a list of components or modules to scan for components to populate convertor container.
+**/
+struct WithContainerScanning(Locations...) {
+
+    void initialize(Context)(ref Context context) {
+        static foreach (Location; Locations) {
+            context.storage.scan!Location(context.container);
+        }
+    }
+
+    void register(To, From, Context)(ref Context context, string path) {}
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+/**
+Policy that will populate first available combined convertor in container with all registered types.
+**/
+struct WithConvertorAggregation(ConvertorType) {
+    void initialize(Context)(ref Context context) {
+        context.convertors ~= context.container.locate!ConvertorType;
+	}
+
+    void register(To, From, Context)(ref Context context, string path) {}
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {
+        ConvertorType combined = context.container.locate!ConvertorType;
+
+		if (combined != convertor) {
+			combined.add(convertor);
+		}
+    }
+}
+
+/**
+Policy that adds a locator of unregistered components yet available in root document.
+
+Since type of unregistered components is not available, document locator will try to infer
+it using type guesser.
+**/
+struct WithLocatorForUnregisteredComponents {
+	string identity;
+
+	void initialize(Context)(ref Context context) {
+		auto locator = new DocumentLocator!(Context.DocumentType)(context.document, context.allocator);
+		locator.guesser = context.container.locate!(typeof(locator.guesser));
+		locator.accessor = context.container.locate!(typeof(locator.accessor));
+		locator.convertor = context.container.locate!(typeof(locator.convertor));
+
+		context.container.set(locator, identity);
+	}
+
+    void register(To, From, Context)(ref Context context, string path) {}
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+struct WithConversionToCompositeConvertor {
+
+	void initialize(Context)(ref Context context) {}
+
+    void register(To, From, Context)(ref Context context, string path) {
+        import std.traits : isAggregateType;
+        static if (isAggregateType!To) {
+			if (context.container.locate!(Locator!())("singleton").has(path)) {
+				debug(trace) trace("Container has already registered convertor for ", path, " skipping registration");
+				return;
+			}
+
+			if (context.container.locate!(Locator!())("singleton").has(typeid(CompositeConvertor!(To, From)).toString)) {
+				debug(trace) trace("Composite convertor for type ", typeid(To), " is already registered.");
+
+			} else {
+				debug(trace) trace("Registering convertor for composite type ", typeid(To));
+
+				with (context.container.load("singleton")) {
+					register!(CompositeMapper!(To, From)).scan;
+					register!(CompositeConvertor!(To, From)).scan;
+				}
+			}
+
+			context.register(context.container.locate!(CompositeConvertor!(To, From)), path, typeid(To));
+        }
+    }
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+struct WithCompositeAccessor {
+
+	void initialize(Context)(ref Context context) {}
+
+    void register(To, From, Context)(ref Context context, string path) {
+        import std.traits : isAggregateType;
+		import aermicioi.aedi_property_reader.convertor.accessor : CompositeAccessor;
+        static if (isAggregateType!To) {
+            debug(trace) trace("Registering composite accessor for type ", typeid(To));
+
+            with (context.container.load("singleton")) {
+				register!(CompositeAccessor!To).scan;
+            }
+        }
+    }
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+struct WithCompositeInspector {
+
+	void initialize(Context)(ref Context context) {}
+
+    void register(To, From, Context)(ref Context context, string path) {
+        import std.traits : isAggregateType;
+		import aermicioi.aedi_property_reader.convertor.inspector : CompositeInspector;
+        static if (isAggregateType!To) {
+            debug(trace) trace("Registering composite inspector for type ", typeid(To));
+
+            with (context.container.load("singleton")) {
+				register!(CompositeInspector!To).scan;
+            }
+        }
+    }
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+struct WithCompositeSetter {
+
+	void initialize(Context)(ref Context context) {}
+
+    void register(To, From, Context)(ref Context context, string path) {
+        import std.traits : isAggregateType;
+		import aermicioi.aedi_property_reader.convertor.setter : CompositeSetter;
+        static if (isAggregateType!To) {
+            debug(trace) trace("Registering composite setter for type ", typeid(To));
+
+            with (context.container.load("singleton")) {
+				register!(CompositeSetter!To).scan;
+            }
+        }
+    }
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+struct WithRangeToRangeConvertor {
+
+	void initialize(Context)(ref Context context) {}
+
+    void register(To, From, Context)(ref Context context, string path) {
+        static if (is(RangeConvertor!(To, From))) {
+			if (context.container.locate!(Locator!())("singleton").has(path)) {
+				debug(trace) trace("Container has already registered convertor for ", path, " skipping registration");
+				return;
+			}
+
+			if (context.container.locate!(Locator!())("singleton").has(typeid(RangeConvertor!(To, From)).toString)) {
+				debug(trace) trace("Range convertor for type ", typeid(To), " is already registered.");
+
+			} else {
+				debug(trace) trace("Registering range convertor for type ", typeid(To));
+
+				with (context.container.load("singleton")) {
+					register!(RangeConvertor!(To, From)).scan;
+				}
+			}
+
+			context.register(context.container.locate!(RangeConvertor!(To, From)), path, typeid(To));
+        }
+    }
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+struct WithRangeToArrayConvertor {
+
+	void initialize(Context)(ref Context context) {}
+
+    void register(To, From, Context)(ref Context context, string path) {
+        static if (is(RangeToArrayConvertor!(To, From))) {
+			if (context.container.locate!(Locator!())("singleton").has(path)) {
+				debug(trace) trace("Container has already registered convertor for ", path, " skipping registration");
+				return;
+			}
+
+			if (context.container.locate!(Locator!())("singleton").has(typeid(RangeToArrayConvertor!(To, From)).toString)) {
+				debug(trace) trace("Array convertor for type ", typeid(To), " is already registered.");
+
+			} else {
+				debug(trace) trace("Registering array convertor for type ", typeid(To));
+
+				with (context.container.load("singleton")) {
+					register!(RangeToArrayConvertor!(To, From)).scan;
+				}
+			}
+
+			context.register(context.container.locate!(RangeToArrayConvertor!(To, From)), path, typeid(To));
+        }
+    }
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+struct WithMapToMapConvertor {
+
+	void initialize(Context)(ref Context context) {}
+
+    void register(To, From, Context)(ref Context context, string path) {
+        static if (is(MapConvertor!(To, From))) {
+			if (context.container.locate!(Locator!())("singleton").has(path)) {
+				debug(trace) trace("Container has already registered convertor for ", path, " skipping registration");
+				return;
+			}
+
+			if (context.container.locate!(Locator!())("singleton").has(typeid(MapConvertor!(To, From)).toString)) {
+				debug(trace) trace("Array convertor for type ", typeid(To), " is already registered.");
+
+			} else {
+				debug(trace) trace("Registering array convertor for type ", typeid(To));
+
+				with (context.container.load("singleton")) {
+					register!(MapConvertor!(To, From)).scan;
+				}
+			}
+
+			context.register(context.container.locate!(MapConvertor!(To, From)), path, typeid(To));
+        }
+    }
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+struct WithVariantConvertor {
+
+	void initialize(Context)(ref Context context) {}
+
+    void register(To, From, Context)(ref Context context, string path) {
+        static if (is(VariantConvertor!To)) {
+			if (context.container.locate!(Locator!())("singleton").has(path)) {
+				debug(trace) trace("Container has already registered convertor for ", path, " skipping registration");
+				return;
+			}
+
+			if (context.container.locate!(Locator!())("singleton").has(typeid(VariantConvertor!To).toString)) {
+				debug(trace) trace("Array convertor for type ", typeid(To), " is already registered.");
+
+			} else {
+				debug(trace) trace("Registering array convertor for type ", typeid(To));
+
+				with (context.container.load("singleton")) {
+					register!(VariantConvertor!To).scan;
+				}
+			}
+
+			context.register(context.container.locate!(VariantConvertor!To), path, typeid(To));
+        }
+    }
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+struct UsingCombinedConvertor(ConvertorType) {
+
+	void initialize(Context)(ref Context context) {
+	}
+
+    void register(To, From, Context)(ref Context context, string path) {
+		if (context.container.locate!(Locator!())("singleton").has(path)) {
+			return;
+		}
+
+		CombinedConvertor convertor = context.container.locate!ConvertorType;
+
+		if (convertor.converts(typeid(From), typeid(To))) {
+			debug(trace) trace("Combined convertor ", convertor, " is able to convert from ", typeid(From), " to ", typeid(To), " setting as convertor for property ", path);
+
+			context.register(convertor, path, typeid(To));
+		}
+    }
+
+    void register(Context)(ref Context context, Convertor convertor, string path, const TypeInfo to) {}
+}
+
+alias WithDefaultRegisterers = AliasSeq!(
+	UsingCombinedConvertor!CombinedConvertor(),
+	WithCompositeAccessor(),
+	WithCompositeInspector(),
+	WithCompositeSetter(),
+	WithConversionToCompositeConvertor(),
+	WithRangeToArrayConvertor(),
+	WithRangeToRangeConvertor(),
+	WithMapToMapConvertor(),
+	WithVariantConvertor()
+);
+
+/**
+Wrapper over a document enhancing it with various configuration policies.
+**/
+struct PolicyDocument(DocumentType, FieldType, Policies...) {
+    DocumentType document;
 }

@@ -4,7 +4,7 @@
 		"Alexandru Ermicioi"
 	],
 	"dependencies": {
-		"dyaml": "~>0.6.3",
+		"dyaml": "~>0.7.1",
 		"aedi-property-reader:core": "*"
 	},
 	"description": "yaml document loader and factory",

@@ -60,58 +60,57 @@ module aermicioi.aedi_property_reader.test.sdlang.convertor;
 
 import std.meta;
 import std.exception;
+import std.datetime;
 import sdlang;
-import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
-import aermicioi.aedi_property_reader.convertor.exception : InvalidCastException;
+import sdlang.ast;
+import sdlang.token;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException, InvalidCastException;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import aermicioi.aedi_property_reader.sdlang.convertor;
-import aermicioi.aedi_property_reader.sdlang.accessor : SdlangElement;
 
 unittest {
-	enum T {
-		first,
-		second
-	}
+
+	TagConvertor tagConvertor = new TagConvertor;
+	AttributeConvertor attributeConvertor = new AttributeConvertor;
 
 	Tag root = parseSource(q{
-		valid 2 value=1
-		array "an" " " "array"
-		char "a"
-		invalid "string" value="march"
-		enum "first"
+		valid null true 1 2L 3.0f 4.0 5.0BD "string" 'c'
+		date-full 2015/12/06 12:00:00-UTC
+		date-local 2015/12/06 12:00:00.000
+		date 2015/12/06
+		duration 12:14:34
+		ubyte-array [c3RyaW5n]
+
+		attribute nullable=null bool=true int=1 long=2L float=3.0f double=4.0 real=5.0BD string="string" dchar='c' date-full=2015/12/06 12:00:00-UTC date-local=2015/12/06 12:00:00.000 date=2015/12/06 duration=12:14:34 ubyte-array=[c3RyaW5n]
 	});
 
-	int i, k;
-	ubyte u;
-	char ch;
-	string str;
-	char[] charr;
-	string[] s;
-	T e;
+	assert(tagConvertor.convert(root.tags["valid"].front.pack, typeid(typeof(null))).unpack!(typeof(null)) == null);
+	assert(tagConvertor.convert(root.tags["valid"].front.pack, typeid(bool)).unpack!(bool) == true);
+	assert(tagConvertor.convert(root.tags["valid"].front.pack, typeid(int)).unpack!(int) == 1);
+	assert(tagConvertor.convert(root.tags["valid"].front.pack, typeid(long)).unpack!(long) == 2L);
+	assert(tagConvertor.convert(root.tags["valid"].front.pack, typeid(float)).unpack!(float) == 3.0);
+	assert(tagConvertor.convert(root.tags["valid"].front.pack, typeid(double)).unpack!(double) == 4.0);
+	assert(tagConvertor.convert(root.tags["valid"].front.pack, typeid(real)).unpack!(real) == 5.0);
+	assert(tagConvertor.convert(root.tags["valid"].front.pack, typeid(string)).unpack!(string) == "string");
+	assert(tagConvertor.convert(root.tags["valid"].front.pack, typeid(dchar)).unpack!(dchar) == 'c');
+	assert(tagConvertor.convert(root.tags["date"].front.pack, typeid(Date)).unpack!(Date) == Date(2015, 12, 06));
+	assert(tagConvertor.convert(root.tags["date-local"].front.pack, typeid(DateTimeFrac)).unpack!(DateTimeFrac) == DateTimeFrac(DateTime(Date(2015, 12, 06), TimeOfDay(12, 00, 00)), dur!"seconds"(0)));
+	assert(tagConvertor.convert(root.tags["date-full"].front.pack, typeid(SysTime)).unpack!(SysTime) == SysTime(DateTime(Date(2015, 12, 06), TimeOfDay(12, 00, 00)), UTC()));
+	assert(tagConvertor.convert(root.tags["duration"].front.pack, typeid(Duration)).unpack!(Duration).total!"seconds" == ((12*60+14)*60+34));
+	assert(tagConvertor.convert(root.tags["ubyte-array"].front.pack, typeid(ubyte[])).unpack!(ubyte[]) == cast(ubyte[]) "string");
 
-	SdlangElement(root.tags["valid"].front).convert(i);
-	SdlangElement(root.tags["valid"].front).convert(u);
-	SdlangElement(root.tags["invalid"].front).convert(charr);
-	SdlangElement(root.tags["invalid"].front.attributes["value"].front).convert(charr);
-	SdlangElement(root.tags["invalid"].front.attributes["value"].front).convert(str);
-	SdlangElement(root.tags["invalid"].front).convert(str);
-	SdlangElement(root.tags["enum"].front).convert(e);
-	SdlangElement(root.tags["array"].front).convert(s);
-	assert(i == 2);
-	assert(s == ["an", " ", "array"]);
-
-	SdlangElement(root.tags["valid"].front.attributes["value"].front).convert(i);
-	SdlangElement(root.tags["char"].front).convert(ch);
-	assert(i == 1);
-
-	assertThrown!InvalidCastException(SdlangElement(root.tags["invalid"].front).convert(i));
-
-	try {
-		SdlangElement(root.tags["invalid"].front.attributes["value"].front).convert(k);
-		import std.stdio;
-		writeln("***************", k);
-		assert(false);
-	} catch (InvalidCastException e) {
-
-	}
-
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["nullable"].front.pack, typeid(typeof(null))).unpack!(typeof(null)) == null);
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["bool"].front.pack, typeid(bool)).unpack!(bool) == true);
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["int"].front.pack, typeid(int)).unpack!(int) == 1);
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["long"].front.pack, typeid(long)).unpack!(long) == 2L);
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["float"].front.pack, typeid(float)).unpack!(float) == 3.0);
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["double"].front.pack, typeid(double)).unpack!(double) == 4.0);
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["real"].front.pack, typeid(real)).unpack!(real) == 5.0);
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["string"].front.pack, typeid(string)).unpack!(string) == "string");
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["dchar"].front.pack, typeid(dchar)).unpack!(dchar) == 'c');
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["date"].front.pack, typeid(Date)).unpack!(Date) == Date(2015, 12, 06));
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["date-local"].front.pack, typeid(DateTimeFrac)).unpack!(DateTimeFrac) == DateTimeFrac(DateTime(Date(2015, 12, 06), TimeOfDay(12, 00, 00)), dur!"seconds"(0)));
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["date-full"].front.pack, typeid(SysTime)).unpack!(SysTime) == SysTime(DateTime(Date(2015, 12, 06), TimeOfDay(12, 00, 00)), UTC()));
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["duration"].front.pack, typeid(Duration)).unpack!(Duration).total!"seconds" == ((12*60+14)*60+34));
+	assert(attributeConvertor.convert(root.tags["attribute"].front.attributes["ubyte-array"].front.pack, typeid(ubyte[])).unpack!(ubyte[]) == cast(ubyte[]) "string");
 }

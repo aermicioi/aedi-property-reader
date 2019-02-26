@@ -33,40 +33,18 @@ import std.process;
 import std.exception;
 import std.json;
 import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.placeholder : pack, unpack;
 import aermicioi.aedi_property_reader.json.convertor;
+import aermicioi.aedi_property_reader.json.type_guesser;
 
 unittest {
-    enum Colorful {
-        yes,
-        no
-    }
+    JsonConvertor convertor = new JsonConvertor(new JsonTypeGuesser);
 
-    int i;
-    double d;
-    bool b;
-    Colorful c;
-    char ch;
-    dchar dch;
-    wchar wch;
-    string[string] as;
-    string s;
-    string t;
-    string[] sd;
-
-    JSONValue(29192).convert!int(i);
-    JSONValue(1.0).convert!double(d);
-    JSONValue(true).convert!bool(b);
-    JSONValue("a").convert!char(ch);
-    JSONValue("a").convert!wchar(wch);
-    JSONValue("a").convert!dchar(dch);
-    JSONValue("yes").convert!Colorful(c);
-    JSONValue(["pest" : "p", "test" : "t"]).convert!(string[string])(as);
-    JSONValue(["second one", "third one"]).convert!(string[])(sd);
-
-    assert(i == 29192);
-    assert(d == 1.0);
-    assert(b == true);
-    assert(c == Colorful.yes);
-    assert(as == ["pest" : "p", "test" : "t"]);
-    assert(sd == ["second one", "third one"]);
+    assert(convertor.convert(JSONValue(-29192).pack, typeid(long)).unpack!long == -29192);
+    assert(convertor.convert(JSONValue(29192UL).pack, typeid(ulong)).unpack!ulong == 29192);
+    assert(convertor.convert(JSONValue(1.0).pack, typeid(double)).unpack!double == 1.0);
+    assert(convertor.convert(JSONValue(true).pack, typeid(bool)).unpack!bool == true);
+    assert(convertor.convert(JSONValue("yes").pack, typeid(string)).unpack!string == "yes");
+    assert(convertor.convert(JSONValue(["pest" : JSONValue("p"), "test" : JSONValue("t")]).pack, typeid(JSONValue[string])).unpack!(JSONValue[string]) == ["pest" : JSONValue("p"), "test" : JSONValue("t")]);
+    assert(convertor.convert(JSONValue(["second one", "third one"]).pack, typeid(JSONValue[])).unpack!(JSONValue[]) == [JSONValue("second one"), JSONValue("third one")]);
 }

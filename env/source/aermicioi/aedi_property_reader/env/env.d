@@ -29,6 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.env.env;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
@@ -36,40 +37,46 @@ import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.convertor.std_conv;
 
-alias EnvironmentDocumentContainer = AdvisedDocumentContainer!(
+alias EnvironmentDocumentContainer = PolicyDocument!(
     string[string],
     string,
-    WithConvertorBuilder!StdConvAdvisedConvertorBuilderFactory,
-	WithConvertorsFor!DefaultConvertibleTypes,
-    WithConvertors!(
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.core.config,
+        aermicioi.aedi_property_reader.env.env,
+    )(),
+    WithInitializer!(
         StdConvStringPrebuiltConvertorsFactory
-    )
+    )(),
+    WithConvertorAggregation!CombinedConvertor(),
+    WithLocatorForUnregisteredComponents("env-document-locator"),
+    WithDefaultRegisterers
 );
+
+@component
+auto runtimeTypeGuesser(TypeGuesser!string guesser) {
+    return new DelegatingObjectTypeGuesser!string(guesser);
+}
+
+@component
+auto propertyAccessor() {
+    return new AssociativeArrayAccessor!(string[string]);
+}
+
+@component
+auto runtimePropertyAccessor(PropertyAccessor!(string[string], string) accessor) {
+    return new WrappingFieldAccessor!(string[string], string)(accessor);
+}
 
 /**
 Create environment variable container
 
-Params:
-    guesser = type guesser for unknown environment properties
 Returns:
     DocumentContainer!(string[string], string)
 **/
-auto env(TypeGuesser!string guesser) {
+auto env() {
     import std.process : environment;
-    import std.experimental.allocator : theAllocator;
 
-    EnvironmentDocumentContainer container = new EnvironmentDocumentContainer(environment.toAA);
-
-    container.guesser = guesser;
-    container.accessor = new AssociativeArrayAccessor!(string[string]);
-    container.allocator = theAllocator;
+    EnvironmentDocumentContainer container = EnvironmentDocumentContainer(environment.toAA);
 
     return container;
-}
-
-/**
-ditto
-**/
-auto env() {
-    return env(new StringToScalarConvTypeGuesser);
 }

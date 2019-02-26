@@ -29,176 +29,141 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.xml.convertor;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.traits : n;
 import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.placeholder : unwrap, pack, unpack, identify;
 import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.xml.accessor;
-import aermicioi.aedi_property_reader.xml.xml : accessor;
+import aermicioi.aedi_property_reader.xml.xml;
 import aermicioi.aedi_property_reader.xml.inspector;
 import aermicioi.aedi_property_reader.convertor.exception;
+import std.experimental.allocator;
+import std.conv : to, text;
+import std.exception : enforce;
+import std.experimental.logger;
+import std.string : strip;
+import std.range : choose;
 import std.traits;
 import std.xml;
-import std.string : strip;
-import std.conv : to, ConvException;
-import std.experimental.allocator;
 
-public {
-    enum XmlAccessorFactory(From : XmlElement) = () => new RuntimeFieldAccessor!XmlElement(accessor());
-    enum XmlAccessorFactory(From : Element) = () => new RuntimeFieldAccessor!Element(
-        dsl(
-            new XmlElementPropertyAccessor(),
-            new XmlElementIndexAccessor()
-        )
-    );
-    enum XmlInspectorFactory(From : XmlElement) = () => new TaggedInspector!(XmlElement, Element)(new XmlInspector);
-    enum XmlInspectorFactory(From : Element) = () => new XmlInspector;
-}
+@component
+class XmlConvertor : Convertor {
+    import std.meta : AliasSeq;
+    import aermicioi.aedi_property_reader.convertor.type_guesser : TypeGuesser;
+    private alias DestinationTypes = AliasSeq!(Text[], Item[], CData[], ProcessingInstruction[], Element[], string, Tag);
 
-alias XmlConvertorBuilderFactory = (Convertor[] convertors) {
-    return factoryAnyConvertorBuilder(
-        new TypeGuessCallbackConvertorBuilder!(convert, destruct),
-        new MappingConvertorBuilder!(
-            XmlAccessorFactory,
-            CompositeSetterFactory,
-            CompositeInspectorFactory,
-            XmlInspectorFactory
-        )(convertors, true, true, true, true)
-    );
-};
+    private TypeGuesser!Element guesser;
 
-/**
-Convert from Element into To scalar/array/assocarray value.
+    mixin FromMixin!(Element, Document);
+    mixin ToMixin!DestinationTypes;
+    mixin ConvertsFromToMixin DefaultMixin;
+    mixin EqualToHashToStringOpCmpMixin;
 
-As converting value only text of from element is taken into consideration.
-
-Params:
-    value = storage where to put converted from Element
-    from = the data that is to be converted.
-Tohrows:
-    InvalidCastException when the type of value does not match stored data.
-Returns:
-    value
-**/
-void convert(To, From : Element)(in From from, ref To value, RCIAllocator allocator = theAllocator)
-    if (isNumeric!To && !is(To == enum)) {
-
-    try {
-
-        value = from.text.strip.to!To;
-    } catch (ConvException e) {
-        throw new InvalidCastException("Could not convert ${from} value to ${to}", typeid(from), typeid(value), e);
+    @autowired
+    this(TypeGuesser!Element guesser) {
+        this.guesser = guesser;
     }
-}
 
-/**
-ditto
-**/
-void convert(To, From : Element)(in From from, ref To value, RCIAllocator allocator = theAllocator)
-    if (is(To : bool) && !is(To == enum)) {
-    import std.string : strip;
+    /**
+    ditto
+    **/
+    bool converts(in Object from, const TypeInfo to) @safe const nothrow {
+        import std.algorithm : all;
 
-    try {
+        if (DefaultMixin.converts(from, to)) {
 
-        value = from.text.strip.to!To;
-    } catch (ConvException e) {
-        throw new InvalidCastException("Could not convert ${from} value to ${to}", typeid(from), typeid(value), e);
-    }
-}
+            auto guessed = this.guesser.guess(from.unwrap!Element).n;
 
-/**
-ditto
-**/
-void convert(To, From : Element)(in From from, ref To value, RCIAllocator allocator = theAllocator)
-    if ((isSomeString!To || isSomeChar!To) && !is(To == enum)) {
+            if ((to is typeid(Text[])) || (to is typeid(string))) {
+                if (guessed !is typeid(string)) {
+                    return false;
+                }
+            }
 
-    try {
-
-        value = from.text.to!To;
-    } catch (ConvException e) {
-        throw new InvalidCastException("Could not convert ${from} value to ${to}", typeid(from), typeid(value), e);
-    }
-}
-
-/**
-ditto
-**/
-void convert(To : Z[], From : Element, Z)(in From from, ref To value, RCIAllocator allocator = theAllocator)
-    if (!isSomeString!To && !is(To == enum)) {
-
-    value = allocator.makeArray!Z(from.elements.length);
-
-    foreach (index, ref el; value) {
-        from.elements[index].convert(el, allocator);
-    }
-}
-
-/**
-ditto
-**/
-void convert(To : Z[string], From : Element, Z)(in From from, ref To value, RCIAllocator allocator = theAllocator)
-    if (!is(To == enum)) {
-
-    foreach (ref el; from.elements) {
-
-        Z temp;
-        el.convert(temp, allocator);
-        value[el.tag.name] = temp;
-    }
-}
-
-/**
-ditto
-**/
-void convert(To, From : Element)(in From from, ref To value, RCIAllocator allocator = theAllocator) if (is(To == enum)){
-
-    string temp;
-    from.convert!string(temp, allocator);
-    value = temp.to!To;
-	temp.destruct(allocator);
-}
-
-/**
-ditto
-**/
-void convert(To, From : string)(in From from, ref To value, RCIAllocator allocator = theAllocator) {
-
-    value = from.to!To;
-}
-
-/**
-ditto
-**/
-void convert(To, From : XmlElement)(in From from, ref To value, RCIAllocator allocator = theAllocator) {
-
-    final switch(from.kind) {
-        case XmlElement.Kind.element: {
-            (cast(const(Element)) from).convert(value, allocator);
-            break;
+            return true;
         }
-        case XmlElement.Kind.attribute: {
-            (cast(const(string)) from).convert(value, allocator);
-            break;
+
+        return false;
+    }
+
+    /**
+    ditto
+    **/
+    bool converts(in Object from, in Object to) @safe const nothrow {
+        return this.converts(from, to.identify);
+    }
+
+    /**
+    Convert from component to component.
+
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when there is a converting error
+        InvalidArgumentException when arguments passed are not of right type or state
+    Returns:
+        Resulting converted component.
+    **/
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator)  const {
+        enforce!ConvertorException(this.converts(from, to), text(
+            "Cannot convert ", from.identify, " to ", to, " expected original component of types: ", this.from, " and destination types of ", this.to
+        ));
+
+        if (to is typeid(string)) {
+            return from.unwrap!Element.text.pack(from, this, allocator);
+        }
+
+        if (to is typeid(CData[])) {
+            return from.unwrap!Element.cdatas.pack(from, this, allocator);
+        }
+
+        if (to is typeid(ProcessingInstruction[])) {
+            return from.unwrap!Element.pis.pack(from, this, allocator);
+        }
+
+        if (to is typeid(Element[])) {
+            return from.unwrap!Element.elements.pack(from, this, allocator);
+        }
+
+        if (to is typeid(Tag)) {
+            return from.unwrap!Element.tag.pack(from, this, allocator);
+        }
+
+        if (to is typeid(Text[])) {
+            return from.unwrap!Element.texts.pack(from, this, allocator);
+        }
+
+        if (to is typeid(Item[])) {
+            return from.unwrap!Element.items.pack(from, this, allocator);
+        }
+
+        throw new ConvertorException(text("Cannot convert ", from.identify, " expected component with one of types ", this.from));
+    }
+
+    /**
+    Destroy component created using this convertor.
+
+    Destroy component created using this convertor.
+    Since convertor could potentially allocate memory for
+    converted component, only itself is containing history of allocation,
+    and therefore it is responsible as well to destroy and free allocated
+    memory with allocator.
+
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    **/
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+        enforce!ConvertorException(this.convertsTo(converted), text("Cannot destroy component ", converted.identify, " that is not convertible by ", this));
+
+        static foreach (ToType; DestinationTypes) {
+            if (converted.identify is typeid(ToType)) {
+                converted.unpack!ToType(allocator);
+            }
         }
     }
-}
-
-/**
-Destroy component constructed from xml element
-
-Params:
-    to = component constructed out of xml element or attribute
-    allocator = allocator used to create component
-**/
-void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
-    destroy(to);
-    to = To.init;
-}
-
-/**
-ditto
-**/
-void destruct(To : Z[], Z)(ref To to, RCIAllocator allocator = theAllocator)
-    if (!isSomeString!To) {
-    allocator.dispose(to);
-    to = To.init;
 }

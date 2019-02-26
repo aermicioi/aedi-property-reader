@@ -29,13 +29,20 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.json.type_guesser;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.json.accessor;
 import std.json;
 
+@component
+auto delegatingObjectTypeGuesser(TypeGuesser!JSONValue guesser) {
+    return new DelegatingObjectTypeGuesser!JSONValue(guesser);
+}
+
 /**
 Json type guesser
 **/
+@component
 class JsonTypeGuesser : TypeGuesser!JSONValue {
 
     public {

@@ -32,92 +32,108 @@ module aermicioi.aedi_property_reader.csv.csv;
 import std.experimental.allocator;
 import std.experimental.logger;
 import std.range : array;
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.convertor;
 import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.convertor.setter;
+import aermicioi.aedi_property_reader.convertor.std_conv;
 import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.core;
-import aermicioi.aedi_property_reader.convertor.std_conv :
-        AssociativeArrayAccessorFactory,
-        AssociativeArraySetterFactory,
-        AssociativeArrayInspectorFactory,
-        StdConvStringPrebuiltConvertorsFactory,
-        stdConvert = convert,
-        stdDestruct = destruct;
 
-public {
-    enum CsvAccessorFactory(From : string[string]) =
-        () => new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string]));
-    enum CsvSetterFactory(To : string[string]) =
-        () => new RuntimeFieldSetter!(string[string], string)(new AssociativeArraySetter!string);
-    enum CsvInspector(Type : string[string]) =
-        () => new AssociativeArrayInspector!string;
-}
-
-/**
-Advised convertor builder for csv.
-**/
-alias CsvAdvisedConvertorBuilderFactory = (Convertor[] convertors) {
-    return factoryAnyConvertorBuilder(
-        new MappingConvertorBuilder!(
-            CsvAccessorFactory,
-            CompositeSetterFactory,
-            CompositeInspectorFactory,
-            CsvInspector
-        )(convertors, true, true, true, true),
-        new MappingConvertorBuilder!(
-            CsvAccessorFactory,
-            CsvSetterFactory,
-            CsvInspector,
-            CsvInspector
-        )(convertors, true, true, true, true)
-    );
-};
-
-/**
-Csv document container
-**/
-alias CsvDocumentContainer = AdvisedDocumentContainer!(
+alias CsvDocumentContainer = PolicyDocument!(
     string[string][],
     string[string],
-    WithConvertorBuilder!CsvAdvisedConvertorBuilderFactory,
-    WithConvertors!(StdConvStringPrebuiltConvertorsFactory)
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.core.config,
+    )(),
+    WithInitializer!(
+        StdConvStringPrebuiltConvertorsFactory
+    )(),
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.csv.csv,
+    )(),
+    WithConvertorAggregation!CombinedConvertor(),
+    WithLocatorForUnregisteredComponents("csv-document-locator"),
+    WithDefaultRegisterers
 );
+
+@component
+auto runtimeCsvTypeGuesser(
+    TypeGuesser!string guesser
+) {
+    return new DelegatingObjectTypeGuesser!(string[string], string)(
+        new SimpleTypeGuesser!(string[string])(),
+        guesser
+    );
+}
+
+@component
+auto propertyAccessor() {
+    return new AssociativeArrayAccessor!(string[string]);
+}
+
+@component
+auto rootAccessor(
+    Convertor defaultConvertor
+) {
+    return new KeyConvertingAccessor!(string[string][], string[string], string, size_t)(
+            new ArrayAccessor!(string[string][]),
+            defaultConvertor
+        );
+}
+
+@component
+auto runtimeEntryAccessor(
+    PropertyAccessor!(string[string], string) propertyAccessor,
+) {
+    return new WrappingFieldAccessor!(string[string], string)(propertyAccessor);
+}
+
+@component
+auto runtimeRootPathAccessor(
+    PropertyAccessor!(string[string], string) propertyAccessor,
+    PropertyAccessor!(string[string][], string[string]) rootAccessor,
+    Convertor defaultConvertor
+) {
+    auto accessor = new AggregatePropertyAccessor!(Object, Object)(
+        new UnwrappingComponentAccessor!(string[string][], Object)(
+            new WrappingFieldAccessor!(string[string][], string[string])(
+                rootAccessor
+            )
+        ),
+        new UnwrappingComponentAccessor!(string[string], Object)(
+            new WrappingFieldAccessor!(string[string], string)(
+                propertyAccessor
+            )
+        )
+    );
+
+    return new WrappingComponentAccessor!(string[string][], Object)(
+        dsl(
+            accessor,
+            accessor
+        )
+    );
+}
 
 /**
 Create a csv document container
 
 Params:
     data = associative array with parsed csv content
-    accessor = accessor used for accessing data
     allocator = allocator used to convert types
 
 Returns:
     DocumentContainer!(string[string][], string[string])
 **/
 auto csv(
-    string[string][] data,
-    PropertyAccessor!(string[string][], string[string]) accessor,
-    RCIAllocator allocator = theAllocator
+    string[string][] data
 ) {
-
-    CsvDocumentContainer container = new CsvDocumentContainer(data);
-
-    container.accessor = accessor;
-    container.allocator = allocator;
+    CsvDocumentContainer container = CsvDocumentContainer(data);
 
     return container;
-}
-
-/**
-ditto
-**/
-auto csv(string[string][] data) {
-    return data.csv(
-        defaultAccessor,
-    );
 }
 
 /**
@@ -141,8 +157,6 @@ Returns:
 **/
 auto csv(
     string fileOrData,
-    PropertyAccessor!(string[string][], string[string]) accessor,
-    RCIAllocator allocator = theAllocator,
     bool returnEmpty = true
 ) {
 
@@ -151,10 +165,10 @@ auto csv(
 
     try {
         if (fileOrData.exists) {
-            return fileOrData.readText.csvReader!(string[string])(null).array.csv(accessor, allocator);
+            return fileOrData.readText.csvReader!(string[string])(null).array.csv();
         }
 
-        return fileOrData.csvReader!(string[string])(null).array.csv(accessor, allocator);
+        return fileOrData.csvReader!(string[string])(null).array.csv();
     } catch (CSVException e) {
         debug(trace) trace("Error parsing csv: ", e);
 
@@ -168,22 +182,4 @@ auto csv(
             e
         );
     }
-}
-
-/**
-ditto
-**/
-auto csv(string fileOrPath, bool returnEmpty = true) {
-    return fileOrPath.csv(
-        defaultAccessor,
-        theAllocator,
-        returnEmpty
-    );
-}
-
-private auto defaultAccessor() {
-    return new KeyConvertingAccessor!(string[string][], string[string], string, size_t)(
-        new ArrayAccessor!(string[string][]),
-        new CallbackConvertor!(stdConvert!(size_t, const string), stdDestruct!(size_t))
-    );
 }

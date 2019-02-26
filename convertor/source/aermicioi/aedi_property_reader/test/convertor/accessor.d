@@ -472,7 +472,7 @@ unittest {
 	];
 
 
-	auto accessor = new RuntimeFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string]));
+	auto accessor = new WrappingFieldAccessor!(string[string], string)(new AssociativeArrayAccessor!(string[string]));
 
 	assert(accessor.has(elems, "foo"));
 	assert(accessor.has(elems, "moo"));
@@ -490,7 +490,7 @@ unittest {
 	];
 
 
-	auto accessor = new RuntimeFieldAccessor!(const(string[string]), const string)(new AssociativeArrayAccessor!(const(string[string])));
+	auto accessor = new WrappingFieldAccessor!(const(string[string]), const string)(new AssociativeArrayAccessor!(const(string[string])));
 
 	assert(accessor.has(elems, "foo"));
 	assert(accessor.has(elems, "moo"));
@@ -510,7 +510,7 @@ unittest {
 // 	import aermicioi.aedi_property_reader.convertor.placeholder;
 // 	import std.traits;
 
-// 	auto accessor = new RuntimeFieldAccessor!(immutable(string[string]), immutable string, immutable string)(new AssociativeArrayAccessor!(immutable(string[string])));
+// 	auto accessor = new WrappingFieldAccessor!(immutable(string[string]), immutable string, immutable string)(new AssociativeArrayAccessor!(immutable(string[string])));
 
 // 	assert(accessor.has(elems, "foo"));
 // 	assert(accessor.has(elems, "moo"));
@@ -528,7 +528,7 @@ unittest {
 	];
 
 
-	auto accessor = new RuntimeFieldAccessor!(immutable(int[string]), immutable int, string)(new AssociativeArrayAccessor!(immutable(int[string])));
+	auto accessor = new WrappingFieldAccessor!(immutable(int[string]), immutable int, string)(new AssociativeArrayAccessor!(immutable(int[string])));
 
 	assert(accessor.has(elems, "foo"));
 	assert(accessor.has(elems, "moo"));

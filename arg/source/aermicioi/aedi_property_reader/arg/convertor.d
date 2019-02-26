@@ -29,114 +29,144 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.arg.convertor;
 
-import std.string;
 import std.algorithm;
 import std.array;
-import std.traits;
 import std.conv;
+import std.exception;
 import std.getopt;
 import std.range;
+import std.string;
+import std.traits;
 import std.experimental.allocator;
-import aermicioi.aedi_property_reader.convertor.convertor;
-import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.arg.accessor;
-import aermicioi.aedi_property_reader.convertor.setter;
-import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.arg.inspector;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.exception;
+import aermicioi.aedi_property_reader.convertor.inspector;
+import aermicioi.aedi_property_reader.convertor.placeholder;
+import aermicioi.aedi_property_reader.convertor.setter;
 
 /**
-Convert a list of command line arguments to a value.
+Converts command line arguments in string[] to string[string] format.
 
-Params:
-    from = list of command line arguments used to convert
-    to = target type and storage of converted arguments.
-Throws:
-    GetOptException
+Converted associative array (aa) will contain each argument by it's position as a key.
+Compound arguments of form --key=value will be split, and available as key -> value pair
+in aa, furthermore if following sequence is encountered --key value, it will be treated as
+previous construct, and registered in aa as well. Single dashed arguments will be treated all
+as single bool flags, i.e. -uni will expand into --u=true --n=true --i=true and be registered
+in by value arguments.
 **/
-void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
-    if (isScalarType!To) {
-    string[] args = cast(string[]) from;
+@component
+class ArgumentArrayToAssociativeArray : Convertor {
 
-    if (from.length == 2) {
-        string identity = args.back.splitter("=").front.strip('-');
+    mixin ConvertsFromToMixin!(string[], ArgumentsHolder);
+    mixin EqualToHashToStringOpCmpMixin;
 
-        getopt(args, identity, &to);
+    /**
+    Convert from component to component.
+
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when there is a converting error
+        InvalidArgumentException when arguments passed are not of right type or state
+    Returns:
+        Resulting converted component.
+    **/
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator) const {
+        enforce!ConvertorException(this.converts(from, to), text(
+            "Cannot convert component ", from.identify, " to ", to, " expected original component of ", this.from, " and destination of ", this.to
+        ));
+        import std.algorithm;
+        import std.range;
+        import std.conv : to;
+
+        ArgumentsHolder argumentsHolder;
+        string[] original = from.unwrap!(string[]);
+        argumentsHolder.byValue = original;
+
+        foreach (index, element; original) {
+            string argument, key, value;
+            this.processDoubleDash(original[index .. $], element, argument, key, value);
+
+            if (argument !is null) {
+                if ((key in argumentsHolder.byKeyValues) || (key in argumentsHolder.byKeyValue)) {
+                    if (key in argumentsHolder.byKeyValue) {
+                        argumentsHolder.byKeyValues[key] ~= argumentsHolder.byKeyValue[key];
+                        argumentsHolder.byKeyValue.remove(key);
+                    }
+
+                    argumentsHolder.byKeyValues[key] ~= value;
+                } else {
+                    argumentsHolder.byKeyValue[key] = value;
+                }
+            } else {
+                this.processSingleDash(element, argumentsHolder.byKeyValue);
+            }
+
+        }
+
+        return argumentsHolder.pack(from, this, allocator);
+    }
+
+    /**
+    Destroy component created using this convertor.
+
+    Destroy component created using this convertor.
+    Since convertor could potentially allocate memory for
+    converted component, only itself is containing history of allocation,
+    and therefore it is responsible as well to destroy and free allocated
+    memory with allocator.
+
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    Return:
+        true if component is destroyed, false otherwise
+    **/
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+        enforce!ConvertorException(this.destroys(from, converted), text(
+            "Cannot destroy component ", to.identify, ". Passed component isn't converted by this convertor"
+        ));
+
+        converted.unpack!(string[string])(allocator);
+    }
+
+    private void processDoubleDash(string[] remainingArguments, string unprocessed, out string argument, out string key, out string value) const {
+        if (unprocessed.startsWith("--")) {
+            argument = unprocessed.stripLeft('-');
+            ptrdiff_t pointcut = argument.indexOf('=');
+
+            if (pointcut != -1) {
+                key = argument[0 .. pointcut];
+                value = argument[pointcut + 1 .. $];
+            } else if ((remainingArguments.length > 1) && (!remainingArguments[1].startsWith('-'))) {
+                key = argument;
+                value = remainingArguments[1];
+            } else {
+                key = argument;
+                value = "true";
+            }
+        }
+    }
+
+    private void processSingleDash(string unprocessed, string[string] array) const {
+        import std.uni : isAlpha;
+        import std.algorithm;
+        import std.utf : byDchar;
+
+        if (unprocessed.startsWith("-")) {
+            string argument = unprocessed.stripLeft('-');
+
+            if (argument.byDchar.all!(dch => dch.isAlpha)) {
+                foreach (index, dch; argument) {
+                    array[argument[index .. index + 1]] = "true";
+                }
+            }
+        }
     }
 }
-
-/**
-ditto
-**/
-void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
-    if (isSomeString!To) {
-    import std.conv : conv = to;
-    string[] args = cast(string[]) from;
-
-    if (from.length == 2) {
-
-        string identity = args.back.splitter("=").front.strip('-');
-
-        string temp;
-        getopt(args, identity, &temp);
-
-        to = temp.conv!To;
-    }
-}
-
-/**
-ditto
-**/
-void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
-    if (!isSomeString!To && isArray!To) {
-    string[] args = cast(string[]) from;
-
-    string identity = args.drop(1).fold!commonPrefix.splitter("=").front.strip('-');
-
-    getopt(args, identity, &to);
-}
-
-/**
-ditto
-**/
-void convert(To, From : const(string)[])(in From from, ref To to, RCIAllocator allocator = theAllocator)
-    if (isAssociativeArray!To) {
-    string[] args = cast(string[]) from;
-
-    string identity = args.drop(1).fold!commonPrefix.splitter("=").front.strip('-');
-
-    getopt(args, identity, &to);
-}
-
-/**
-Destroy data that is allocated using command line convertor
-
-Params:
-    to = constructed type with convert that needs to be destroyed.
-**/
-void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
-    destroy(to);
-    to = To.init;
-}
-
-public {
-    enum ArgumentAccessorFactory(From : const(string)[]) =
-        () => new RuntimeFieldAccessor!(const(string)[])(new ArgumentAccessor);
-
-    enum ArgumentInspectorFactory(From : const(string)[]) =
-        () => new ArgumentInspector;
-}
-
-/**
-Default convertor factory for command line arguments usable by configuration api.
-**/
-alias ArgumentAdvisedConvertorFactory = (Convertor[] convertors) {
-    return factoryAnyConvertorBuilder(
-        new TypeGuessCallbackConvertorBuilder!(convert, destruct),
-        new MappingConvertorBuilder!(
-            ArgumentAccessorFactory,
-            CompositeSetterFactory,
-            CompositeInspectorFactory,
-            ArgumentInspectorFactory
-        )(convertors, true, true, true, true)
-    );
-};

@@ -31,35 +31,39 @@ module aermicioi.aedi_property_reader.env.test.env;
 
 import aermicioi.aedi_property_reader.env;
 import aermicioi.aedi_property_reader.core;
+import aermicioi.aedi.storage.locator;
 
 unittest {
-    auto c = env();
+    auto document = env();
+    Locator!() c;
 
-    c.document = [
+    document.document = [
             "string" : "stringed",
             "array" : "[ \"hello\", \" \", \"world!\"]",
-            "float" : "1.0",
+            "double" : "1.0",
             "integer" : "10",
-            "guessable-long" : "10",
-            "guessable-double" : "1.0",
+            "guessable-ubyte" : "10",
+            "guessable-float" : "1.0",
             "guessable-array" : "[ \"hello\", \" \", \"world!\"]",
             "guessable-string" : "stringed"
     ];
 
-    with (c.configure) {
+    with (document.configure) {
         property!(string)("string"); // Not testing it since factory takes arguments from
         property!(string[])("array");
-        property!(float)("float");
+        property!(double)("double");
         property!(size_t)("integer");
+
+        c = container;
     }
 
     assert(c.locate!(string) == "stringed");
 	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
-	assert(c.locate!float("float") == 1.0);
+	assert(c.locate!double("double") == 1.0);
 	assert(c.locate!size_t("integer") == 10);
 
     assert(c.locate!(string)("guessable-string") == "stringed");
 	assert(c.locate!(string[])("guessable-array") == ["hello", " ", "world!"]);
-	assert(c.locate!double("guessable-double") == 1.0);
-	assert(c.locate!long("guessable-long") == 10);
+	assert(c.locate!float("guessable-float") == 1.0);
+	assert(c.locate!ubyte("guessable-ubyte") == 10);
 }

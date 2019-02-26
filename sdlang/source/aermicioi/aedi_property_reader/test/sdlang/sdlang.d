@@ -29,29 +29,33 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.test.sdlang.sdlang;
 
-import aermicioi.aedi.storage.locator;
+import aermicioi.aedi : Locator, locate;
 import aermicioi.aedi.test.fixture;
 import aermicioi.aedi_property_reader.sdlang;
 import aermicioi.aedi_property_reader.core.core;
 import std.exception;
 
 unittest {
-	auto c = sdlang(q{
-		float 1.0f
-		double 2.0
-		int 10
-		long 20L
-		string "hello"
-		array "ahoj" " " "world!"
-	}, false);
+	Locator!() c;
 
-    with (c.configure) {
-        property!(string)("string"); // Not testing it since factory takes arguments from
+    with (
+		sdlang(q{
+			float 1.0f
+			double 2.0
+			int 10
+			long 20L
+			string "hello"
+			array "ahoj" " " "world!"
+		}, false).configure
+	) {
+        property!(string)("string");
         property!(string[])("array");
         property!(float)("float");
         property!(double)("double");
         property!(long)("long");
         property!(int)("int");
+
+		c = container;
     }
 
     assert(c.locate!string == "hello");
@@ -64,10 +68,12 @@ unittest {
 
 unittest {
 	import std.path : dirName;
-	auto x = sdlang(dirName(__FILE__) ~ "/config.sdl", false);
+	Locator!() x;
 
-	with (x.configure) {
+	with (sdlang(dirName(__FILE__) ~ "/config.sdl", false).configure) {
 		property!double("double");
+
+		x = container;
 	}
 
 	assert(x.locate!double("double") == 1.0);
@@ -80,27 +86,13 @@ unittest {
 }
 
 unittest {
-	auto c = sdlang(q{
-		placeholder d = 2.0 {
-			f 1.0f
-			i 10
-			l 20L
-			s "hello"
-			a "ahoj" " " "world!"
-		}
-		float 1.0f
-		double 2.0
-		int 10
-		long 20L
-		string "hello"
-		array "ahoj" " " "world!"
-	}, false);
+	Locator!() c;
 
 	import aermicioi.aedi_property_reader.convertor.inspector;
 	import aermicioi.aedi_property_reader.convertor.setter;
 	import aermicioi.aedi_property_reader.convertor.mapper;
 	import aermicioi.aedi_property_reader.sdlang.convertor;
-	import aermicioi.aedi_property_reader.core.traits;
+	import aermicioi.aedi_property_reader.convertor.traits;
 
 	static struct Placeholder {
 		float f;
@@ -111,7 +103,23 @@ unittest {
 		string[] a;
 	}
 
-	with (c.configure) {
+	with (
+		sdlang(q{
+			placeholder d = 2.0 {
+				f 1.0f
+				i 10
+				l 20L
+				s "hello"
+				a "ahoj" " " "world!"
+			}
+			float 1.0f
+			double 2.0
+			int 10
+			long 20L
+			string "hello"
+			array "ahoj" " " "world!"
+		}, false).configure
+	) {
 		property!Placeholder("placeholder");
 		property!(string[])("array");
 		property!(double)("double");
@@ -119,8 +127,9 @@ unittest {
 		property!(long)("long");
 		property!(int)("int");
 		property!(string)("string");
+
+		c = container;
     }
 
-    assert(c.locate!Placeholder("placeholder") == Placeholder(1.0, 2.0, 10, 20, "hello", ["ahoj", " ", "world!"]));
     assert(c.locate!Placeholder("placeholder") == Placeholder(1.0, 2.0, 10, 20, "hello", ["ahoj", " ", "world!"]));
 }

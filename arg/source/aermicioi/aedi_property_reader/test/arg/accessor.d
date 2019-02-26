@@ -30,7 +30,11 @@ Authors:
 module aermicioi.aedi_property_reader.test.arg.accessor;
 
 import aermicioi.aedi_property_reader.arg.accessor;
+import aermicioi.aedi_property_reader.arg.convertor;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.std_conv;
 import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import std.exception;
 
 unittest {
@@ -38,7 +42,7 @@ unittest {
     string[] args = [
         "command",
         "--integer=29192",
-        "--double=1.0"	,
+        "--double=1.0",
         "--boolean=true",
         "--enum=yes",
         "--assoc-array=beta=0.5",
@@ -52,35 +56,43 @@ unittest {
         "second one"
     ];
 
-    ArgumentAccessor accessor = new ArgumentAccessor;
+    ArgumentsHolder argumentsHolder = new ArgumentArrayToAssociativeArray().convert(args.stored, typeid(ArgumentsHolder)).unpack!ArgumentsHolder;
 
-    assert(accessor.has(args, "integer"));
-    assert(accessor.has(args, "double"));
-    assert(accessor.has(args, "boolean"));
-    assert(accessor.has(args, "enum"));
-    assert(accessor.has(args, "assoc-array"));
-    assert(accessor.has(args, "theta"));
-    assert(accessor.has(args, "array"));
-    assert(accessor.has(args, "d"));
-    assert(accessor.has(args, "m"));
-    assert(accessor.has(args, "f"));
-    assert(accessor.has(args, "z"));
-    assert(accessor.has(args, "l"));
-    assert(accessor.has(args, "0"));
-    assert(accessor.has(args, "1"));
+    ArgumentAccessor accessor = new ArgumentAccessor(
+        new AssociativeArrayAccessor!(string[][string])(),
+        new AssociativeArrayAccessor!(string[string])(),
+        new KeyConvertingAccessor!(string[], string, string, size_t)(
+            new ArrayAccessor!(string[]),
+            new StdConvConvertor!(size_t, string)
+        )
+    );
 
-    assert(accessor.access(args, "integer") == ["command", "--integer=29192"]);
-    assert(accessor.access(args, "double") == ["command", "--double=1.0"]);
-    assert(accessor.access(args, "boolean") == ["command", "--boolean=true"]);
-    assert(accessor.access(args, "enum") == ["command", "--enum=yes"]);
-    assert(accessor.access(args, "assoc-array") == ["command", "--assoc-array=beta=0.5", "--assoc-array"]);
-    assert(accessor.access(args, "theta") == ["command", "theta=0.95"]);
-    assert(accessor.access(args, "array") == ["command", "--array", "--array=second one"]);
-    assert(accessor.access(args, "d") == ["command", "-d"]);
-    assert(accessor.access(args, "m") == ["command", "-mfzl"]);
-    assert(accessor.access(args, "f") == ["command", "-mfzl"]);
-    assert(accessor.access(args, "z") == ["command", "-mfzl"]);
-    assert(accessor.access(args, "l") == ["command", "-mfzl"]);
-    assert(accessor.access(args, "0") == ["command", "first one"]);
-    assert(accessor.access(args, "1") == ["command", "second one"]);
+    assert(accessor.has(argumentsHolder, "integer"));
+    assert(accessor.has(argumentsHolder, "double"));
+    assert(accessor.has(argumentsHolder, "boolean"));
+    assert(accessor.has(argumentsHolder, "enum"));
+    assert(accessor.has(argumentsHolder, "assoc-array"));
+    assert(accessor.has(argumentsHolder, "array"));
+    assert(accessor.has(argumentsHolder, "d"));
+    assert(accessor.has(argumentsHolder, "m"));
+    assert(accessor.has(argumentsHolder, "f"));
+    assert(accessor.has(argumentsHolder, "z"));
+    assert(accessor.has(argumentsHolder, "l"));
+    assert(accessor.has(argumentsHolder, "0"));
+    assert(accessor.has(argumentsHolder, "1"));
+
+    assert(accessor.access(argumentsHolder, "integer").unpack!string == "29192");
+    assert(accessor.access(argumentsHolder, "double").unpack!string == "1.0");
+    assert(accessor.access(argumentsHolder, "boolean").unpack!string == "true");
+    assert(accessor.access(argumentsHolder, "enum").unpack!string == "yes");
+    assert(accessor.access(argumentsHolder, "assoc-array").unpack!(string[]) == ["beta=0.5", "theta=0.95"]);
+    assert(accessor.access(argumentsHolder, "array").unpack!(string[]) == ["first one", "second one"]);
+    assert(accessor.access(argumentsHolder, "d").unpack!string == "true");
+    assert(accessor.access(argumentsHolder, "m").unpack!string == "true");
+    assert(accessor.access(argumentsHolder, "f").unpack!string == "true");
+    assert(accessor.access(argumentsHolder, "z").unpack!string == "true");
+    assert(accessor.access(argumentsHolder, "l").unpack!string == "true");
+    assert(accessor.access(argumentsHolder, "0").unpack!string == "command");
+    assert(accessor.access(argumentsHolder, "1").unpack!string == "--integer=29192");
+    assert(accessor.access(argumentsHolder, "2").unpack!string == "--double=1.0");
 }

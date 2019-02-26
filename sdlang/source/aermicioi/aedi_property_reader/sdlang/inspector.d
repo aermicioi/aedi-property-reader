@@ -29,16 +29,18 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.sdlang.inspector;
 
+import aermicioi.aedi.configurer.annotation.annotation;
+import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import aermicioi.aedi_property_reader.convertor.inspector;
+import aermicioi.aedi_property_reader.sdlang.accessor;
 import sdlang;
 import sdlang.ast;
 import std.algorithm;
-import aermicioi.aedi_property_reader.sdlang.accessor;
-import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 
 /**
 Inspector for sdlang tags.
 **/
+@component
 class SdlangTagInspector : Inspector!Tag {
 
     /**

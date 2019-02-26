@@ -29,8 +29,13 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.convertor.mapper;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.exception;
-import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.convertor :
+    CombinedConvertor,
+    ConvertsFromToMixin,
+    Convertor,
+    EqualToHashToStringOpCmpMixin;
 import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.convertor.setter;
 import aermicioi.aedi_property_reader.convertor.accessor;
@@ -40,6 +45,8 @@ import std.experimental.logger;
 import std.exception;
 import std.algorithm;
 import std.conv;
+import std.traits : fullyQualifiedName;
+import std.typecons : Flag;
 
 /**
 Interface for components that are able to map from one type to another one.
@@ -68,7 +75,7 @@ interface Mapper(To, From = To) {
         Returns:
             typeof(this)
         **/
-        typeof(this) convertors(const(Convertor)[] convertors) @safe nothrow pure;
+        typeof(this) convertor(Convertor convertor) @safe nothrow pure;
 
         /**
         Get convertors
@@ -76,7 +83,7 @@ interface Mapper(To, From = To) {
         Returns:
             Convertor[]
         **/
-        inout(const(Convertor)[]) convertors() @safe nothrow pure inout;
+        inout(Convertor) convertor() @safe nothrow pure inout;
 
         /**
         Set force
@@ -87,15 +94,15 @@ interface Mapper(To, From = To) {
         Returns:
             typeof(this)
         **/
-        typeof(this) force(bool force) @safe nothrow pure;
+        typeof(this) force(Flag!"force" force) @safe nothrow pure;
 
         /**
         Get force
 
         Returns:
-            bool
+            Flag!"force"
         **/
-        inout(bool) force() @safe nothrow pure inout;
+        inout(Flag!"force") force() @safe nothrow pure inout;
 
         /**
         Set conversion
@@ -106,15 +113,15 @@ interface Mapper(To, From = To) {
         Returns:
             typeof(this)
         **/
-        typeof(this) conversion(bool conversion) @safe nothrow pure;
+        typeof(this) conversion(Flag!"conversion" conversion) @safe nothrow pure;
 
         /**
         Get conversion
 
         Returns:
-            bool
+            Flag!"conversion"
         **/
-        inout(bool) conversion() @safe nothrow pure inout;
+        inout(Flag!"conversion") conversion() @safe nothrow pure inout;
 
         /**
         Set skip
@@ -125,15 +132,15 @@ interface Mapper(To, From = To) {
         Returns:
             typeof(this)
         **/
-        typeof(this) skip(bool skip) @safe nothrow pure;
+        typeof(this) skip(Flag!"skip" skip) @safe nothrow pure;
 
         /**
         Get skip
 
         Returns:
-            bool
+            Flag!"skip"
         **/
-        inout(bool) skip() @safe nothrow pure inout;
+        inout(Flag!"skip") skip() @safe nothrow pure inout;
     }
 }
 
@@ -145,23 +152,36 @@ It will use inspectors for From and To component to get information about compon
 at runtime, and then use accessor and setter implementations to transfer data from one
 component to another, with optional conversion of data using passed convertors.
 **/
+@component
 class CompositeMapper(To, From) : Mapper!(To, From) {
 
     private {
-        import std.typecons : Rebindable;
-        bool conversion_;
-        bool force_;
-        bool skip_;
+        Flag!"conversion" conversion_;
+        Flag!"force" force_;
+        Flag!"skip" skip_;
 
-        const(Convertor)[] convertors_;
+        Convertor convertor_;
 
-        Rebindable!(const PropertySetter!(To, Object)) setter_;
-        Rebindable!(const PropertyAccessor!(From, Object)) accessor_;
-        Rebindable!(const Inspector!From) fromInspector_;
-        Rebindable!(const Inspector!To) toInspector_;
+        const PropertySetter!(To, Object) setter;
+        const PropertyAccessor!(From, Object) accessor;
+        const Inspector!From fromInspector;
+        const Inspector!To toInspector;
     }
 
     public {
+
+        @autowired
+        this(
+            PropertySetter!(To, Object) setter,
+            PropertyAccessor!(From, Object) accessor,
+            Inspector!From fromInspector,
+            Inspector!To toInspector
+        ) {
+            this.setter = setter;
+            this.accessor = accessor;
+            this.fromInspector = fromInspector;
+            this.toInspector = toInspector;
+        }
 
         @property {
             /**
@@ -173,8 +193,10 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             Returns:
                 typeof(this)
             **/
-            typeof(this) convertors(const(Convertor)[] convertors) @safe nothrow pure {
-                this.convertors_ = convertors;
+            @autowired
+            typeof(this) convertor(Convertor convertor) @safe nothrow pure
+                in (convertor !is null, "Expected convertor, not null value") {
+                this.convertor_ = convertor;
 
                 return this;
             }
@@ -185,8 +207,9 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             Returns:
                 Convertor[]
             **/
-            inout(const(Convertor)[]) convertors() @safe nothrow pure inout {
-                return this.convertors_;
+            inout(Convertor) convertor() @safe nothrow pure inout
+                out(conv; conv !is null, "Expected to have a proper convertor available not null") {
+                return this.convertor_;
             }
 
             /**
@@ -198,7 +221,8 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             Returns:
                 typeof(this)
             **/
-            typeof(this) conversion(bool conversion) @safe nothrow pure {
+            @autowired
+            typeof(this) conversion(Flag!"conversion" conversion) @safe nothrow pure {
                 this.conversion_ = conversion;
 
                 return this;
@@ -208,110 +232,10 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             Get conversion
 
             Returns:
-                bool
+                Flag!"conversion"
             **/
-            inout(bool) conversion() @safe nothrow pure inout {
+            inout(Flag!"conversion") conversion() @safe nothrow pure inout {
                 return this.conversion_;
-            }
-
-            /**
-            Set setter
-
-            Params:
-                setter = setter used to pass values to component.
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) setter(in PropertySetter!(To, Object) setter) @safe nothrow pure {
-                this.setter_ = setter;
-
-                return this;
-            }
-
-            /**
-            Get setter
-
-            Returns:
-                PropertySetter!(To, Object)
-            **/
-            inout(const PropertySetter!(To, Object)) setter() @safe nothrow pure inout {
-                return this.setter_.get;
-            }
-
-            /**
-            Set accessor
-
-            Params:
-                accessor = property accessor used to extract values from mapped component
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) accessor(in PropertyAccessor!(From, Object) accessor) @safe nothrow pure {
-                this.accessor_ = accessor;
-
-                return this;
-            }
-
-            /**
-            Get accessor
-
-            Returns:
-                PropertyAccessor!(From, Object)
-            **/
-            inout(const PropertyAccessor!(From, Object)) accessor() @safe nothrow pure inout {
-                return this.accessor_.get;
-            }
-
-            /**
-            Set fromInspector
-
-            Params:
-                fromInspector = inspector providing information about mapped component
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) fromInspector(in Inspector!From fromInspector) @safe nothrow pure {
-                this.fromInspector_ = fromInspector;
-
-                return this;
-            }
-
-            /**
-            Get fromInspector
-
-            Returns:
-                Inspector!From
-            **/
-            inout(const Inspector!From) fromInspector() @safe nothrow pure inout {
-                return this.fromInspector_.get;
-            }
-
-            /**
-            Set toInspector
-
-            Params:
-                toInspector = inspector used to provide information about component that will store mapped data
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) toInspector(in Inspector!To toInspector) @safe nothrow pure {
-                this.toInspector_ = toInspector;
-
-                return this;
-            }
-
-            /**
-            Get toInspector
-
-            Returns:
-                Inspector!To
-            **/
-            inout(const Inspector!To) toInspector() @safe nothrow pure inout {
-                return this.toInspector_.get;
             }
 
             /**
@@ -323,7 +247,8 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             Returns:
                 typeof(this)
             **/
-            typeof(this) force(bool force) @safe nothrow pure {
+            @autowired
+            typeof(this) force(Flag!"force" force) @safe nothrow pure {
                 this.force_ = force;
 
                 return this;
@@ -333,9 +258,9 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             Get force
 
             Returns:
-                bool
+                Flag!"force"
             **/
-            inout(bool) force() @safe nothrow pure inout {
+            inout(Flag!"force") force() @safe nothrow pure inout {
                 return this.force_;
             }
 
@@ -348,7 +273,8 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             Returns:
                 typeof(this)
             **/
-            typeof(this) skip(bool skip) @safe nothrow pure {
+            @autowired
+            typeof(this) skip(Flag!"skip" skip) @safe nothrow pure {
                 this.skip_ = skip;
 
                 return this;
@@ -358,9 +284,9 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
             Get skip
 
             Returns:
-                bool
+                Flag!"skip"
             **/
-            inout(bool) skip() @safe nothrow pure inout {
+            inout(Flag!"skip") skip() @safe nothrow pure inout {
                 return this.skip_;
             }
         }
@@ -392,7 +318,7 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                 debug(trace) trace("Migrating \"", property, "\" property ");
                 if (this.toInspector.has(to, property) || this.force) {
 
-                    Object value = this.accessor.access(from, property);
+                    Object value = this.accessor.access(from, property, allocator);
 
                     if (
                         this.fromInspector.typeOf(from, property) != this.toInspector.typeOf(to, property)
@@ -422,26 +348,22 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
                                 this.toInspector.typeOf(to, property)
                             );
 
-                            auto compatible = convertors.filter!(c =>
-                                c.convertsFrom(this.fromInspector.typeOf(from, property)) &&
-                                c.convertsTo(this.toInspector.typeOf(to, property))
+                            enforce!ConvertorException(
+                                this.convertor.converts(this.fromInspector.typeOf(from, property), this.toInspector.typeOf(to, property)),
+                                text(
+                                    "Could not convert \"", property, "\" from ",
+                                    this.fromInspector.typeOf(from, property), " to ", this.toInspector.typeOf(to, property), " ",
+                                    this.convertor, " does not support it"
+                                )
                             );
 
-                            enforce!ConvertorException(!compatible.empty, text(
-                                "Could not find convertor to convert \"", property, "\" from ",
-                                this.fromInspector.typeOf(from, property), " to ", this.toInspector.typeOf(to, property)
-                            ));
-
                             debug(trace) trace(
-                                "Found convertor for \"",
-                                property,
-                                "\" from ",
-                                this.fromInspector.typeOf(from, property),
-                                " to ",
+                                "Converting \"", property, "\" from ",
+                                this.fromInspector.typeOf(from, property), " to ",
                                 this.toInspector.typeOf(to, property)
                             );
 
-                            value = compatible.front.convert(value, this.toInspector.typeOf(to, property), allocator);
+                            value = this.convertor.convert(value, this.toInspector.typeOf(to, property), allocator);
                         } else {
 
                             throw new InvalidArgumentException(text(
@@ -490,7 +412,8 @@ class CompositeMapper(To, From) : Mapper!(To, From) {
 /**
 An implementation of convertor that is using a mapper to map from component to component.
 **/
-class CompositeConvertor(To, From) : CombinedConvertor {
+@component
+class CompositeConvertor(To, From) : Convertor {
     import std.algorithm : filter;
     import std.array: array;
 
@@ -499,56 +422,6 @@ class CompositeConvertor(To, From) : CombinedConvertor {
     }
 
     public {
-        /**
-        Set used convertors
-
-        Params:
-            convertors = list of convertors to be used.
-
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) convertors(Convertor[] convertors) @safe nothrow {
-            this.mapper.convertors = convertors;
-
-            return this;
-        }
-
-        /**
-        Add a convertor to existing list
-
-        Params:
-            convertor = convertor to be added to
-
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) add(Convertor convertor) @safe nothrow {
-            this.mapper.convertors = this.mapper.convertors ~ convertor;
-
-            return this;
-        }
-
-        /**
-        Remove a convertor from existing list
-
-        Params:
-            convertor = convertor to be removed
-
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) remove(Convertor convertor) @trusted nothrow {
-            try {
-                this.mapper.convertors = this.mapper.convertors.filter!(c => c != convertor).array;
-
-            } catch (Exception e) {
-                assert(false, text("Failed to remove convertor due to ", e));
-            }
-
-            return this;
-        }
-
         @property {
             /**
             Set mapper
@@ -559,6 +432,7 @@ class CompositeConvertor(To, From) : CombinedConvertor {
             Returns:
                 typeof(this)
             **/
+            @autowired
             typeof(this) mapper(Mapper!(To, From) mapper) @safe nothrow pure {
                 this.mapper_ = mapper;
 
@@ -591,7 +465,7 @@ class CompositeConvertor(To, From) : CombinedConvertor {
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const {
+        Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator)  const {
             enforce!InvalidArgumentException(
                 this.convertsFrom(from),
                 text(
@@ -608,13 +482,14 @@ class CompositeConvertor(To, From) : CombinedConvertor {
                 )
             );
 
+
+            auto placeholder = To.init.pack(from, this, allocator);
+
             static if (is(To : Object)) {
-                To placeholder = allocator.make!To;
-                this.mapper.map(from.unwrap!From, placeholder, allocator);
-            } else {
-                auto placeholder = allocator.make!(PlaceholderImpl!To)(To.init);
-                this.mapper.map(from.unwrap!From, placeholder.value, allocator);
+                placeholder.value = allocator.make!To;
             }
+
+            this.mapper.map(from.unwrap!From, placeholder.value, allocator);
 
             return placeholder;
         }
@@ -632,340 +507,20 @@ class CompositeConvertor(To, From) : CombinedConvertor {
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
-            enforce!InvalidArgumentException(this.convertsFrom(from), text(
-                "Cannot destruct ", from.identify, " to ", typeid(To), " not supported by ", typeid(this)
+        void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+            enforce!ConvertorException(this.destroys(from, converted), text(
+                "Cannot destruct ", converted.identify, " not supported by ", typeid(this), " expected ", this.to
             ));
 
-            allocator.dispose(converted);
+            static if (is(To : Object)) {
+                allocator.dispose(converted.unpack!To);
+            } else {
+                converted.unpack!To;
+            }
+
             converted = Object.init;
         }
 
         mixin EqualToHashToStringOpCmpMixin!();
-    }
-}
-
-/**
-An implementation of mapper, that works solely with components that have their type erased.
-
-An implementation of mapper, that works solely with components that have their type erased.
-At runtime it will attempt to match inspectors, accessor and setter for original component and
-destination, then use them to create a specific mapper for that configuration and use it to
-transfer data from origin component to destination one. If no matches are found, no transfer is performed
-and an exception should be thrown.
-**/
-class RuntimeMapper : Mapper!(Object, Object) {
-
-    private {
-        bool conversion_;
-        bool force_;
-        bool skip_;
-
-        const(Convertor)[] convertors_;
-
-        PropertyAccessor!Object[] accessors_;
-        PropertySetter!Object[] setters_;
-        Inspector!Object[] inspectors_;
-        Mapper!Object delegate (
-            in PropertyAccessor!Object,
-            in PropertySetter!Object,
-            in Inspector!Object,
-            in Inspector!Object
-        ) factory_;
-
-        void delegate(Mapper!Object) destructor_;
-    }
-
-    public {
-        @property {
-            /**
-            Set convertors
-
-            Params:
-                convertors = a list of convertors that could optionally be used to convert mapped fields
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) convertors(const(Convertor)[] convertors) @safe nothrow pure {
-                this.convertors_ = convertors;
-
-                return this;
-            }
-
-            /**
-            Get convertors
-
-            Returns:
-                Convertor[]
-            **/
-            inout(const(Convertor)[]) convertors() @safe nothrow pure inout {
-                return this.convertors_;
-            }
-
-            /**
-            Set conversion
-
-            Params:
-                conversion = whether to automatically convert or not mapped fields to desired type
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) conversion(bool conversion) @safe nothrow pure {
-                this.conversion_ = conversion;
-
-                return this;
-            }
-
-            /**
-            Get conversion
-
-            Returns:
-                bool
-            **/
-            inout(bool) conversion() @safe nothrow pure inout {
-                return this.conversion_;
-            }
-
-            /**
-            Set force
-
-            Params:
-                force = whether force or not an attempt to set an inexistent field.
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) force(bool force) @safe nothrow pure {
-                this.force_ = force;
-
-                return this;
-            }
-
-            /**
-            Get force
-
-            Returns:
-                bool
-            **/
-            inout(bool) force() @safe nothrow pure inout {
-                return this.force_;
-            }
-
-            /**
-            Set skip
-
-            Params:
-                skip = whether to skip mapping of fields that have their type not identifiable in destination component
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) skip(bool skip) @safe nothrow pure {
-                this.skip_ = skip;
-
-                return this;
-            }
-
-            /**
-            Get skip
-
-            Returns:
-                bool
-            **/
-            inout(bool) skip() @safe nothrow pure inout {
-                return this.skip_;
-            }
-
-            /**
-            Set factory
-
-            Params:
-                factory = factory used to create a mapper
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) factory(Mapper!Object delegate (
-                    in PropertyAccessor!Object,
-                    in PropertySetter!Object,
-                    in Inspector!Object,
-                    in Inspector!Object
-                ) factory) @safe nothrow pure {
-                this.factory_ = factory;
-
-                return this;
-            }
-
-            /**
-            Get factory
-
-            Returns:
-                Mapper!Object delegate ()
-            **/
-            inout(Mapper!Object delegate (
-                in PropertyAccessor!Object,
-                in PropertySetter!Object,
-                in Inspector!Object,
-                in Inspector!Object
-            )) factory() @safe nothrow pure inout {
-                return this.factory_;
-            }
-
-            /**
-            Set destructor
-
-            Params:
-                destructor = destructor used to destroy created mapper
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) destructor(void delegate(Mapper!Object) destructor) @safe nothrow pure {
-                this.destructor_ = destructor;
-
-                return this;
-            }
-
-            /**
-            Get destructor
-
-            Returns:
-                void delegate(Mapper!Object)
-            **/
-            inout(void delegate(Mapper!Object)) destructor() @safe nothrow pure inout {
-                return this.destructor_;
-            }
-
-            /**
-            Set accessors
-
-            Params:
-                accessors = list of runtime accessors used to access data
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) accessors(PropertyAccessor!Object[] accessors) @safe nothrow pure {
-                this.accessors_ = accessors;
-
-                return this;
-            }
-
-            /**
-            Get accessors
-
-            Returns:
-                PropertyAccessor!Object[]
-            **/
-            inout(PropertyAccessor!Object[]) accessors() @safe nothrow pure inout {
-                return this.accessors_;
-            }
-
-            /**
-            Set setters
-
-            Params:
-                setters = list of runtime setters used to map from one to another
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) setters(PropertySetter!Object[] setters) @safe nothrow pure {
-                this.setters_ = setters;
-
-                return this;
-            }
-
-            /**
-            Get setters
-
-            Returns:
-                PropertySetter!Object[]
-            **/
-            inout(PropertySetter!Object[]) setters() @safe nothrow pure inout {
-                return this.setters_;
-            }
-
-            /**
-            Set inspectors
-
-            Params:
-                inspectors = list of runtime inspectors used to inspect various components
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) inspectors(Inspector!Object[] inspectors) @safe nothrow pure {
-                this.inspectors_ = inspectors;
-
-                return this;
-            }
-
-            /**
-            Get inspectors
-
-            Returns:
-                Inspector!Object[]
-            **/
-            inout(Inspector!Object[]) inspectors() @safe nothrow pure inout {
-                return this.inspectors_;
-            }
-
-        }
-
-        /**
-        Map from component to component.
-
-        Map from component to component, or transfer data from component to component
-        with optional conversion of data along the way.
-
-        Params:
-            from = original component that has it's data transferred
-            to = destination component that receives transferred data
-            allocator = optional allocator that could be used by convertors when doing field conversion
-        Throws:
-            InvalidArgumentException when no either accessor, setter, or inspector is found.
-        **/
-        void map(Object from, ref Object to, RCIAllocator allocator = theAllocator) const {
-            auto accessors = this.accessors.filter!(accessor => accessor.componentType(from) is from.identify);
-            auto setters = this.setters.filter!(setter => setter.componentType(to) is to.identify);
-            auto fromInspectors = this.inspectors.filter!(inspector => inspector.typeOf(from) is from.identify);
-            auto toInspectors = this.inspectors.filter!(inspector => inspector.typeOf(to) is to.identify);
-
-            enforce!InvalidArgumentException(
-                !accessors.empty,
-                text("No field accessor for ", from.identify, " has been provided, cannot map to ", to.identify)
-            );
-            enforce!InvalidArgumentException(
-                !setters.empty,
-                text("No field setter for ", to.identify, " has been provided, cannot map from ", from.identify)
-            );
-            enforce!InvalidArgumentException(
-                !fromInspectors.empty,
-                text("No inspector for ", from.identify, " has been provided, cannot map to ", to.identify)
-            );
-            enforce!InvalidArgumentException(
-                !toInspectors.empty,
-                text("No inspector for ", to.identify, " has been provided, cannot map from ", to.identify)
-            );
-
-            auto mapper = this.factory()(
-                accessors.front,
-                setters.front,
-                fromInspectors.front,
-                toInspectors.front
-            );
-            mapper.force = this.force;
-            mapper.conversion = this.conversion;
-            mapper.skip = this.skip;
-            mapper.convertors = this.convertors;
-
-            mapper.map(from, to, allocator);
-
-            this.destructor()(mapper);
-        }
-
     }
 }

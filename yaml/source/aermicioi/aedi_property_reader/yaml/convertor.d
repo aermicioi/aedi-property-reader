@@ -29,163 +29,198 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.yaml.convertor;
 
-import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi_property_reader.yaml.accessor;
-import aermicioi.aedi_property_reader.yaml.yaml : accessor;
-import aermicioi.aedi_property_reader.yaml.inspector;
-import aermicioi.aedi.factory;
-import aermicioi.aedi.storage.locator;
-import aermicioi.aedi.storage.wrapper;
-import aermicioi.aedi.storage.decorator;
 import aermicioi.aedi_property_reader.convertor.exception;
-import std.traits;
-import std.experimental.allocator;
+import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.placeholder;
+import aermicioi.aedi_property_reader.convertor.type_guesser;
+import aermicioi.aedi_property_reader.yaml.inspector;
+import aermicioi.aedi_property_reader.yaml.yaml;
 import dyaml;
 import std.conv;
-import std.range;
+import std.datetime : SysTime;
 import std.exception;
+import std.experimental.allocator;
+import std.meta : AliasSeq;
+import std.range;
+import std.traits;
 
-public {
-    enum YamlAccessorFactory(From : Node) = () => new RuntimeFieldAccessor!Node(accessor());
-    enum YamlInspectorFactory(From : Node) = () => new YamlInspector;
-}
+@component
+class YamlConvertor : Convertor {
+	alias ToTypes = AliasSeq!(bool, long, real, ubyte[], string, SysTime, Node[], Node.Pair[]);
+	mixin ToMixin!ToTypes;
+	mixin FromMixin!Node;
+	mixin ConvertsFromToMixin DefaultConvertsImplementation;
+	mixin EqualToHashToStringOpCmpMixin;
 
-alias YamlConvertorBuilderFactory = (Convertor[] convertors) {
-    return factoryAnyConvertorBuilder(
-		new TypeGuessCallbackConvertorBuilder!(convert, destruct),
-    	new MappingConvertorBuilder!(
-			YamlAccessorFactory,
-			CompositeSetterFactory,
-			CompositeInspectorFactory,
-			YamlInspectorFactory
-		)(convertors, true, true, true, true)
-	);
-};
+	private TypeGuesser!Node guesser;
 
-/**
-Convert yaml node to destination type using allocator
+	@autowired
+	this(TypeGuesser!Node guesser)
+		in (guesser !is null, "Expected yaml type guesser not null.") {
+		this.guesser = guesser;
+	}
 
-Params:
-	node = yaml node which is converted
-	to = destination type and storage of yaml node
-	allocator = allocator used to allocate neccessary storage
-**/
-void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum) && !isAggregateType!To && !isSomeChar!To) {
+    bool converts(in Object from, const TypeInfo to) @safe const nothrow {
+		try {
+			if (DefaultConvertsImplementation.converts(from, to)) {
+				TypeInfo actual = this.guesser.guess(from.unwrap!Node);
 
-	enforce(node.convertsTo!To, new InvalidCastException("Could not convert ${from} to ${to} ", typeid(node), typeid(to)));
+				if (actual is to) {
+					return true;
+				}
 
-	to = (cast() node).as!To;
-}
+				if (to is typeid(Node[])) {
+					return true;
+				}
 
-/**
-ditto
-**/
-void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator allocator = theAllocator)
-	if (isSomeChar!Z && !is(To == enum)) {
+				if (to is typeid(Node.Pair[])) {
+					return true;
+				}
+			}
 
-	enforce(
-		node.isString,
-		new InvalidCastException("Could not convert ${from} to ${to}, ${from} is not a string", typeid(node), typeid(to))
-	);
+			return false;
+		} catch (Exception e) {
+			throw new Error("Unexpected exception occured during check whether convertor is able to convert or not.", e);
+		}
+    }
 
-	to = std.conv.to!To((cast() node).as!(string));
-}
+    bool converts(in Object from, in Object to) @safe const nothrow {
+        return this.converts(from, to.identify);
+    }
 
-/**
-ditto
-**/
-void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
-	if (isSomeChar!To && !is(To == enum)) {
+	/**
+    Convert from component to component.
 
-	enforce(node.isString, new InvalidCastException("Could not convert ${from} to ${to}, ${from} is not a string", typeid(node), typeid(to))
-	);
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when there is a converting error
+        InvalidArgumentException when arguments passed are not of right type or state
+    Returns:
+        Resulting converted component.
+    **/
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator) const {
+		enforce!ConvertorException(this.converts(from, to), text(
+            "Cannot convert ", from.identify, " to ", to, " expected original component of types: ", this.from, " and destination types of ", this.to
+        ));
 
-	to = (cast() node).as!string.to!char;
-}
+		if (from.unwrap!Node.isInt && (to is typeid(long))) {
+			return from.unwrap!Node.get!long.pack(from, this, allocator);
+		}
 
-/**
-ditto
-**/
-void convert(To : Z[], From : Node, Z)(in From node, ref To to, RCIAllocator allocator = theAllocator)
-	if (!isSomeString!To && !is(To == enum)) {
+		if (from.unwrap!Node.isFloat && (to is typeid(real))) {
+			return from.unwrap!Node.get!real.pack(from, this, allocator);
+		}
 
-	enforce(node.isSequence, new InvalidCastException("Could not convert ${from} to ${to}, ${from} is not a sequence", typeid(node), typeid(to))
-	);
+		if (from.unwrap!Node.isBinary && (to is typeid(ubyte[]))) {
+			return from.unwrap!Node.get!(ubyte[]).pack(from, this, allocator);
+		}
 
-	auto sequence = (cast() node).sequence;
-	to = allocator.makeArray!Z(sequence.length);
+		if (from.unwrap!Node.isBool && (to is typeid(bool))) {
+			return from.unwrap!Node.get!bool.pack(from, this, allocator);
+		}
 
-	foreach (index, ref element; sequence.enumerate) {
-		element.convert(to[index], allocator);
+		if (from.unwrap!Node.isString && (to is typeid(string))) {
+			return from.unwrap!Node.get!string.pack(from, this, allocator);
+		}
+
+		if (from.unwrap!Node.isTime && (to is typeid(SysTime))) {
+			return from.unwrap!Node.get!SysTime.pack(from, this, allocator);
+		}
+
+		if (to is typeid(Node[])) {
+			return from.unwrap!Node.get!(Node[]).pack(from, this, allocator);
+		}
+
+		if (to is typeid(Node.Pair[])) {
+			return from.unwrap!Node.get!(Node.Pair[]).pack(from, this, allocator);
+		}
+
+		assert(false, "Code flow should not get here");
+	}
+
+    /**
+    Destroy component created using this convertor.
+
+    Destroy component created using this convertor.
+    Since convertor could potentially allocate memory for
+    converted component, only itself is containing history of allocation,
+    and therefore it is responsible as well to destroy and free allocated
+    memory with allocator.
+
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    Return:
+        true if component is destroyed, false otherwise
+    **/
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+        enforce!ConvertorException(this.destroys(from, converted), text("Cannot destroy component ", converted.identify, " that is not convertible by ", this));
+
+		static foreach (Type; ToTypes) {
+			if (converted.identify is typeid(Type)) {
+				converted.unpack!Type(allocator);
+			}
+		}
 	}
 }
 
-/**
-ditto
-**/
-void convert(To : Z[K], From : Node, Z, K)(in From node, ref To to, RCIAllocator allocator = theAllocator)
-	if (!is(To == enum)) {
+@component
+class YamlNodePairsToAssociativeArrayConvertor : Convertor {
+	mixin ToMixin!(Node[Node]);
+	mixin FromMixin!(Node.Pair[]);
+	mixin ConvertsFromToMixin DefaultConvertsImplementation;
+	mixin EqualToHashToStringOpCmpMixin;
 
-	enforce(node.isMapping, new InvalidCastException("Could not convert ${from} to ${to}, ${from} is not a map", typeid(node), typeid(to)));
+	/**
+    Convert from component to component.
 
-	auto pairs = (cast() node).mapping;
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when there is a converting error
+        InvalidArgumentException when arguments passed are not of right type or state
+    Returns:
+        Resulting converted component.
+    **/
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator) const {
+		enforce!ConvertorException(this.converts(from, to), text(
+            "Cannot convert ", from.identify, " to ", to, " expected original component of types: ", this.from, " and destination types of ", this.to
+        ));
 
-	foreach (pair; pairs) {
-		Z value;
-		K key;
+		Node[Node] container;
 
-		pair.key.convert(key, allocator);
-		pair.value.convert(value, allocator);
+		foreach (pair; from.unwrap!(Node.Pair[])) {
+			container[pair.key] = pair.value;
+		}
 
-		to[key] = value;
+		return container.pack(from, this, allocator);
 	}
-}
 
-/**
-ditto
-**/
-void convert(To, From : Node)(in From node, ref To to, RCIAllocator allocator = theAllocator)
-	if (is(To == enum)) {
+    /**
+    Destroy component created using this convertor.
 
-	string temp;
-    node.convert!string(temp, allocator);
-    to = temp.to!To;
-	temp.destruct(allocator);
-}
+    Destroy component created using this convertor.
+    Since convertor could potentially allocate memory for
+    converted component, only itself is containing history of allocation,
+    and therefore it is responsible as well to destroy and free allocated
+    memory with allocator.
 
-/**
-Destroy component constructed out of yaml element.
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    Return:
+        true if component is destroyed, false otherwise
+    **/
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+        enforce!ConvertorException(this.destroys(from, converted), text("Cannot destroy component ", converted.identify, " that is not convertible by ", this));
 
-Params:
-	to = component about to be destroyed
-	allocator = allocator used originally to create component
-**/
-void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
-	destroy(to);
-
-	to = To.init;
-}
-
-/**
-ditto
-**/
-void destruct(To: Z[], Z)(ref To to, RCIAllocator allocator = theAllocator)
-	if (!isSomeString!To) {
-	allocator.dispose(to);
-
-	to = To.init;
-}
-
-private string dumper(Node node) {
-	import dyaml.stream : YMemoryStream;
-	YMemoryStream stream = new YMemoryStream;
-
-	Dumper dumper = Dumper(stream);
-	dumper.explicitStart = false;
-	dumper.explicitEnd = false;
-	dumper.dump(node);
-
-	return cast(string) stream.data.idup;
+		converted.unpack!(Node[Node])(allocator);
+	}
 }

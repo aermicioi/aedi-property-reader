@@ -29,211 +29,52 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.convertor.convertor;
 
-import aermicioi.aedi;
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.exception : ConvertorException;
-import aermicioi.aedi.storage.wrapper;
-import std.meta;
-import std.conv;
-import std.experimental.allocator;
-import std.exception : enforce;
-import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi_property_reader.convertor.setter;
-import aermicioi.aedi_property_reader.convertor.inspector;
-import aermicioi.aedi_property_reader.convertor.traits;
-import aermicioi.aedi_property_reader.convertor.placeholder;
-import aermicioi.aedi_property_reader.convertor.type_guesser;
-import std.algorithm;
-import std.array;
-import std.traits;
-import std.experimental.logger;
+import aermicioi.aedi_property_reader.convertor.placeholder : identify, unwrap, unpack, pack, stored, original;
+import aermicioi.aedi_property_reader.convertor.traits : n, PureSafeNothrowToString;
 import taggedalgebraic : TaggedAlgebraic;
+import std.array : array, empty, popFront, front;
+import std.conv : text;
+import std.exception : enforce;
+import std.experimental.allocator : RCIAllocator, theAllocator, expandArray, make, makeArray, dispose;
+import std.experimental.logger : trace, info, error, fatal, critical;
+import std.meta : AliasSeq, allSatisfy, staticMap;
+import std.range.primitives : hasLength, hasSlicing, hasAssignableElements, isOutputRange, isForwardRange, ElementType;
+import std.range : enumerate;
+import std.traits : isSomeFunction, Parameters;
+import std.typecons : Flag, Yes, No;
+import std.variant : VariantN;
+
 
 alias ScalarConvertibleTypes = AliasSeq!(
 	ubyte, byte, ushort, short, uint, int, ulong, long, float, double, real, char, wchar, dchar
 );
 
 alias StringConvertibleTypes = AliasSeq!(
-    string, wstring, dstring
+    string, wstring, dstring, char[], wchar[], dchar[]
 );
 
 alias ScalarArrayConvertibleTypes = AliasSeq!(
-	ubyte[], byte[], ushort[], short[], uint[], int[], ulong[], long[], float[], double[], real[],
-    char[], wchar[], dchar[], string[]
+	ubyte[], byte[], ushort[], short[], uint[], int[], ulong[], long[], float[], double[], real[]
+);
+
+alias StringArrayConvertibleTypes = AliasSeq!( // TODO add back dstring[] once std.conv is fixed.
+    string[], wstring[], char[][], wchar[][], dchar[][]
+);
+
+alias MapConvertibleTypes = AliasSeq!(
+    string[string], wstring[wstring]
 );
 
 alias DefaultConvertibleTypes = AliasSeq!(
-    ScalarConvertibleTypes, StringConvertibleTypes, ScalarArrayConvertibleTypes
+    MapConvertibleTypes, StringArrayConvertibleTypes, ScalarArrayConvertibleTypes, ScalarConvertibleTypes, StringConvertibleTypes
 );
-
-/**
-Functional convertor that is taking a component of type From and converts it into a component of type To.
-
-Params:
-    from = original component that is converted.
-    to = destination component that is constructed.
-    allocator = optional allocator used to allocate required memory during conversion.
-**/
-alias FunctionalConvertor(To, From) = void function(in From, ref To, RCIAllocator allocator = theAllocator);
-
-/**
-ditto
-**/
-alias DelegateConvertor(To, From) = void delegate(in From, ref To, RCIAllocator allocator = theAllocator);
-
-/**
-Check wether T symbol is a functional convertor.
-
-Params:
-    T = symbol to be tested.
-
-Returns:
-    Symbols: yes -> whether it is or not, From -> type of original component that function is accepting, To -> destination type that function is converting.
-**/
-template isConvertor(alias T)
-    if (isSomeFunction!T) {
-    static if (
-        is(typeof(&T) : R function(in Y, ref X, RCIAllocator), Y, X, R) ||
-        is(typeof(&T) : R delegate(in Y, ref X, RCIAllocator), Y, X, R) ||
-        is(typeof(T) : R function(in Y, ref X, RCIAllocator), Y, X, R) ||
-        is(typeof(T) : R delegate(in Y, ref X, RCIAllocator), Y, X, R)
-    ) {
-        enum bool yes = true;
-
-        alias To = X;
-        alias From = Y;
-    } else {
-
-        enum bool yes = false;
-    }
-}
-
-/**
-Check whether symbol T is a functional convertor from type From to type To.
-
-Params:
-    T = symbol to test
-    To = destination type
-    From = original type
-
-Returns:
-    yes -> whether it is or not,
-    From -> type of original component that function is accepting,
-    To -> destination type that function is converting.
-**/
-template isConvertor(alias T, To, From) {
-    static if (isConvertor!T.yes && is(isConvertor!T.To == To) && is(isConvertor!T.From == From)) {
-        alias isConvertor = isConvertor!T;
-    } else {
-        enum yes = false;
-    }
-}
-
-/**
-Test whether template T can be instantiated as a functional convertor from From to To.
-
-Params:
-    T = template that is to be instantiated
-    To = destination type
-    From = original type
-Returns:
-    yes -> whether it is possible to instantiate template as functional convertor
-    Convertor -> resulting functional convertor
-    Info -> data returned by isConvertor
-**/
-template maybeConvertor(alias T, To, From) {
-    static if (is(typeof(isConvertor!(T!(To, From)))) && isConvertor!(T!(To, From)).yes) {
-        enum yes = true;
-        alias Convertor = T!(To, From);
-        alias Info = isConvertor!Convertor;
-    } else {
-        enum yes = false;
-    }
-}
-
-/**
-Functional destructor responsible for destroying components of To type.
-
-Params:
-    to = the component that is to be destroyed.
-    allocator = the allocator originally used to allocate all memory for To component
-**/
-alias FunctionalDestructor(To) = void function (ref To, RCIAllocator = theAllocator);
-
-/**
-ditto
-**/
-alias DelegateDestructor(To) = void delegate (ref To, RCIAllocator = theAllocator);
-
-/**
-Check whether symbol T is a functional destructor.
-
-Params:
-    T = symbol to be tested.
-Returns:
-    yes = whether it is functional destructor or not
-    To = the type of accepted components to be destructed
-**/
-template isDestructor(alias T) {
-    static if (
-        is(typeof(&T) : R function (ref X, RCIAllocator = theAllocator), X, R) ||
-        is(typeof(&T) : R delegate (ref X, RCIAllocator = theAllocator), X, R) ||
-        is(typeof(T) : R function (ref X, RCIAllocator = theAllocator), X, R) ||
-        is(typeof(T) : R delegate (ref X, RCIAllocator = theAllocator), X, R)
-    ) {
-        enum bool yes = true;
-
-        alias To = X;
-    } else {
-
-        enum bool yes = false;
-    }
-}
-
-/**
-Check if symbol T is a functional destructor for component of type To
-
-Params:
-    T = symbol that is tested
-    To = the component that functional destructor may accept
-
-Returns:
-    yes = whether it is functional destructor or not
-    To = the type of accepted components to be destructed
-**/
-template isDestructor(T, To) {
-    static if (isDestructor!T.yes && is(isDestructor!T.To == To)) {
-        alias isDestructor = isDestructor!T;
-    } else {
-        enum yes = false;
-    }
-}
-
-/**
-Test if T template's instantiantiation with type To is a functional destructor for component of type To.
-
-Params:
-    T = template that is to be tested.
-    To = the type of component that T instantiation should manage destruction.
-
-Returns:
-    yes -> whether it is possible to instantiate a functional destructor for To or not
-    Destructor -> the instantiated functional destructor
-    Info -> information from isDestructor check
-**/
-template maybeDestructor(alias T, To) {
-    static if (isDestructor!(T!To).yes) {
-        enum yes = true;
-        alias Destructor = T!(To);
-        alias Info = isDestructor!Destructor;
-    } else {
-        enum yes = false;
-    }
-}
 
 /**
 Interface for components that are able to convert from one erased type to another erased type.
 **/
-interface Convertor {
+interface Convertor : PureSafeNothrowToString {
     @property {
 
         /**
@@ -247,7 +88,7 @@ interface Convertor {
         Returns:
             type info of component that convertor is able to convert.
         **/
-        TypeInfo from() @safe const nothrow pure;
+        const(TypeInfo)[] from() @safe const nothrow pure;
 
         /**
         Get the type info of component that convertor is able to convert to.
@@ -260,7 +101,7 @@ interface Convertor {
         Returns:
             type info of component that can be converted to.
         **/
-        TypeInfo to() @safe const nothrow pure;
+        const(TypeInfo)[] to() @safe const nothrow pure;
     }
 
     /**
@@ -275,7 +116,7 @@ interface Convertor {
     Returns:
         true if it is able to convert from, or false otherwise.
     **/
-    bool convertsFrom(TypeInfo from) @safe const nothrow pure;
+    bool convertsFrom(const TypeInfo from) @safe const nothrow pure;
 
     /**
     Check whether convertor is able to convert from.
@@ -306,7 +147,7 @@ interface Convertor {
     Returns:
         true if it is able to convert to, false otherwise.
     **/
-    bool convertsTo(TypeInfo to) @safe const nothrow pure;
+    bool convertsTo(const TypeInfo to) @safe const nothrow pure;
 
     /**
     Check whether convertor is able to convert to.
@@ -343,22 +184,53 @@ interface Convertor {
     Returns:
         true if it is able to convert from component to destination component
     **/
-    bool converts(TypeInfo from, TypeInfo to) @safe const nothrow;
+    bool converts(const TypeInfo from, const TypeInfo to) @safe const nothrow;
 
     /**
     ditto
     **/
-    bool converts(TypeInfo from, in Object to) @safe const nothrow;
+    bool converts(const TypeInfo from, in Object to) @safe const nothrow;
 
     /**
     ditto
     **/
-    bool converts(in Object from, TypeInfo to) @safe const nothrow;
+    bool converts(in Object from, const TypeInfo to) @safe const nothrow;
 
     /**
     ditto
     **/
     bool converts(in Object from, in Object to) @safe const nothrow;
+
+    /**
+    Check whether this convertor is able to destroy to component.
+
+    The destroys family of methods are designed purposely for identification
+    whether convertor was able to convert from type to destination to, and
+    is eligible for destruction of converted components.
+
+    Params:
+        from = original component which was converted.
+        to = converted component that should be destroyed by convertor.
+
+    Returns:
+        true if convertor is eligible for destroying to, or false otherwise.
+    **/
+    bool destroys(const TypeInfo from, const TypeInfo to) @safe const nothrow;
+
+    /**
+    ditto
+    **/
+    bool destroys(in Object from, const TypeInfo to) @safe const nothrow;
+
+    /**
+    ditto
+    **/
+    bool destroys(const TypeInfo from, in Object to) @safe const nothrow;
+
+    /**
+    ditto
+    **/
+    bool destroys(in Object from, in Object to) @safe const nothrow;
 
     /**
     Convert from component to component.
@@ -373,7 +245,7 @@ interface Convertor {
     Returns:
         Resulting converted component.
     **/
-    Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const;
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator) const;
 
     /**
     Destroy component created using this convertor.
@@ -387,14 +259,30 @@ interface Convertor {
     Params:
         converted = component that should be destroyed.
         allocator = allocator used to allocate converted component.
+    Return:
+        true if component is destroyed, false otherwise
     **/
-    void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const;
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const;
 }
 
 /**
-Default implementation of converts from method
+Default implementation of from method
 **/
-mixin template ConvertsFromMixin(FromType) {
+mixin template FromMixin(FromTypes...) {
+    private {
+        static immutable TypeInfo[] fromTypes;
+
+        static this() {
+            TypeInfo[] infos;
+
+            static foreach (Type; FromTypes) {
+                infos ~= typeid(Type);
+            }
+
+            fromTypes = cast(immutable) infos;
+        }
+    }
+
     @property {
         /**
         Get the type info of component that convertor can convert from.
@@ -407,10 +295,17 @@ mixin template ConvertsFromMixin(FromType) {
         Returns:
             type info of component that convertor is able to convert.
         **/
-        TypeInfo from() @safe const nothrow pure {
-            return typeid(FromType);
+        const(TypeInfo)[] from() @safe const nothrow pure {
+            return fromTypes;
         }
     }
+}
+
+/**
+Default implementation of converts from method
+**/
+mixin template ConvertsFromMixin() {
+    import aermicioi.aedi_property_reader.convertor.placeholder : identify;
 
     /**
     Check whether convertor is able to convert from.
@@ -424,8 +319,9 @@ mixin template ConvertsFromMixin(FromType) {
     Returns:
         true if it is able to convert from, or false otherwise.
     **/
-    bool convertsFrom(TypeInfo from) @safe const nothrow pure {
-        return from is this.from;
+    bool convertsFrom(const TypeInfo from) @safe const nothrow pure {
+        import std.algorithm;
+        return this.from.canFind!(tested => tested is from);
     }
 
     /**
@@ -448,9 +344,23 @@ mixin template ConvertsFromMixin(FromType) {
 }
 
 /**
-Default implementation of converts to method
+Default implementation of to method
 **/
-mixin template ConvertsToMixin(ToType) {
+mixin template ToMixin(ToTypes...) {
+    private {
+        static immutable TypeInfo[] toTypes;
+
+        static this() {
+            TypeInfo[] infos;
+
+            static foreach (Type; ToTypes) {
+                infos ~= typeid(Type);
+            }
+
+            toTypes = cast(immutable) infos;
+        }
+    }
+
     @property {
         /**
         Get the type info of component that convertor is able to convert to.
@@ -463,11 +373,16 @@ mixin template ConvertsToMixin(ToType) {
         Returns:
             type info of component that can be converted to.
         **/
-        TypeInfo to() @safe const nothrow pure {
-            return typeid(ToType);
+        const(TypeInfo)[] to() @safe const nothrow pure {
+            return this.toTypes;
         }
     }
+}
 
+/**
+Default implementation of converts to method
+**/
+mixin template ConvertsToMixin() {
     /**
     Check whether convertor is able to convert to.
 
@@ -481,8 +396,9 @@ mixin template ConvertsToMixin(ToType) {
     Returns:
         true if it is able to convert to, false otherwise.
     **/
-    bool convertsTo(TypeInfo to) @safe const nothrow pure {
-        return this.to is to;
+    bool convertsTo(const TypeInfo to) @safe const nothrow pure {
+        import std.algorithm;
+        return this.to.canFind!(tested => tested is to);
     }
 
     /**
@@ -531,21 +447,21 @@ mixin template ConvertsMixin() {
     Returns:
         true if it is able to convert from component to destination component
     **/
-    bool converts(TypeInfo from, TypeInfo to) @safe const nothrow {
+    bool converts(const TypeInfo from, const TypeInfo to) @safe const nothrow {
         return this.convertsFrom(from) && this.convertsTo(to);
     }
 
     /**
     ditto
     **/
-    bool converts(TypeInfo from, in Object to) @safe const nothrow {
+    bool converts(const TypeInfo from, in Object to) @safe const nothrow {
         return this.convertsFrom(from) && this.convertsTo(to);
     }
 
     /**
     ditto
     **/
-    bool converts(in Object from, TypeInfo to) @safe const nothrow {
+    bool converts(in Object from, const TypeInfo to) @safe const nothrow {
         return this.convertsFrom(from) && this.convertsTo(to);
     }
 
@@ -557,10 +473,87 @@ mixin template ConvertsMixin() {
     }
 }
 
+/**
+Default implementation of destroys method.
+**/
+mixin template DestroysMixin() {
+    import aermicioi.aedi_property_reader.convertor.placeholder : original;
+
+    /**
+    Check whether this convertor is able to destroy to component.
+
+    The destroys family of methods are designed purposely for identification
+    whether convertor was able to convert from type to destination to, and
+    is eligible for destruction of converted components.
+
+    Params:
+        from = original component which was converted.
+        to = converted component that should be destroyed by convertor.
+
+    Returns:
+        true if convertor is eligible for destroying to, or false otherwise.
+    **/
+    bool destroys(const TypeInfo from, const TypeInfo to) @safe const nothrow {
+        return this.convertsFrom(from) && this.convertsTo(to);
+    }
+
+    /**
+    ditto
+    **/
+    bool destroys(in Object from, const TypeInfo to) @safe const nothrow {
+        return this.convertsFrom(from) && this.convertsTo(to);
+    }
+
+    /**
+    ditto
+    **/
+    bool destroys(const TypeInfo from, in Object to) @safe const nothrow {
+        if (this.convertsFrom(from) && this.convertsTo(to)) {
+            if (to.original !is typeid(void)) {
+                return this.convertsFrom(to.original);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+    ditto
+    **/
+    bool destroys(in Object from, in Object to) @safe const nothrow {
+        if (this.convertsFrom(from) && this.convertsTo(to)) {
+            if (to.original !is typeid(void)) {
+                return this.convertsFrom(to.original);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+}
+
 mixin template ConvertsFromToMixin(FromType, ToType) {
-    mixin ConvertsFromMixin!FromType;
-    mixin ConvertsToMixin!ToType;
+    import aermicioi.aedi_property_reader.convertor.convertor : FromMixin, ToMixin, ConvertsFromMixin, ConvertsToMixin, ConvertsMixin, DestroysMixin;
+
+    mixin FromMixin!FromType;
+    mixin ToMixin!ToType;
+    mixin ConvertsFromMixin;
+    mixin ConvertsToMixin;
     mixin ConvertsMixin;
+    mixin DestroysMixin;
+}
+
+
+mixin template ConvertsFromToMixin() {
+    import aermicioi.aedi_property_reader.convertor.convertor : ConvertsFromMixin, ConvertsToMixin, ConvertsMixin, DestroysMixin;
+
+    mixin ConvertsFromMixin;
+    mixin ConvertsToMixin;
+    mixin ConvertsMixin;
+    mixin DestroysMixin;
 }
 
 /**
@@ -573,7 +566,30 @@ mixin template EqualMixin() {
     }
 
     bool opEquals(Convertor convertor) {
-        return (convertor !is null) && ((this.from is convertor.from) || (this.to is convertor.to));
+        if (convertor is null) {
+            return false;
+        }
+
+        if (
+            (this.from.length != convertor.from.length) ||
+            (this.to.length != convertor.to.length)
+        ) {
+            return false;
+        }
+
+        foreach (index, from; this.from) {
+            if (from !is convertor.from[index]) {
+                return false;
+            }
+        }
+
+        foreach (index, to; this.to) {
+            if (to !is convertor.to[index]) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 
@@ -583,15 +599,15 @@ Mixin that provides default implementation of hashing algorithm
 mixin template ToHashMixin() {
 
     override size_t toHash() {
-        import std.digest.murmurhash : MurmurHash3;
-        import std.digest : digest;
+        import std.range : only, chain;
+        import std.algorithm : map;
+        size_t result = 7;
 
-        size_t[8] buffer;
-        buffer[0] = this.from.toHash;
-        buffer[1] = this.to.toHash;
-        buffer[2] = this.classinfo.toHash;
+        foreach (hash; chain(this.from, this.to, this.classinfo.only).map!(ti => ti.toHash)) {
+            result = result * 31 + hash;
+        }
 
-        return cast(size_t) *(&digest!(MurmurHash3!128)(buffer[])[0]);
+        return result;
     }
 }
 
@@ -600,14 +616,20 @@ Mixin that provides default implementation of toString method
 **/
 mixin template ToStringMixin() {
 
-    override string toString() {
+    override string toString() @safe nothrow pure {
+        import std.string : lastIndexOf;
         import std.conv : text;
-        import std.algorithm : until;
-        import std.range : retro;
-        return text(
-            typeid(this).name.retro.until('.').array.retro,
-            " [", this.from, ", ", this.to, "]"
-        );
+
+        try {
+            auto identity = typeid(this).name[typeid(this).name.lastIndexOf(".") + 1 .. $];
+            auto from = this.from.length > 2 ? text(this.from[0 .. 2], "...") : text(this.from);
+            auto to = this.to.length > 2 ? text(this.to[0 .. 2], "...") : text(this.to);
+            return text(
+                identity, " [ from: ",  from, ", to: ", to, "]"
+            );
+        } catch (Exception e) {
+            throw new Error("Failed to convert component to string, due to an exception.", e);
+        }
     }
 }
 
@@ -634,6 +656,8 @@ mixin template OpCmpMixin() {
 Amalgation of EqualMixin, ToHashMixin, ToStringMixin, and OpCmpMixin
 **/
 mixin template EqualToHashToStringOpCmpMixin() {
+    import aermicioi.aedi_property_reader.convertor.convertor : EqualMixin, ToHashMixin, ToStringMixin, OpCmpMixin;
+
     mixin EqualMixin!();
     mixin ToHashMixin!();
     mixin ToStringMixin!();
@@ -641,252 +665,29 @@ mixin template EqualToHashToStringOpCmpMixin() {
 }
 
 /**
-A convertor that is using functional convertor and destructor for conversion logic.
-**/
-@component
-class CallbackConvertor(alias convertor, alias destructor) : Convertor
-    if (isConvertor!convertor.yes && isDestructor!destructor.yes) {
-
-    private {
-        alias Info = isConvertor!convertor;
-    }
-
-    public {
-
-        mixin ConvertsFromToMixin!(Info.From, Info.To);
-
-        /**
-        Convert from component to component.
-
-        Convert from component to component.
-        In case when functional convertor's from argument is rooted in Object
-        class, the convertor will attempt to downcast passed component to
-        it's rightfull type. If not, the convertor will attempt to downcast
-        from component to placeholding object of value that is accepted by functional
-        convertor.
-        For converted to component, in case when it is rooted in Object class
-        nothing special is performed, while otherwise it will be wrapped into placeholding
-        object allocated by allocator that will be returned to callee.
-
-        Params:
-            from = original component that is to be converted.
-            to = destination object that will be constructed out for original one.
-            allocator = optional allocator that could be used to construct to component.
-        Throws:
-            ConvertorException when convertor is not able to convert from, or to component.
-        Returns:
-            Resulting converted component.
-        **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const
-        {
-            enforce!ConvertorException(
-                this.convertsTo(to),
-                text(to, " is not supported destination by convertor expected ", typeid(Info.To))
-            );
-            enforce!ConvertorException(
-                this.convertsFrom(from),
-                text(from.identify, " is not supported source by convertor expected ", typeid(Info.From))
-            );
-
-            static if (is(From : Object)) {
-                Info.From naked = cast(From) from;
-
-                if (naked is null) {
-                    throw new ConvertorException(
-                        text("Cannot convert ", from.classinfo, " only supported ", this.from)
-                    );
-                }
-            } else {
-
-                auto wrapper = (cast(Placeholder!(Info.From)) from);
-
-                if (wrapper is null) {
-                    throw new ConvertorException(text("Cannot convert ", from.identify, " only supported ", this.from));
-                }
-
-                Info.From naked = wrapper.value;
-            }
-
-
-            static if (is(Info.To : Object)) {
-                Info.To placeholder = allocator.make!(Info.To);
-
-                convertor(naked, placeholder, allocator);
-            } else {
-                PlaceholderImpl!(Info.To) placeholder = allocator.make!(PlaceholderImpl!(Info.To))(Info.To.init);
-
-                convertor(naked, placeholder.value, allocator);
-            }
-
-            return placeholder;
-        }
-
-        /**
-        Destroy component created using this convertor.
-
-        Destroy component created using this convertor.
-        The method will attempt to downcast converted component
-        to type supported by functional destructor when the type is rooted in
-        Object class, otherwise it will attempt to downcast converted to placeholding
-        object of value supported by functional destructor. In latest case, the
-        method will dispose out of placeholding object using passed allocator.
-
-        Params:
-            converted = component that should be destroyed.
-            allocator = allocator used to allocate converted component.
-        **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
-            static if (is(Info.To : Object)) {
-
-                auto c = cast(Info.To) converted;
-                destructor(c, allocator);
-
-                converted = null;
-            } else {
-                auto container = cast(Placeholder!(Info.To)) converted;
-
-                destructor(container.value, allocator);
-                allocator.dispose(converted);
-            }
-        }
-
-        mixin EqualToHashToStringOpCmpMixin!();
-    }
-}
-
-/**
-A callback convertor that uses a type guesser to infer the concrete type of component stored in FromType and
-check whether it is the same requested to convert to.
-**/
-@component
-@safe class TypeGuessCallbackConvertor(alias convert, alias destruct) : CallbackConvertor!(convert, destruct) {
-    import aermicioi.aedi_property_reader.json.type_guesser;
-    private {
-        TypeGuesser!(typeof(super).Info.From) guesser;
-    }
-
-    @autowired
-    this(TypeGuesser!(typeof(super).Info.From) guesser) {
-        this.guesser = guesser;
-    }
-
-    override bool converts(in Object from, TypeInfo to) @safe const nothrow {
-        try {
-
-            return super.converts(from, to) && (this.guesser.guess(from.unwrap!(typeof(super).Info.From)) is to);
-        } catch (Exception e) {
-            debug error("Encountered an exception during .converts call of convertor, ", e).n;
-            assert(false, "Encountered an exception during .converts call of convertor");
-        }
-    }
-
-    override bool converts(in Object from, in Object to) @safe const nothrow {
-        return this.converts(from, to.identify);
-    }
-}
-
-/**
-A convertor that is providing additional type information for converted tagged types.
-
-A convertor that is providing additional type information for converted tagged types.
-In case when wrong convertor is passed to tagged convertor, any type conversion
-and information capabilities are inhibited.
+A convertor able to unwrap an element out of TaggedAlgebraic!Union.
 **/
 class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
+    import std.traits : Fields, FieldNameTuple;
 
-    private {
-        Convertor convertor_;
-    }
+    mixin FromMixin!Tagged;
+    mixin ToMixin!(Fields!Union);
+
+    mixin ConvertsFromToMixin;
 
     public {
 
         /**
-        Constructor for TaggedConvertor
-
-        Params:
-            convertor = convertor for underlying tagged types
+        ditto
         **/
-        this(Convertor convertor) {
-            this.convertor = convertor;
-        }
+        bool converts(in Object from, const TypeInfo to) @safe const nothrow {
+            if (this.convertsFrom(from)) {
+                auto tagged = from.unwrap!Tagged;
 
-        @property {
-            /**
-            Set convertor
-
-            Params:
-                convertor = convertor accepting a tagged union that will be decorated with addional type information.
-
-            Returns:
-                typeof(this)
-            **/
-            typeof(this) convertor(Convertor convertor) @safe nothrow pure {
-                this.convertor_ = convertor;
-
-                return this;
-            }
-
-            /**
-            Get convertor
-
-            Returns:
-                Convertor
-            **/
-            inout(Convertor) convertor() @safe nothrow pure inout {
-                return this.convertor_;
-            }
-
-            /**
-            Get the type info of component that convertor can convert from.
-
-            Get the type info of component that convertor can convert from.
-            The method is returning the default type that it is able to convert,
-            though it is not necessarily limited to this type only. More generalistic
-            checks should be done by convertsFrom method.
-
-            Returns:
-                type info of component that convertor is able to convert.
-            **/
-            TypeInfo from() nothrow const {
-                return this.convertor.from is typeid(Tagged) ? typeid(Tagged) : typeid(void);
-            }
-
-            /**
-            Get the type info of component that convertor is able to convert to.
-
-            Get the type info of component that convertor is able to convert to.
-            The method is returning the default type that is able to convert,
-            though it is not necessarily limited to this type only. More generalistic
-            checks should be done by convertsTo method.
-
-            Returns:
-                type info of component that can be converted to.
-            **/
-            TypeInfo to() nothrow const {
-                return this.convertor.to;
-            }
-        }
-
-        /**
-        Check whether convertor is able to convert from.
-
-        Params:
-            from = the type info of component that could potentially be converted by convertor.
-        Returns:
-            true if it is able to convert from, or false otherwise.
-        **/
-        bool convertsFrom(TypeInfo from) @safe const nothrow pure  {
-            if (from is typeid(void)) {
-                return false;
-            }
-
-            if (this.convertor.convertsFrom(from)) {
-                return true;
-            }
-
-            static foreach (T; Fields!Union) {
-                if (from is typeid(T)) {
-                    return true;
+                static foreach (field; FieldNameTuple!Union) {
+                    if (tagged.kind == mixin("Tagged.Kind." ~ field)) {
+                        return mixin("typeid(typeof(Union." ~ field ~ ")) is to");
+                    }
                 }
             }
 
@@ -896,31 +697,9 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
         /**
         ditto
         **/
-        bool convertsFrom(in Object from) @safe const nothrow pure  {
-            return this.convertsFrom(from.identify);
+        bool converts(in Object from, in Object to) @safe const nothrow {
+            return this.converts(from, to.identify);
         }
-
-        /**
-        Check whether convertor is able to convert to.
-
-        Params:
-            to = type info of component that convertor could potentially convert to.
-
-        Returns:
-            true if it is able to convert to, false otherwise.
-        **/
-        bool convertsTo(TypeInfo to) @safe const nothrow pure  {
-            return this.convertor.convertsTo(to);
-        }
-
-        /**
-        ditto
-        **/
-        bool convertsTo(in Object to) @safe const nothrow pure  {
-            return this.convertsTo(to.identify);
-        }
-
-        mixin ConvertsMixin;
 
         /**
         Convert from component to component.
@@ -944,9 +723,23 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const
+        Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator)  const
         {
-            return this.convertor.convert(from, to, allocator);
+            enforce!ConvertorException(this.converts(from, to), text(
+                "Cannot convert component ", from.identify, " to ", to, " expected original component of ", this.from, " and destination of ", this.to
+            ));
+
+            auto tagged = from.unwrap!Tagged;
+
+            static foreach (field; FieldNameTuple!Union) {
+                if (tagged.kind == mixin("Tagged.Kind." ~ field)) {
+
+                    debug(trace) trace("Converting ", tagged, " to ", to);
+                    return mixin("(cast(typeof(Union." ~ field ~ ")) tagged).pack(from, this, allocator)");
+                }
+            }
+
+            throw new ConvertorException(text("Could not unwrap tagged element ", from.identify, " to ", to, " expected "));
         }
 
         /**
@@ -963,8 +756,19 @@ class TaggedConvertor(Tagged : TaggedAlgebraic!Union, Union) : Convertor {
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
-            return this.convertor.destruct(converted, allocator);
+        void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+            enforce!ConvertorException(this.destroys(from, converted), text(
+                "Cannot destroy ", converted.identify, " which was not converted from ", from, ".",
+                " Expected destroyable type of ", this.to, " from origin of ", this.from
+            ));
+
+            static foreach(Type; Fields!Union) {
+                if (converted.identify is typeid(Type)) {
+
+                    debug(trace) trace("Disposing of container for type ", typeid(Type), " if it is value type");
+                    converted.unpack!Type(allocator);
+                }
+            }
         }
 
         mixin EqualToHashToStringOpCmpMixin!();
@@ -1021,10 +825,13 @@ interface CombinedConvertor : Convertor {
 A convertor that is delegating converting task to a set of child convertors.
 **/
 class CombinedConvertorImpl : CombinedConvertor {
-    import std.algorithm : canFind, find;
+    import std.algorithm : canFind, find, map, joiner, filter, any;
 
     private {
         Convertor[] convertors_;
+
+        private const(TypeInfo)[] fromTypes;
+        private const(TypeInfo)[] toTypes;
     }
 
     public {
@@ -1045,8 +852,18 @@ class CombinedConvertorImpl : CombinedConvertor {
         Returns:
             typeof(this)
         **/
-        typeof(this) convertors(Convertor[] convertors) @safe nothrow pure {
+        typeof(this) convertors(Convertor[] convertors) @trusted nothrow pure
+            in (!convertors.empty, "Combined convertor is expecting to have at least one convertor passed to it. None passed")
+            in (convertors.all!(c => c !is null), "Encountered null convertor in convertor list received in combined convertor, none are expected") {
             this.convertors_ = convertors;
+
+            this.fromTypes = null;
+            this.toTypes = null;
+
+            foreach (convertor; convertors) {
+                this.fromTypes ~= convertors.map!(convertor => convertor.from).joiner.filter!(type => this.fromTypes.canFind!(from => type is from)).array;
+                this.toTypes ~= convertors.map!(convertor => convertor.to).joiner.filter!(type => this.fromTypes.canFind!(from => type is from)).array;
+            }
 
             return this;
         }
@@ -1070,8 +887,12 @@ class CombinedConvertorImpl : CombinedConvertor {
         Returns:
             typeof(this)
         **/
-        typeof(this) add(Convertor convertor) @safe {
+        typeof(this) add(Convertor convertor) @trusted nothrow
+            in (convertor !is null, "Cannot add null convertor into combined convertor") {
             this.convertors_ ~= convertor;
+
+            this.fromTypes ~= convertor.from.filter!(type => !this.fromTypes.canFind!(from => type is from)).array;
+            this.toTypes ~= convertor.from.filter!(type => !this.toTypes.canFind!(to => type is to)).array;
 
             return this;
         }
@@ -1092,6 +913,14 @@ class CombinedConvertorImpl : CombinedConvertor {
             try {
 
                 this.convertors_ = this.convertors_.remove(this.convertors.countUntil!(c => c == convertor));
+                this.fromTypes = this.fromTypes.filter!(
+                    from => !this.convertors.any!(convertor => convertor.convertsFrom(from))
+                ).array;
+
+                this.toTypes = this.fromTypes.filter!(
+                    to => !this.convertors.any!(convertor => convertor.convertsTo(to))
+                ).array;
+
             } catch (Exception e) {
                 assert(false, text("countUntil threw an exception: ", e));
             }
@@ -1111,8 +940,8 @@ class CombinedConvertorImpl : CombinedConvertor {
             Returns:
                 type info of component that convertor is able to convert.
             **/
-            TypeInfo from() @safe nothrow pure const {
-                return typeid(void);
+            const(TypeInfo)[] from() @safe nothrow pure const {
+                return fromTypes;
             }
 
             /**
@@ -1126,8 +955,8 @@ class CombinedConvertorImpl : CombinedConvertor {
             Returns:
                 type info of component that can be converted to.
             **/
-            TypeInfo to() @safe nothrow pure const {
-                return typeid(void);
+            const(TypeInfo)[] to() @safe nothrow pure const {
+                return toTypes;
             }
         }
 
@@ -1139,7 +968,7 @@ class CombinedConvertorImpl : CombinedConvertor {
         Returns:
             true if it is able to convert from, or false otherwise.
         **/
-        bool convertsFrom(TypeInfo from) const {
+        bool convertsFrom(const TypeInfo from) const {
             return this.convertors.canFind!(c => c.convertsFrom(from));
         }
 
@@ -1159,7 +988,7 @@ class CombinedConvertorImpl : CombinedConvertor {
         Returns:
             true if it is able to convert to, false otherwise.
         **/
-        bool convertsTo(TypeInfo to) const {
+        bool convertsTo(const TypeInfo to) const {
             return this.convertors.canFind!(c => c.convertsTo(to));
         }
 
@@ -1170,7 +999,91 @@ class CombinedConvertorImpl : CombinedConvertor {
             return this.convertors.canFind!(c => c.convertsTo(to));
         }
 
-        mixin ConvertsMixin;
+        /**
+        Check whether convertor is able to convert from type to type.
+
+        Check whether convertor is able to convert from type to type.
+        This set of methods should be the most precise way of determining
+        whether convertor is able to convert from type to type, since it
+        provides both components to the decision logic implemented by convertor
+        compared to the case with $(D_INLINECODE convertsTo) and $(D_INLINECODE convertsFrom).
+        Note that those methods are still useful when categorization or other
+        logic should be applied per original or destination type.
+
+        Implementation:
+            This is default implementation of converts methods which delegate
+            the decision to $(D_INLINECODE convertsTo) and $(D_INLINECODE convertsFrom).
+
+        Params:
+            from = the original component or it's type to convert from
+            to = the destination component or it's type to convert to
+
+        Returns:
+            true if it is able to convert from component to destination component
+        **/
+        bool converts(const TypeInfo from, const TypeInfo to) @safe const nothrow {
+            return this.convertors.canFind!(convertor => convertor.converts(from, to));
+        }
+
+        /**
+        ditto
+        **/
+        bool converts(const TypeInfo from, in Object to) @safe const nothrow {
+            return this.convertors.canFind!(convertor => convertor.converts(from, to));
+        }
+
+        /**
+        ditto
+        **/
+        bool converts(in Object from, const TypeInfo to) @safe const nothrow {
+            return this.convertors.canFind!(convertor => convertor.converts(from, to));
+        }
+
+        /**
+        ditto
+        **/
+        bool converts(in Object from, in Object to) @safe const nothrow {
+            return this.convertors.canFind!(convertor => convertor.converts(from, to));
+        }
+
+        /**
+        Check whether this convertor is able to destroy to component.
+
+        The destroys family of methods are designed purposely for identification
+        whether convertor was able to convert from type to destination to, and
+        is eligible for destruction of converted components.
+
+        Params:
+            from = original component which was converted.
+            to = converted component that should be destroyed by convertor.
+
+        Returns:
+            true if convertor is eligible for destroying to, or false otherwise.
+        **/
+        bool destroys(const TypeInfo from, const TypeInfo to) @safe const nothrow {
+            return this.convertors.canFind!(convertor => convertor.destroys(from, to));
+        }
+
+        /**
+        ditto
+        **/
+        bool destroys(in Object from, const TypeInfo to) @safe const nothrow {
+            return this.convertors.canFind!(convertor => convertor.destroys(from, to));
+        }
+
+        /**
+        ditto
+        **/
+        bool destroys(const TypeInfo from, in Object to) @safe const nothrow {
+            return this.convertors.canFind!(convertor => convertor.destroys(from, to));
+        }
+
+        /**
+        ditto
+        **/
+        bool destroys(in Object from, in Object to) @safe const nothrow {
+            return this.convertors.canFind!(convertor => convertor.destroys(from, to));
+        }
 
         /**
         Convert from component to component.
@@ -1187,12 +1100,13 @@ class CombinedConvertorImpl : CombinedConvertor {
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const
+        Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator)  const
         {
-            auto convertors = this.convertors.find!(c => c.convertsFrom(from) && c.convertsTo(to));
+            auto convertors = this.convertors.find!(c => c.converts(from, to));
 
             if (!convertors.empty) {
-                return convertors[0].convert(from, to, allocator);
+                debug(trace) trace("Converting ", from.identify, " to ", to, " using convertor ", convertors.front);
+                return convertors.front.convert(from, to, allocator);
             }
 
             throw new ConvertorException(text("Could not convert ", typeid(from), " to type ", to));
@@ -1207,14 +1121,20 @@ class CombinedConvertorImpl : CombinedConvertor {
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
-            auto convertors = this.convertors.find!(c => c.convertsTo(converted));
+        void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+            enforce!ConvertorException(this.destroys(from, converted), text(
+                "Cannot destroy ", converted.identify, " which was not converted from ", from, ".",
+                " Expected destroyable type of ", this.to, " from origin of ", this.from
+            ));
+
+            auto convertors = this.convertors.find!(c => c.destroys(from, converted));
 
             if (convertors.empty) {
-                throw new ConvertorException(text("Could not destroy ", converted));
+                throw new ConvertorException(text("No convertor was found to be able to destroy component of ", converted.identify, " converted from ", from));
             }
 
-            convertors[0].destruct(converted, allocator);
+            debug(trace) trace("Destroying ", converted.identify, " converted from ", from, " using convertor ", convertors.front);
+            convertors.front.destruct(from, converted, allocator);
         }
 
         mixin EqualToHashToStringOpCmpMixin!();
@@ -1225,81 +1145,11 @@ class CombinedConvertorImpl : CombinedConvertor {
 A convertor that simply doesn't do any conversion and returns existing object
 **/
 class NoOpConvertor : Convertor {
-    import std.algorithm;
 
     public {
-        @property {
-            /**
-            Get the type info of component that convertor can convert from.
-
-            Get the type info of component that convertor can convert from.
-            The method is returning the default type that it is able to convert,
-            though it is not necessarily limited to this type only. More generalistic
-            checks should be done by convertsFrom method.
-
-            Returns:
-                type info of component that convertor is able to convert.
-            **/
-            TypeInfo from() @safe nothrow pure const {
-                return typeid(Object);
-            }
-
-            /**
-            Get the type info of component that convertor is able to convert to.
-
-            Get the type info of component that convertor is able to convert to.
-            The method is returning the default type that is able to convert,
-            though it is not necessarily limited to this type only. More generalistic
-            checks should be done by convertsTo method.
-
-            Returns:
-                type info of component that can be converted to.
-            **/
-            TypeInfo to() @safe nothrow pure const {
-                return typeid(Object);
-            }
-        }
-
-        /**
-        Check whether convertor is able to convert from.
-
-        Params:
-            from = the type info of component that could potentially be converted by convertor.
-        Returns:
-            true if it is able to convert from, or false otherwise.
-        **/
-        bool convertsFrom(TypeInfo from) const {
-            return this.from is from;
-        }
-
-        /**
-        ditto
-        **/
-        bool convertsFrom(in Object from) const {
-            return this.convertsTo(typeid(from));
-        }
-
-        /**
-        Check whether convertor is able to convert to.
-
-        Params:
-            to = type info of component that convertor could potentially convert to.
-
-        Returns:
-            true if it is able to convert to, false otherwise.
-        **/
-        bool convertsTo(TypeInfo to) const {
-            return this.to is to;
-        }
-
-        /**
-        ditto
-        **/
-        bool convertsTo(in Object to) const {
-            return this.convertsTo(typeid(to));
-        }
-
-        mixin ConvertsMixin;
+        mixin FromMixin;
+        mixin ToMixin;
+        mixin ConvertsFromToMixin;
 
         /**
         Convert from component to component.
@@ -1317,7 +1167,7 @@ class NoOpConvertor : Convertor {
         Returns:
             Resulting converted component.
         **/
-        Object convert(in Object from, TypeInfo to, RCIAllocator allocator = theAllocator) const
+        Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator)  const
         {
             enforce!ConvertorException(
                 from.identify is to,
@@ -1340,11 +1190,577 @@ class NoOpConvertor : Convertor {
             converted = component that should be destroyed.
             allocator = allocator used to allocate converted component.
         **/
-        void destruct(ref Object converted, RCIAllocator allocator = theAllocator) const {
+        void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
 
         }
 
         mixin EqualToHashToStringOpCmpMixin!();
+    }
+}
+
+/**
+A convertor that converts a elements of a forward range and puts into an output range that is also a forward range.
+**/
+@component
+class RangeConvertor(To, From) : Convertor
+    if (
+        isForwardRange!From &&
+        isForwardRange!To &&
+        __traits(hasMember, To, "put")
+    ) {
+
+    private {
+        alias InputType = ElementType!From;
+        alias OutputType = Parameters!(To.put)[0];
+
+        Convertor convertor_;
+    }
+
+    public {
+        @property {
+            /**
+            Set convertor
+
+            Params:
+                convertor = convertor used to convert elements from input range and put them into output range.
+
+            Returns:
+                typeof(this)
+            **/
+            @autowired
+            typeof(this) convertor(Convertor defaultConvertor) @safe nothrow pure
+            in (defaultConvertor !is null, "Cannot accept a null as a convertor, expected one that converts range " ~ typeid(From).toString ~ " to " ~ typeid(To).toString)
+            in (defaultConvertor.converts(typeid(InputType), typeid(OutputType)), "Passed convertor is not able to convert range elements from " ~ typeid(InputType).toString ~ " to " ~ typeid(OutputType).toString) {
+                this.convertor_ = defaultConvertor;
+
+                return this;
+            }
+
+            /**
+            Get convertor
+
+            Returns:
+                Convertor
+            **/
+            inout(Convertor) convertor() @safe nothrow pure inout {
+                return this.convertor_;
+            }
+        }
+
+        mixin ConvertsFromToMixin!(From, To) DefaultImplementation;
+
+        /**
+        ditto
+        **/
+        bool converts(in Object from, const TypeInfo to) @safe const nothrow {
+            return this.convertsFrom(from) && this.convertsTo(to);
+        }
+
+        /**
+        ditto
+        **/
+        bool converts(in Object from, in Object to) @safe const nothrow {
+            return this.convertsFrom(from) && this.convertsTo(to);
+        }
+
+        /**
+        Convert from component to component.
+
+        It will simply pass existing from component as to component
+        as consequence requested to component should be same as type info
+        of from component.
+
+        Params:
+            from = original component that is to be converted.
+            to = destination object that will be constructed out for original one.
+            allocator = optional allocator that could be used to construct to component.
+        Throws:
+            ConvertorException when convertor is not able to convert from, or to component.
+        Returns:
+            Resulting converted component.
+        **/
+        Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator)  const
+        {
+            enforce!ConvertorException(
+                this.convertsFrom(from),
+                "Cannot transfer contents of a range ", from.identify, " to output range. Expected range of ", typeid(From)
+            );
+
+            enforce!ConvertorException(
+                this.convertsTo(to),
+                "Cannot transfer contents of range to ", to, " expected an output range of ", typeid(To)
+            );
+
+            To output;
+
+            static if (is(To == class)) {
+                output = allocator.make!To();
+            } else {
+                output = To();
+            }
+
+            From source = from.unwrap!From;
+
+            debug(trace) trace("Converting range ", from.identify, " to ", to);
+            foreach (element; source) {
+                auto temporary = source.stored(from, this);
+                output.put(this.convertor.convert(temporary, typeid(OutputType), allocator).unpack!OutputType(allocator));
+            }
+
+            return output.pack(from, this, allocator);
+        }
+
+        /**
+        Does not destruct anything since it is not allocating anything.
+
+        Params:
+            converted = component that should be destroyed.
+            allocator = allocator used to allocate converted component.
+        **/
+        void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+            enforce!ConvertorException(this.destroys(from, converted), text(
+                "Cannot destroy ", converted.identify, " which was not converted from ", from, ".",
+                " Expected destroyable type of ", this.to, " from origin of ", this.from
+            ));
+
+            To destroyable = converted.unpack!To(allocator);
+
+            debug(trace) trace("Destroying converted range ", converted.identify, " constructed from ", from);
+            foreach (element; destroyable) {
+                auto temporary = element.stored(from, this);
+                Object reference = temporary;
+                this.convertor.destruct(from, reference, allocator);
+            }
+        }
+
+        mixin EqualToHashToStringOpCmpMixin!();
+    }
+}
+
+/**
+A convertor that converts a forward range into an array of it's elements converted to a destination type.
+**/
+@component
+class RangeToArrayConvertor(To : Element[], From, Element) : Convertor
+    if (
+        isForwardRange!From
+    ) {
+
+    private {
+        alias InputType = ElementType!From;
+
+        Convertor convertor_;
+    }
+
+    public {
+        @autowired
+        this(Convertor convertor) {
+            this.convertor = convertor;
+        }
+
+        @property {
+            /**
+            Set convertor
+
+            Params:
+                convertor = convertor used to convert elements from input range and put them into output range.
+
+            Returns:
+                typeof(this)
+            **/
+            @autowired
+            typeof(this) convertor(Convertor defaultConvertor) @safe nothrow
+            in (defaultConvertor !is null, "Cannot accept a null as a convertor, expected one that converts range " ~ typeid(From).toString ~ " to " ~ typeid(To).toString)
+            in (defaultConvertor.converts(typeid(InputType), typeid(Element)), "Passed convertor is not able to convert range elements from " ~ typeid(InputType).toString ~ " to " ~ typeid(Element).toString) {
+                this.convertor_ = defaultConvertor;
+
+                return this;
+            }
+
+            /**
+            Get convertor
+
+            Returns:
+                Convertor
+            **/
+            inout(Convertor) convertor() @safe nothrow pure inout {
+                return this.convertor_;
+            }
+        }
+
+        mixin ConvertsFromToMixin!(From, To);
+
+        /**
+        Convert from component to component.
+
+        It will simply pass existing from component as to component
+        as consequence requested to component should be same as type info
+        of from component.
+
+        Params:
+            from = original component that is to be converted.
+            to = destination object that will be constructed out for original one.
+            allocator = optional allocator that could be used to construct to component.
+        Throws:
+            ConvertorException when convertor is not able to convert from, or to component.
+        Returns:
+            Resulting converted component.
+        **/
+        Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator)  const
+        {
+            enforce!ConvertorException(
+                this.convertsFrom(from),
+                text("Cannot transfer contents of a range ", from.identify, " to output range. Expected range of ", typeid(From))
+            );
+
+            enforce!ConvertorException(
+                this.convertsTo(to),
+                text("Cannot transfer contents of range to ", to, " expected an array of ", typeid(Element))
+            );
+
+            To output;
+            From source = from.unwrap!From;
+
+            if (source.empty) {
+                return output.pack(from.identify, this, allocator);
+            }
+
+            static if (hasLength!From) {
+                output = allocator.makeArray!Element(source.length);
+            } else {
+                output = allocator.makeArray!Element(1);
+            }
+
+            debug(trace) trace("Converting range ", from.identify, " to an array of type ", to);
+            foreach (indexed; source.enumerate) {
+                if (indexed.index == output.length) {
+                    allocator.expandArray(output, 1);
+                }
+
+                auto temporary = indexed.value.stored(from.identify, this);
+                output[indexed.index] = this.convertor.convert(temporary, typeid(Element), allocator).unpack!Element(allocator);
+            }
+
+            return output.pack(from.identify, this, allocator);
+        }
+
+        /**
+        Does not destruct anything since it is not allocating anything.
+
+        Params:
+            converted = component that should be destroyed.
+            allocator = allocator used to allocate converted component.
+        **/
+        void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+            enforce!ConvertorException(this.destroys(from, converted), text(
+                "Cannot destroy ", converted.identify, " which was not converted from ", from, ".",
+                " Expected destroyable type of ", this.to, " from origin of ", this.from
+            ));
+
+            To destroyable = converted.unpack!To(allocator);
+
+            debug(trace) trace("Destroying array ", to, " converted from original range of type ", from);
+            foreach (element; destroyable) {
+                auto temporary = element.stored(from.identify, this);
+                Object reference = temporary;
+                this.convertor.destruct(from, reference, allocator);
+            }
+
+            allocator.dispose(destroyable);
+        }
+
+        mixin EqualToHashToStringOpCmpMixin!();
+    }
+}
+
+/**
+A convertor that converts a forward range into an array of it's elements converted to a destination type.
+**/
+@component
+class MapConvertor(To : ToElement[ToKey], From : FromElement[FromKey], ToElement, ToKey, FromElement, FromKey) : Convertor {
+
+    private {
+        alias InputType = ElementType!From;
+
+        Convertor elementConvertor_;
+        Convertor keyConvertor_;
+    }
+
+    public {
+        @property {
+            /**
+            Set convertor
+
+            Params:
+                convertor = convertor used to convert elements from input range and put them into output range.
+
+            Returns:
+                typeof(this)
+            **/
+            @autowired
+            typeof(this) elementConvertor(Convertor elementConvertor) @safe nothrow pure
+            in (elementConvertor !is null, "Cannot accept a null as a convertor, expected one that map value " ~ typeid(FromElement) ~ " to " ~ typeid(ToElement))
+            in (elementConvertor.converts(typeid(FromElement), typeid(ToElement)), "Passed convertor is not able to convert map value from " ~ typeid(FromElement) ~ " to " ~ typeid(ToElement)) {
+                this.elementConvertor_ = elementConvertor;
+
+                return this;
+            }
+
+            /**
+            Get convertor
+
+            Returns:
+                Convertor
+            **/
+            inout(Convertor) elementConvertor() @safe nothrow pure inout {
+                return this.elementConvertor_;
+            }
+
+            /**
+            Set convertor
+
+            Params:
+                convertor = convertor used to convert elements from input range and put them into output range.
+
+            Returns:
+                typeof(this)
+            **/
+            @autowired
+            typeof(this) keyConvertor(Convertor keyConvertor) @safe nothrow pure
+            in (keyConvertor !is null, "Cannot accept a null as a convertor, expected one that map key " ~ typeid(FromKey) ~ " to " ~ typeid(ToKey))
+            in (keyConvertor.converts(typeid(FromElement), typeid(ToElement)), "Passed convertor is not able to convert map key from " ~ typeid(FromKey) ~ " to " ~ typeid(ToKey)) {
+                this.keyConvertor_ = keyConvertor;
+
+                return this;
+            }
+
+            /**
+            Get convertor
+
+            Returns:
+                Convertor
+            **/
+            inout(Convertor) keyConvertor() @safe nothrow pure inout {
+                return this.keyConvertor_;
+            }
+
+            /**
+            Get the type info of component that convertor can convert from.
+
+            Get the type info of component that convertor can convert from.
+            The method is returning the default type that it is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsFrom method.
+
+            Returns:
+                type info of component that convertor is able to convert.
+            **/
+            TypeInfo from() @safe nothrow pure const {
+                return typeid(From);
+            }
+
+            /**
+            Get the type info of component that convertor is able to convert to.
+
+            Get the type info of component that convertor is able to convert to.
+            The method is returning the default type that is able to convert,
+            though it is not necessarily limited to this type only. More generalistic
+            checks should be done by convertsTo method.
+
+            Returns:
+                type info of component that can be converted to.
+            **/
+            TypeInfo to() @safe nothrow pure const {
+                return typeid(To);
+            }
+        }
+
+        /**
+        Check whether convertor is able to convert from.
+
+        Params:
+            from = the type info of component that could potentially be converted by convertor.
+        Returns:
+            true if it is able to convert from, or false otherwise.
+        **/
+        bool convertsFrom(const TypeInfo from) const {
+            return this.from is from;
+        }
+
+        /**
+        ditto
+        **/
+        bool convertsFrom(in Object from) const {
+            return this.convertsTo(from.identify);
+        }
+
+        /**
+        Check whether convertor is able to convert to.
+
+        Params:
+            to = type info of component that convertor could potentially convert to.
+
+        Returns:
+            true if it is able to convert to, false otherwise.
+        **/
+        bool convertsTo(const TypeInfo to) const {
+            return this.to is to;
+        }
+
+        /**
+        ditto
+        **/
+        bool convertsTo(in Object to) const {
+            return this.convertsTo(to.identify);
+        }
+
+        mixin ConvertsMixin;
+
+        /**
+        Convert from component to component.
+
+        It will simply pass existing from component as to component
+        as consequence requested to component should be same as type info
+        of from component.
+
+        Params:
+            from = original component that is to be converted.
+            to = destination object that will be constructed out for original one.
+            allocator = optional allocator that could be used to construct to component.
+        Throws:
+            ConvertorException when convertor is not able to convert from, or to component.
+        Returns:
+            Resulting converted component.
+        **/
+        Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator)  const
+        {
+            enforce!ConvertorException(
+                this.convertsFrom(from),
+                "Cannot transfer contents of a range ", from.identify, " to output range. Expected range of ", typeid(From)
+            );
+
+            enforce!ConvertorException(
+                this.convertsTo(to),
+                "Cannot transfer contents of range to ", to, " expected an array of ", typeid(Element)
+            );
+
+            To output;
+
+            From source = from.unwrap!From;
+
+            debug(trace) trace("Converting from associative array of type ", from.identify, " to associative array of ", to);
+            foreach (key, value; source) {
+                auto keyTemporary = key.stored(from, this);
+                auto valueTemporary = value.stored(from, this);
+
+                output[
+                    this.keyConvertor.convert(keyTemporary, typeid(ToKey), allocator).unpack!ToKey(allocator)
+                ] = this.elementConvertor.convert(valueTemporary, typeid(ToElement), allocator).unpack!ToElement(allocator);
+            }
+
+            return output.make(allocator);
+        }
+
+        /**
+        Does not destruct anything since it is not allocating anything.
+
+        Params:
+            converted = component that should be destroyed.
+            allocator = allocator used to allocate converted component.
+        **/
+        void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+            enforce!ConvertorException(this.destroys(from, converted), text(
+                "Cannot destroy ", converted.identify, " which was not converted from ", from, ".",
+                " Expected destroyable type of ", this.to, " from origin of ", this.from
+            ));
+
+            To destroyable = converted.unpack!To(allocator);
+
+            debug(trace) trace("Destroying keys and values of associative array of ", converted.identify, " converted from ", from);
+            foreach (key, element; destroyable) {
+                auto keyTemporary = key.stored(from, this);
+                auto elementTemporary = element.stored(from, this);
+
+                this.keyConvertor.destruct(from, keyTemporary, allocator);
+                this.elementConvertor.destruct(from, elementTemporary, allocator);
+            }
+        }
+
+        mixin EqualToHashToStringOpCmpMixin!();
+    }
+}
+
+/**
+A convertor that extracts data from a std.variant.VariantN type.
+**/
+@component
+class VariantConvertor(Variant: VariantN!(maxDataSize, Types), size_t maxDataSize, Types...) : Convertor {
+
+    mixin FromMixin!Variant;
+    mixin ToMixin!Types;
+    mixin ConvertsFromToMixin DefaultConvertsImplementation;
+    mixin EqualToHashToStringOpCmpMixin;
+
+    bool converts(in Object from, const TypeInfo to) @safe const nothrow {
+        if (this.DefaultConvertsImplementation.converts(from, to)) {
+            return from.unwrap!Variant.type is to;
+        }
+
+        return false;
+    }
+
+    bool converts(in Object from, in Object to) @safe const nothrow {
+        return this.converts(from, to.identify);
+    }
+
+    /**
+    Convert from component to component.
+
+    It will simply pass existing from component as to component
+    as consequence requested to component should be same as type info
+    of from component.
+
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when convertor is not able to convert from, or to component.
+    Returns:
+        Resulting converted component.
+    **/
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator)  const
+    {
+        enforce!ConvertorException(this.converts(from, to), text(
+            "Cannot convert component ", from.identify, " to ", to, " expected original component of ", this.from, " and destination of ", this.to
+        ));
+
+        static foreach (Type; Types) {
+            if (to is typeid(Type)) {
+                return from.unwrap!Variant.get!Type.pack(from, this, allocator);
+            }
+        }
+
+        assert(false, "Code flow should never get here.");
+    }
+
+    /**
+    Does not destruct anything since it is not allocating anything.
+
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    **/
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+        enforce!ConvertorException(this.destroys(from, converted), text(
+            "Cannot destroy component ", to.identify, ". Passed component isn't converted by this convertor"
+        ));
+
+        static foreach (Type; Types) {
+            if (converted.identify is typeid(Type)) {
+                converted.unpack!Type(allocator);
+            }
+        }
     }
 }
 
@@ -1360,335 +1776,5 @@ Returns:
     To converted component
 **/
 To convert(To, From)(Convertor convertor, From from, RCIAllocator allocator = theAllocator) {
-    import std.typecons : scoped;
-    static if (is(From : Object)) {
-
-        Object converted = convertor.convert(from, typeid(To), allocator);
-    } else {
-
-        Object converted = convertor.convert(scoped!(PlaceholderImpl!From)(from), typeid(To), allocator);
-    }
-
-    static if (is(To : Object)) {
-
-        return cast(To) converted;
-    } else {
-
-        scope(exit) allocator.dispose(converted);
-        return (cast(Placeholder!To) converted).value;
-    }
+    return convertor.convert(from.stored, typeid(To), allocator).unpack!To;
 }
-
-enum isConvertorBuilder(T) =
-    hasMember!(T, "make") &&
-    hasMember!(T, "isAble") &&
-    hasMember!(T, "cause");
-
-/**
-A callback convertor factory advised with functional convertor and destructor.
-
-Params:
-    convertor = functional convertor used for callback convertor
-    destructor = functional destructor used for callback convertor
-
-Returns:
-    AdvisedConvertor(To, From) template ready to instantiate a callback convertor for To, and From types using convertor and destructor.
-**/
-template TypeGuessCallbackConvertorBuilder(alias convertor, alias destructor) {
-    class TypeGuessCallbackConvertorBuilder {
-        bool throwOnFailure = true;
-
-        this() {
-
-        }
-
-        this(bool throwOnFailure) {
-            this.throwOnFailure = throwOnFailure;
-        }
-
-        Convertor make(To, From)() {
-            static if (isAble!(To, From)) {
-
-                return new CallbackConvertor!(convertor!(To, From), destructor!To)();
-            } else {
-
-                if (this.throwOnFailure) {
-                    throw new Exception(this.cause!(To, From));
-                } else {
-                    error(this.cause!(To, From));
-                }
-
-                return null;
-            }
-        }
-
-        static bool isAble(To, From)() {
-            return maybeConvertor!(convertor, To, From).yes && maybeDestructor!(destructor, To).yes;
-        }
-
-        static string cause(To, From)() {
-            alias ConvertorInfo = maybeConvertor!(convertor, To, From);
-            alias DestructorInfo = maybeDestructor!(destructor, To);
-            return text(
-                    "Cannot convert type ",
-                    typeid(From),
-                    " to ",
-                    typeid(To),
-                    " when:\n ",
-                    fullyQualifiedName!convertor,
-                    " implements convertor ",
-                    ConvertorInfo.yes,
-                    "\n ",
-                    fullyQualifiedName!destructor,
-                    " implements destructor ",
-                    DestructorInfo.yes
-                );
-        }
-    }
-}
-
-/**
-A composite convertor factory advised with accessor, setter, and inspectors.
-
-Params:
-    Accessor = accessor used to extract data out of From component
-    Setter = setter used to set extracted data into To component
-    FromInspector = inspector used to inspect From components for accessible fields
-    ToInspector = inspector used to inspect To components for settable fields
-Returns:
-    AdvisedConvertor(To, From) template ready to instantiate a composite convertor for To, and From types using advised accessor, setter, and inspectors.
-**/
-template MappingConvertorBuilder(alias Accessor, alias Setter, alias ToInspector, alias FromInspector) {
-    enum AccessorCheck(To, From) = (is(typeof(Accessor!From()) : PropertyAccessor!(From, Object)));
-    enum SetterCheck(To, From) = (is (typeof(Setter!To()) : PropertySetter!(To, Object)));
-    enum FromInspectorCheck(To, From) = (is (typeof(FromInspector!From()) : Inspector!From));
-    enum ToInspectorCheck(To, From) = (is (typeof(ToInspector!To()) : Inspector!To));
-
-    class MappingConvertorBuilder {
-        private {
-            Convertor[] convertors_ = [];
-        }
-
-        bool conversion = true;
-        bool force = true;
-        bool skip = true;
-        bool throwOnFailure = true;
-
-        this(Convertor[] convertors, bool conversion, bool force, bool skip, bool throwOnFailure) {
-            this.convertors = convertors;
-            this.conversion = conversion;
-            this.force = force;
-            this.skip = skip;
-            this.throwOnFailure = throwOnFailure;
-        }
-
-        this() {
-
-        }
-
-        /**
-        Set convertors
-
-        Params:
-            convertors = list of convertors used to inject into mapping convertor
-        Throws:
-
-        Returns:
-            typeof(this)
-        **/
-        typeof(this) convertors(Convertor[] convertors) @safe nothrow pure
-        in {
-            assert(convertors !is null, "Cannot build mapping convertor with no convertors");
-            assert(convertors.length > 0, "Cannot build mapping convertor with no convertors");
-        }
-        body {
-            this.convertors_ = convertors;
-
-            return this;
-        }
-
-        /**
-        Get convertors
-
-        Returns:
-            Convertor[]
-        **/
-        inout(Convertor[]) convertors() @safe nothrow pure inout {
-            return this.convertors_;
-        }
-
-        Convertor make(To, From)() {
-            import aermicioi.aedi_property_reader.convertor.mapper : CompositeMapper, CompositeConvertor;
-            static if (
-                FromInspectorCheck!(To, From) &&
-                ToInspectorCheck!(To, From) &&
-                AccessorCheck!(To, From) &&
-                SetterCheck!(To, From)
-            ) {
-
-                auto convertor = new CompositeConvertor!(To, From)();
-                CompositeMapper!(To, From) mapper = new CompositeMapper!(To, From)();
-                mapper.fromInspector = FromInspector!From();
-                mapper.toInspector = ToInspector!To();
-                mapper.accessor = Accessor!From();
-                mapper.setter = Setter!To();
-                mapper.conversion = conversion;
-                mapper.force = force;
-                mapper.skip = skip;
-                convertor.mapper = mapper;
-                convertor.convertors = convertors;
-
-                return convertor;
-            } else {
-
-                if (this.throwOnFailure) {
-                    throw new Exception(this.cause!(To, From));
-                } else {
-                    error(this.cause!(To, From));
-                }
-
-                return null;
-            }
-        }
-
-        bool isAble(To, From)() {
-            return
-                FromInspectorCheck!(To, From) &&
-                ToInspectorCheck!(To, From) &&
-                AccessorCheck!(To, From) &&
-                SetterCheck!(To, From);
-        }
-
-        string cause(To, From)() {
-            return text(
-                    "Cannot convert type ",
-                    typeid(From),
-                    " to ",
-                    typeid(To),
-                    " when:\n ",
-                    fullyQualifiedName!Accessor,
-                    " is able to access ", typeid(From), " ",
-                    AccessorCheck!(To, From),
-                    ",\n ",
-                    fullyQualifiedName!Setter,
-                    " is able to set ", typeid(To), " ",
-                    SetterCheck!(To, From),
-                    ",\n ",
-                    fullyQualifiedName!FromInspector,
-                    " is able to inspect ", typeid(From), " ",
-                    FromInspectorCheck!(To, From),
-                    ",\n ",
-                    fullyQualifiedName!ToInspector,
-                    " is able to inspect ", typeid(To), " ",
-                    ToInspectorCheck!(To, From)
-                );
-        }
-    }
-}
-
-/**
-A convertor builder that will scan through all convertor builders and will use first that is able to create a convertor from a source type to a destination type.
-
-Params:
-    Builders = list of convertor builders, each able to factory a subset of convertors.
-**/
-template AnyConvertorBuilder(Builders...)
-    if (allSatisfy!(isConvertorBuilder, Builders)) {
-
-    template BuilderMakeParameters(To, From) {
-         alias BuilderMakeParameters(Builder) = Parameters!(Builder.make!(From, To));
-    }
-
-    class AnyConvertorBuilder {
-        bool throwOnFailure = true;
-        Builders builders;
-
-        this(Builders builders, bool throwOnFailure = true) {
-            this.builders = builders;
-            this.throwOnFailure = throwOnFailure;
-        }
-
-        Convertor make(To, From)(staticMap!(BuilderMakeParameters!(To, From), Builders) parameters) {
-            if (!this.isAble!(To, From)) {
-                if (this.throwOnFailure) {
-                    throw new Exception(this.cause!(To, From));
-                } else {
-                    error(this.cause!(To, From));
-                }
-
-                return null;
-            }
-
-            foreach (builder; builders) {
-                if (builder.isAble!(To, From)) {
-                    Parameters!(typeof(builder.make!(To, From))) args;
-
-                    foreach (ref arg; args) {
-                        foreach (ref param; parameters) {
-                            static if (is(typeof(arg) == typeof(param))) {
-                                arg = param;
-                            }
-                        }
-                    }
-
-                    return builder.make!(To, From)(args);
-                }
-            }
-
-            throw new Exception(this.cause!(To, From));
-        }
-
-        bool isAble(To, From)() {
-            foreach (builder; builders) {
-                if (builder.isAble!(To, From)) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        string cause(To, From)() {
-            if (!this.isAble!(To, From)) {
-                string[] messages;
-
-                foreach (builder; builders) {
-                    messages ~= text(builder, " failed with: ", builder.cause!(To, From));
-                }
-
-                return text(
-                    "None of convertor builders were able to convert from ",
-                    typeid(From),
-                    " to ",
-                    typeid(To),
-                    " where all of them failed with following errors: ",
-                    messages.joiner("\n")
-                );
-            }
-
-            return null;
-        }
-    }
-}
-
-/**
-ditto
-**/
-auto factoryAnyConvertorBuilder(Builders...)(Builders builders) {
-    return new AnyConvertorBuilder!Builders(builders);
-}
-
-public {
-    enum CompositeAccessorFactory(T) = () => new CompositeAccessor!T;
-    enum CompositeSetterFactory(T) = () => new CompositeSetter!T;
-    enum CompositeInspectorFactory(T) = () => new CompositeInspector!T;
-}
-
-alias MappingConvertorBuilderFactory = (Convertor[] convertors) {
-    return new MappingConvertorBuilder!(
-        CompositeAccessorFactory,
-        CompositeSetterFactory,
-        CompositeInspectorFactory,
-        CompositeInspectorFactory
-    )(convertors, true, true, true, true);
-};

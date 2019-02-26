@@ -29,43 +29,76 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.sdlang.sdlang;
 
-import aermicioi.aedi.storage.storage;
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi.storage.locator;
-import aermicioi.aedi_property_reader.sdlang.accessor;
+import aermicioi.aedi.storage.storage;
 import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi_property_reader.sdlang.convertor;
 import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.chaining_convertor : ByTypePricingStrategy;
+import aermicioi.aedi_property_reader.convertor.std_conv;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.core;
-import aermicioi.aedi_property_reader.convertor.std_conv;
+import aermicioi.aedi_property_reader.sdlang.accessor;
+import aermicioi.aedi_property_reader.sdlang.convertor;
 import aermicioi.aedi_property_reader.sdlang.type_guesser;
 import sdlanguage = sdlang;
 import sdlang.ast : Tag, Attribute;
-import sdlang.token : DateTimeFrac, DateTimeFracUnknownZone;
+import sdlang.token : Value, ValueTypes;
 import core.time : Duration;
 import std.datetime : Date, SysTime;
 import std.experimental.logger;
 import std.experimental.allocator;
 
-alias SdlangDocumentContainer = AdvisedDocumentContainer!(
-    SdlangElement,
-    SdlangElement,
-    WithConvertorBuilder!SdlangConvertorBuilderFactory,
-	WithConvertorsFor!(bool,
-        string, dchar,
-        int, long,
-        float, double, real,
-        Date, DateTimeFrac, SysTime, DateTimeFracUnknownZone, Duration,
-        ubyte[]),
-    WithConvertorSources!(
-        Tag,
-        Attribute
-    ),
-    WithConvertors!(
+auto SdlangConvertors(
+    TagConvertor tagConvertor,
+    AttributeConvertor attributeConvertor,
+    CombinedConvertor defaultConvertor,
+    ByTypePricingStrategy byTypePricingStrategy,
+    size_t byTypePricingStrategyPrice = 900
+) {
+    defaultConvertor.add(tagConvertor);
+    defaultConvertor.add(attributeConvertor);
+
+    defaultConvertor.add(new VariantConvertor!Value);
+
+    byTypePricingStrategy.add(typeid(Value[]), byTypePricingStrategyPrice);
+    static foreach (ValueType; ValueTypes) {
+        defaultConvertor.add(new RangeToArrayConvertor!(ValueType[], Value[])(defaultConvertor));
+        byTypePricingStrategy.add(typeid(ValueType[]), byTypePricingStrategyPrice);
+    }
+};
+
+alias SdlangDocumentContainer = PolicyDocument!(
+    Tag,
+    Object,
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.core.config,
+        aermicioi.aedi_property_reader.sdlang.type_guesser,
+        aermicioi.aedi_property_reader.sdlang.accessor,
+        aermicioi.aedi_property_reader.sdlang.inspector,
+        aermicioi.aedi_property_reader.sdlang.convertor,
+        aermicioi.aedi_property_reader.sdlang.sdlang
+    )(),
+    WithInitializer!(
         StdConvStringPrebuiltConvertorsFactory
-    )
+    )(),
+    WithInitializer!(
+        SdlangConvertors
+    )(),
+    WithConvertorSources!(Tag, Attribute)(),
+    WithConvertorAggregation!CombinedConvertor(),
+    WithLocatorForUnregisteredComponents("sdlang-document-locator"),
+    WithDefaultRegisterers
 );
+
+@component
+auto sdlangRuntimeTypeGuesser(
+    TypeGuesser!Tag tagGuesser,
+    TypeGuesser!Attribute attributeGuesser
+) {
+    return new DelegatingObjectTypeGuesser!(Tag, Attribute)(tagGuesser, attributeGuesser);
+}
 
 /**
 Create a convertor container with data source being sdlang document.
@@ -76,46 +109,24 @@ Params:
     guesser = type guesser based on held sdlang value
     allocator = allocator used to allocate converted values
 Returns:
-    JsonConvertorContainer
+    SdlangConvertorContainer
 **/
 auto sdlang(
-    SdlangElement value,
-    PropertyAccessor!SdlangElement accessor,
-    TypeGuesser!SdlangElement guesser,
-    RCIAllocator allocator = theAllocator
+    Tag value
 ) {
 
-    SdlangDocumentContainer container = new SdlangDocumentContainer(value);
-    container.guesser = guesser;
-    container.accessor = accessor;
-    container.allocator = allocator;
+    SdlangDocumentContainer document = SdlangDocumentContainer(value);
 
-    return container;
+    return document;
 }
 
 /**
 ditto
 **/
-auto sdlang(SdlangElement value, TypeGuesser!SdlangElement guesser, RCIAllocator allocator = theAllocator) {
-
-    return value.sdlang(accessor, guesser, allocator);
-}
-
-/**
-ditto
-**/
-auto sdlang(SdlangElement value, RCIAllocator allocator = theAllocator) {
-
-    return value.sdlang(accessor, new SdlangTypeGuesser(), allocator);
-}
-
-/**
-ditto
-**/
-auto sdlang(RCIAllocator allocator = theAllocator) {
+auto sdlang() {
     import sdlang.ast : Tag;
 
-    return SdlangElement(new Tag()).sdlang(allocator);
+    return new Tag().sdlang;
 }
 
 /**
@@ -135,11 +146,11 @@ auto sdlang(string pathOrData, bool returnEmpty = true) {
         debug(trace) trace("Loading sdlang document from ", pathOrData);
         if (pathOrData.exists) {
             debug(trace) trace("Detected ", pathOrData, " being a sdlang file, parsing it");
-            return sdlang(SdlangElement(sdlanguage.parseFile(pathOrData)));
+            return sdlang(sdlanguage.parseFile(pathOrData));
         } else {
 
             debug(trace) trace("Attempting to parse ", pathOrData, " as sdlang content");
-            return sdlang(SdlangElement(sdlanguage.parseSource(pathOrData)));
+            return sdlang(sdlanguage.parseSource(pathOrData));
         }
     } catch (sdlanguage.SDLangException e) {
         debug(trace) trace("Error parsing sdlang: ", e);
@@ -153,25 +164,4 @@ auto sdlang(string pathOrData, bool returnEmpty = true) {
             "Could not create sdlang convertor container from file or content passed in pathOrData: " ~ pathOrData, e
         );
     }
-}
-
-package auto accessor() {
-    return dsl(
-        new AggregatePropertyAccessor!SdlangElement(
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangAttributePropertyAccessor)
-                (new SdlangAttributePropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangTagPropertyAccessor)
-                (new SdlangTagPropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangIntegerIndexAccessor)
-                (new SdlangIntegerIndexAccessor)
-        ),
-        new AggregatePropertyAccessor!SdlangElement(
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangAttributePropertyAccessor)
-                (new SdlangAttributePropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangTagPropertyAccessor)
-                (new SdlangTagPropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(SdlangElement, SdlangIntegerIndexAccessor)
-                (new SdlangIntegerIndexAccessor)
-        )
-    );
 }

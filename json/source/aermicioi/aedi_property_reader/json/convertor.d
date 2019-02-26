@@ -29,184 +29,139 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.json.convertor;
 
-import aermicioi.aedi_property_reader.convertor;
+import aermicioi.aedi.configurer.annotation.annotation;
+import aermicioi.aedi_property_reader.convertor.convertor : Convertor, ConvertsFromToMixin, FromMixin, ToMixin, EqualToHashToStringOpCmpMixin;
+import aermicioi.aedi_property_reader.convertor.mapper;
+import aermicioi.aedi_property_reader.convertor.accessor;
+import aermicioi.aedi_property_reader.convertor.exception : ConvertorException;
+import aermicioi.aedi_property_reader.convertor.inspector;
+import aermicioi.aedi_property_reader.convertor.placeholder;
+import aermicioi.aedi_property_reader.convertor.traits : n;
 import aermicioi.aedi_property_reader.json.accessor;
 import aermicioi.aedi_property_reader.json.inspector;
 import aermicioi.aedi.factory;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi.storage.wrapper;
 import aermicioi.aedi.storage.decorator;
-import aermicioi.aedi_property_reader.convertor.exception;
+import aermicioi.aedi_property_reader.convertor.exception : InvalidCastException;
 import std.json;
 import std.traits;
 import std.conv : to, text;
 import std.experimental.allocator;
 import std.exception : enforce;
 
-private {
-    enum JAccessor(From : JSONValue) =
-        () => new RuntimeFieldAccessor!JSONValue(dsl(new JsonPropertyAccessor, new JsonIndexAccessor));
-    enum JInspector(From : JSONValue) =
-        () => new JsonInspector;
-    enum CSetter(To) =
-        () => new CompositeSetter!To();
-    enum CInspector(To) =
-        () => new CompositeInspector!To();
-}
+@component
+class JsonConvertor : Convertor {
+    import std.meta : AliasSeq;
+    import aermicioi.aedi_property_reader.convertor.type_guesser : TypeGuesser;
 
-alias JsonConvertorBuilderFactory = (Convertor[] convertors) {
-    return factoryAnyConvertorBuilder(
-        new TypeGuessCallbackConvertorBuilder!(convert, destruct),
-        new MappingConvertorBuilder!(
-            JAccessor,
-            CSetter,
-            CInspector,
-            JInspector
-        )(convertors, true, true, true, true)
-    );
-};
+    alias ToTypes = AliasSeq!(double, bool, ulong, long, string, JSONValue[], JSONValue[string], JSONValue);
 
-/**
-Convert JSONValue into T scalar/array/assocarray value.
+    mixin FromMixin!JSONValue;
+    mixin ToMixin!ToTypes;
+    mixin ConvertsFromToMixin DefaultMixin;
+    mixin EqualToHashToStringOpCmpMixin;
 
-Params:
-    value = storage where to put converted JSONValue
-    json = the data that is to be converted.
-Throws:
-    InvalidCastException when the type of value does not match stored data.
-Returns:
-    value
-**/
-void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
-    if (isFloatingPoint!To && !is(To == enum)) {
-    enforce(json.type == JSON_TYPE.FLOAT, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
+    private TypeGuesser!JSONValue guesser;
 
-    value = json.floating.to!To;
-}
-
-/**
-ditto
-**/
-void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
-    if (is(To : bool) && !is(To == enum)) {
-
-    if (json.type == JSON_TYPE.TRUE) {
-        value = true;
-        return;
+    @autowired
+    this(TypeGuesser!JSONValue guesser) {
+        this.guesser = guesser;
     }
 
-    if (json.type == JSON_TYPE.FALSE) {
-        value = false;
-        return;
+    /**
+    ditto
+    **/
+    bool converts(in Object from, const TypeInfo to) @safe const nothrow {
+        return DefaultMixin.converts(from, to) && (this.guesser.guess(from.unwrap!JSONValue).n is to);
     }
 
-    throw new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value));
-}
-
-/**
-ditto
-**/
-void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
-    if (isUnsigned!To && isIntegral!To && !is(To == enum)) {
-
-    if ((json.type == JSON_TYPE.INTEGER) && (json.integer >= 0)) {
-        value = json.integer.to!To;
-        return;
+    /**
+    ditto
+    **/
+    bool converts(in Object from, in Object to) @safe const nothrow {
+        return DefaultMixin.converts(from, to) && (this.guesser.guess(from.unwrap!JSONValue).n is to.identify);
     }
-    enforce(json.type == JSON_TYPE.UINTEGER, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
 
-    value = json.uinteger.to!To;
-}
+    /**
+    Convert from component to component.
 
-/**
-ditto
-**/
-void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
-    if (!isUnsigned!To && isIntegral!To && !is(To == enum)) {
-    enforce(json.type == JSON_TYPE.INTEGER, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
+    Params:
+        from = original component that is to be converted.
+        to = destination object that will be constructed out for original one.
+        allocator = optional allocator that could be used to construct to component.
+    Throws:
+        ConvertorException when there is a converting error
+        InvalidArgumentException when arguments passed are not of right type or state
+    Returns:
+        Resulting converted component.
+    **/
+    Object convert(in Object from, const TypeInfo to, RCIAllocator allocator = theAllocator) const {
+        enforce!ConvertorException(from.identify is typeid(JSONValue), text("Cannot convert from ", from.identify, " type, expected one of ", this.from));
+        JSONValue unwrapped = from.unwrap!JSONValue;
 
-    value = json.integer.to!To;
-}
+        if (to is typeid(string)) {
+            enforce!ConvertorException(unwrapped.type is JSON_TYPE.string, text("Cannot convert to ", to, " contained value is of type ", unwrapped.type));
+            return unwrapped.str.pack(from, this, allocator);
+        }
 
-/**
-ditto
-**/
-void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
-    if (isSomeChar!To && !is(To == enum)) {
-    enforce(json.type == JSON_TYPE.STRING, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
+        if (to is typeid(double)) {
+            enforce!ConvertorException(unwrapped.type is JSON_TYPE.float_, text("Cannot convert to ", to, " contained value is of type ", unwrapped.type));
+            return unwrapped.floating.pack(from, this, allocator);
+        }
 
-    value = json.str.to!To;
-}
+        if (to is typeid(bool)) {
+            enforce!ConvertorException((unwrapped.type is JSON_TYPE.true_) || (unwrapped.type is JSON_TYPE.false_), text("Cannot convert to ", to, " contained value is of type ", unwrapped.type));
+            return unwrapped.boolean.pack(from, this, allocator);
+        }
 
-/**
-ditto
-**/
-void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
-    if (isSomeString!To && !is(To == enum)) {
-    enforce(json.type == JSON_TYPE.STRING, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
+        if (to is typeid(ulong)) {
+            enforce!ConvertorException(unwrapped.type is JSON_TYPE.uinteger, text("Cannot convert to ", to, " contained value is of type ", unwrapped.type));
+            return unwrapped.uinteger.pack(from, this, allocator);
+        }
 
-    value = json.str.to!To;
-}
+        if (to is typeid(long)) {
+            enforce!ConvertorException(unwrapped.type is JSON_TYPE.integer, text("Cannot convert to ", to, " contained value is of type ", unwrapped.type));
+            return unwrapped.integer.pack(from, this, allocator);
+        }
 
-/**
-ditto
-**/
-void convert(To : Z[], From : JSONValue, Z)(in From json, ref To value, RCIAllocator allocator = theAllocator)
-    if (!isSomeString!To && !is(To == enum)) {
-    enforce(json.type == JSON_TYPE.ARRAY, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
+        if (to is typeid(JSONValue[])) {
+            enforce!ConvertorException(unwrapped.type is JSON_TYPE.array, text("Cannot convert to ", to, " contained value is of type ", unwrapped.type));
+            return unwrapped.array.pack(from, this, allocator);
+        }
 
-    value = allocator.makeArray!Z(json.array.length);
+        if (to is typeid(JSONValue[string])) {
+            enforce!ConvertorException(unwrapped.type is JSON_TYPE.object, text("Cannot convert to ", to, " contained value is of type ", unwrapped.type));
+            return unwrapped.object.pack(from, this, allocator);
+        }
 
-    foreach (index, ref el; value) {
-        convert!Z(json.array[index], el, allocator);
+        if (to is typeid(JSONValue)) {
+            return from.unwrap!JSONValue.pack(from, this, allocator);
+        }
+
+        throw new ConvertorException(text("Destination type ", to, " isn't convertable by ", this, " convertor. Expected destination types of ", this.to));
     }
-}
 
-/**
-ditto
-**/
-void convert(To : Z[string], From : JSONValue, Z)(in From json, ref To value, RCIAllocator allocator = theAllocator)
-    if (!is(To == enum)) {
-    enforce(json.type == JSON_TYPE.OBJECT, new InvalidCastException("Could not convert ${from} value to ${to} ", typeid(json), typeid(value)));
+    /**
+    Destroy component created using this convertor.
 
-    auto jsonAssociativeArray = json.object;
+    Destroy component created using this convertor.
+    Since convertor could potentially allocate memory for
+    converted component, only itself is containing history of allocation,
+    and therefore it is responsible as well to destroy and free allocated
+    memory with allocator.
 
-    foreach (key, ref el; jsonAssociativeArray) {
-
-        Z temp;
-        convert!Z(el, temp, allocator);
-        value[key] = temp;
+    Params:
+        converted = component that should be destroyed.
+        allocator = allocator used to allocate converted component.
+    **/
+    void destruct(const TypeInfo from, ref Object converted, RCIAllocator allocator = theAllocator) const {
+        if (this.destroys(from, converted)) {
+            static foreach (ToType; ToTypes) {
+                if (converted.identify is typeid(ToType)) {
+                    converted.unpack!ToType;
+                }
+            }
+        }
     }
-}
-
-/**
-ditto
-**/
-void convert(To, From : JSONValue)(in From json, ref To value, RCIAllocator allocator = theAllocator)
-    if (is(To == enum)) {
-
-    string temp;
-    json.convert!string(temp, allocator);
-    value = temp.to!To;
-	temp.destruct(allocator);
-}
-
-/**
-Destroy a component allocated using json converting algorithms
-
-Params:
-    to = component to be destroyed
-**/
-void destruct(To)(ref To to, RCIAllocator allocator = theAllocator) {
-    destroy(to);
-    to = to.init;
-}
-
-/**
-ditto
-**/
-void destruct(To : Z[], Z)(ref To to, RCIAllocator allocator = theAllocator)
-    if (!isSomeString!To) {
-    allocator.dispose(to);
-    to = To.init;
 }

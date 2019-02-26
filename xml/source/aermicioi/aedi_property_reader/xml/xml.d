@@ -29,34 +29,71 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.xml.xml;
 
+import aermicioi.aedi : qualifier, component, lref;
 import aermicioi.aedi.storage.storage;
 import aermicioi.aedi.storage.locator;
 import aermicioi.aedi_property_reader.xml.accessor;
 import aermicioi.aedi_property_reader.xml.convertor;
 import aermicioi.aedi_property_reader.convertor.accessor;
 import aermicioi.aedi_property_reader.convertor.convertor;
+import aermicioi.aedi_property_reader.convertor.chaining_convertor : ByTypePricingStrategy;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.core.document;
 import aermicioi.aedi_property_reader.core.core;
 import aermicioi.aedi_property_reader.convertor.std_conv;
 import aermicioi.aedi_property_reader.xml.type_guesser;
 import std.experimental.allocator;
+import std.experimental.logger;
 import std.xml;
 import std.traits;
 
-alias XmlDocumentContainer = AdvisedDocumentContainer!(
-    XmlElement,
-    XmlElement,
-    WithConvertorBuilder!XmlConvertorBuilderFactory,
-    WithConvertorsFor!DefaultConvertibleTypes,
-    WithConvertorSources!Element,
-    WithConvertors!(
+auto XmlConvertors(
+    XmlConvertor xmlConvertor,
+    CombinedConvertor combined,
+) {
+    combined.add(xmlConvertor);
+};
+
+auto XmlArrayConvertors(
+    CombinedConvertor convertor,
+    ByTypePricingStrategy byTypePricingStrategy
+) {
+    import std.meta : AliasSeq;
+
+    static foreach (FromType; AliasSeq!(Element[])) {
+        byTypePricingStrategy.add(typeid(FromType), 900);
+        static foreach (ToType; AliasSeq!(ScalarArrayConvertibleTypes, StringArrayConvertibleTypes)) {
+            byTypePricingStrategy.add(typeid(ToType), 900);
+            convertor.add(new RangeToArrayConvertor!(ToType, FromType)(convertor));
+        }
+    }
+};
+
+alias XmlDocumentContainer = PolicyDocument!(
+    Element,
+    Element,
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.core.config,
+    )(),
+    WithInitializer!(
         StdConvStringPrebuiltConvertorsFactory
-    ),
-    WithConvertorSources!(
-        Element,
-        string
-    )
+    )(),
+    WithConvertorAggregation!CombinedConvertor(),
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.xml.type_guesser,
+        aermicioi.aedi_property_reader.xml.accessor,
+        aermicioi.aedi_property_reader.xml.inspector,
+        aermicioi.aedi_property_reader.xml.convertor,
+        aermicioi.aedi_property_reader.xml.xml
+    )(),
+    WithLocatorForUnregisteredComponents("xml-document-locator"),
+    WithInitializer!(
+        XmlConvertors
+    )(),
+    WithInitializer!(
+        XmlArrayConvertors
+    )(),
+    WithDefaultRegisterers
 );
 
 /**
@@ -68,19 +105,11 @@ Params:
     guesser = type guesser based on held xml value
     allocator = allocator used to allocate converted values
 Returns:
-    JsonConvertorContainer
+    XmlConvertorContainer
 **/
-auto xml(
-    XmlElement value,
-    PropertyAccessor!XmlElement accessor,
-    TypeGuesser!XmlElement guesser,
-    RCIAllocator allocator = theAllocator
-) {
+auto xml(Element value) {
 
-    XmlDocumentContainer container = new XmlDocumentContainer(value);
-    container.guesser = guesser;
-    container.accessor = accessor;
-    container.allocator = allocator;
+    XmlDocumentContainer container = XmlDocumentContainer(value);
 
     return container;
 }
@@ -88,25 +117,9 @@ auto xml(
 /**
 ditto
 **/
-auto xml(XmlElement value, TypeGuesser!XmlElement guesser, RCIAllocator allocator = theAllocator) {
+auto xml() {
 
-    return value.xml(accessor, guesser, allocator);
-}
-
-/**
-ditto
-**/
-auto xml(XmlElement value, RCIAllocator allocator = theAllocator) {
-
-    return value.xml(accessor, new XmlTypeGuesser(new StringToScalarConvTypeGuesser), allocator);
-}
-
-/**
-ditto
-**/
-auto xml(RCIAllocator allocator = theAllocator) {
-
-    return XmlElement(new Document("<root><root>")).xml(allocator);
+    return new Document("<root><root>").xml();
 }
 
 
@@ -130,7 +143,7 @@ auto xml(string pathOrData, bool returnEmpty = true) {
         check(pathOrData);
 
         debug(trace) trace("Parsed as xml");
-        return xml(XmlElement(new Document(pathOrData)));
+        return xml(new Document(pathOrData));
     } catch (CheckException e) {
 
         debug(trace) trace(pathOrData, " is does not contain valid xml due to: ", e);
@@ -145,7 +158,7 @@ auto xml(string pathOrData, bool returnEmpty = true) {
             check(pathOrData);
 
             debug(trace) trace("Parsed as xml");
-            return xml(XmlElement(new Document(pathOrData)));
+            return xml(new Document(pathOrData));
         } catch(CheckException e) {
 
             debug(trace) trace(pathOrData, " does not contain valid xml due to: ", e);
@@ -166,17 +179,5 @@ auto xml(string pathOrData, bool returnEmpty = true) {
 
     throw new Exception(
         "Could not create xml convertor container from file or content passed in pathOrData: " ~ pathOrData
-    );
-}
-
-package auto accessor() {
-    return dsl(
-        new AggregatePropertyAccessor!XmlElement(
-            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementPropertyAccessor)
-                (new XmlElementPropertyAccessor),
-            new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlAttributePropertyAccessor)
-                (new XmlAttributePropertyAccessor),
-        ),
-        new TaggedElementPropertyAccessorWrapper!(XmlElement, XmlElementIndexAccessor)(new XmlElementIndexAccessor)
     );
 }

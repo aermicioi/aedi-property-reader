@@ -29,26 +29,77 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.arg.arg;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.arg.accessor;
+import aermicioi.aedi_property_reader.arg.arg;
 import aermicioi.aedi_property_reader.arg.convertor;
 import aermicioi.aedi_property_reader.convertor.accessor;
-import aermicioi.aedi_property_reader.convertor.convertor : DefaultConvertibleTypes;
-import aermicioi.aedi_property_reader.core.document;
+import aermicioi.aedi_property_reader.convertor.convertor : CombinedConvertor, Convertor;
+import aermicioi.aedi_property_reader.convertor.exception;
+import aermicioi.aedi_property_reader.convertor.placeholder;
+import aermicioi.aedi_property_reader.convertor.std_conv;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import aermicioi.aedi_property_reader.core.core;
-import aermicioi.aedi_property_reader.convertor.std_conv;
-import aermicioi.aedi_property_reader.arg.arg;
+import aermicioi.aedi_property_reader.core.document;
+import std.exception;
 import std.experimental.allocator;
 
-alias ArgumentAdvisedDocumentContainer = AdvisedDocumentContainer!(
-	const(string)[],
-	const(string)[],
-	WithConvertorBuilder!ArgumentAdvisedConvertorFactory,
-	WithConvertorsFor!DefaultConvertibleTypes,
-	WithConvertors!(
+alias ArgumentDocumentContainer = PolicyDocument!(
+    ArgumentsHolder,
+    string,
+	WithConvertorSources!(string[])(),
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.core.config,
+    )(),
+    WithInitializer!(
         StdConvStringPrebuiltConvertorsFactory
-    )
+    )(),
+    WithContainerScanning!(
+        aermicioi.aedi_property_reader.arg.arg,
+    )(),
+    WithConvertorAggregation!CombinedConvertor(),
+    WithLocatorForUnregisteredComponents("arg-document-locator"),
+    WithDefaultRegisterers
 );
+
+@component
+auto runtimeArgumentTypeGuesser(
+    TypeGuesser!string guesser
+) {
+    return new DelegatingObjectTypeGuesser!string(guesser);
+}
+
+@component
+auto rootAccessor(
+	PropertyAccessor!(string[][string], string[]) byKeyValuesAccessor,
+	PropertyAccessor!(string[string], string) byKeyValueAccessor,
+	PropertyAccessor!(string[], string, size_t) byValueAccessor,
+    Convertor defaultConvertor
+) {
+    return new ArgumentAccessor(
+		byKeyValuesAccessor,
+		byKeyValueAccessor,
+		new KeyConvertingAccessor!(string[], string, string, size_t)(
+			byValueAccessor,
+            defaultConvertor
+        )
+	);
+}
+
+@component
+auto byKeyValuesAccessor() {
+	return new AssociativeArrayAccessor!(string[][string]);
+}
+
+@component
+auto byKeyValueAccessor() {
+	return new AssociativeArrayAccessor!(string[string]);
+}
+
+@component
+auto byValueAccessor() {
+	return new ArrayAccessor!(string[]);
+}
 
 /**
 Create container for application arguments passed on command line
@@ -64,47 +115,12 @@ Returns:
 **/
 auto argument(
 	string[] args,
-	PropertyAccessor!(const(string)[]) accessor,
-	TypeGuesser!(const(string)[]) guesser,
-	RCIAllocator allocator
 ) {
-	ArgumentAdvisedDocumentContainer container = new ArgumentAdvisedDocumentContainer(args);
-
-	container.accessor = accessor;
-	container.guesser = guesser;
-	container.allocator = allocator;
+	ArgumentDocumentContainer container = ArgumentDocumentContainer(
+		(new ArgumentArrayToAssociativeArray()).convert(args.stored, typeid(ArgumentsHolder), theAllocator).unpack!ArgumentsHolder
+	);
 
 	return container;
-}
-
-/**
-ditto
-**/
-auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor, TypeGuesser!(const(string)[]) guesser) {
-	return args.argument(
-		accessor,
-		guesser,
-		theAllocator
-	);
-}
-
-/**
-ditto
-**/
-auto argument(string[] args, PropertyAccessor!(const(string)[]) accessor) {
-	return args.argument(
-		accessor,
-		new StdConvTypeGuesser!(const(string)[]),
-	);
-}
-
-/**
-ditto
-**/
-auto argument(string[] args) {
-	return args.argument(
-		new ArgumentAccessor
-	);
 }
 
 /**

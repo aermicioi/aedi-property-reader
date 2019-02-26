@@ -29,10 +29,11 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.test.arg.arg;
 
-import aermicioi.aedi : locate;
+import aermicioi.aedi : locate, Locator;
 import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import aermicioi.aedi.test.fixture;
 import aermicioi.aedi_property_reader.arg;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 import aermicioi.aedi_property_reader.core;
 import std.exception;
 import std.json;
@@ -40,7 +41,7 @@ import std.process : env = environment;
 import std.xml;
 
 unittest {
-	auto c = argument([
+	auto document = argument([
             "commandline",
             "--string=stringed",
             "--array=hello",
@@ -50,14 +51,19 @@ unittest {
             "--integer=10"
     ]);
 
-    with (c.configure) {
+	Locator!() c;
+
+    with (document.configure) {
         property!(string)("string"); // Not testing it since factory takes arguments from
         property!(string[])("array");
         property!(float)("float");
         property!(size_t)("integer");
+
+		c = container;
     }
 
     assert(c.locate!(string) == "stringed");
+	import std.stdio; c.locate!float("float").writeln;
 	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
 	assert(c.locate!float("float") == 1.0);
 	assert(c.locate!size_t("integer") == 10);

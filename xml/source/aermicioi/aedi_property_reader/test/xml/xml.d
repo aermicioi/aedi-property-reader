@@ -29,7 +29,8 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.test.xml.xml;
 
-import aermicioi.aedi.storage.locator;
+import aermicioi.aedi.container.container : Container;
+import aermicioi.aedi.storage.locator : locate;
 import aermicioi.aedi.test.fixture;
 import aermicioi.aedi_property_reader.xml;
 import aermicioi.aedi_property_reader.core.core;
@@ -39,45 +40,41 @@ import std.exception;
 unittest {
 	auto c = xml("
 		<root>
-			<float>
-				1.0
-			</float>
-			<integer>
-			10
-			</integer>
+			<float>1.0</float>
+			<integer>10</integer>
 			<string>hello</string>
-			<array>
-			<v>hello</v>
-			<v> </v>
-			<v>world!</v>
-			</array>
+			<array><v>hello</v><v> </v><v>world!</v></array>
 		</root>
 	");
 
 
-
+	Container locator;
     with (c.configure) {
-        property!(string)("string"); // Not testing it since factory takes arguments from
+        property!(string)("string");
         property!(string[])("array");
         property!(float)("float");
         property!(size_t)("integer");
-    }
 
-    assert(c.locate!(string)("string") == "hello");
-	assert(c.locate!(string[])("array") == ["hello", " ", "world!"]);
-	assert(c.locate!float("float") == 1.0);
-	assert(c.locate!size_t("integer") == 10);
+		locator = container;
+    }
+    assert(locator.locate!(string)("string") == "hello");
+	assert(locator.locate!float("float") == 1.0);
+	assert(locator.locate!size_t("integer") == 10);
+	assert(locator.locate!(string[])("array") == ["hello", " ", "world!"]);
 }
 
 unittest {
 	import std.path : dirName;
 	auto x = xml(dirName(__FILE__) ~ "/config.xml", false);
 
+	Container locator;
 	with (x.configure) {
 		property!double("double");
+
+		locator = container;
 	}
 
-	assert(x.locate!double("double") == 1.0);
+	assert(locator.locate!double("double") == 1.0);
 
 	assertNotThrown(xml("unknown"));
 	assertThrown(xml("unkown", false));
@@ -127,7 +124,7 @@ unittest {
 	import aermicioi.aedi_property_reader.convertor.inspector;
 	import aermicioi.aedi_property_reader.convertor.setter;
 	import aermicioi.aedi_property_reader.convertor.mapper;
-	import aermicioi.aedi_property_reader.core.traits;
+	import aermicioi.aedi_property_reader.convertor.traits;
 
 	static struct Placeholder {
 		float f;
@@ -138,6 +135,7 @@ unittest {
 		string[] a;
 	}
 
+	Container locator;
 	with (c.configure) {
 		property!Placeholder("placeholder");
 		property!(string[])("array");
@@ -146,7 +144,9 @@ unittest {
 		property!(long)("long");
 		property!(int)("int");
 		property!(string)("string");
+
+		locator = container;
     }
 
-	assert(c.locate!Placeholder("placeholder") == Placeholder(1.0, 2.0, 10, 20, "hello", ["ahoj", " ", "world!"]));
+	assert(locator.locate!Placeholder("placeholder") == Placeholder(1.0, 2.0, 10, 20, "hello", ["ahoj", " ", "world!"]));
 }

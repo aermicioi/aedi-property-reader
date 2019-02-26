@@ -34,35 +34,26 @@ import std.exception;
 import std.xml;
 import aermicioi.aedi_property_reader.convertor.exception : NotFoundException;
 import aermicioi.aedi_property_reader.xml.convertor;
+import aermicioi.aedi_property_reader.xml.type_guesser;
+import aermicioi.aedi_property_reader.convertor.placeholder;
 
-unittest {
-    enum Colorful {
-        yes,
-        no
-    }
+unittest
+{
+	XmlConvertor convertor = new XmlConvertor(new ElementTypeGuesser());
 
-    int i;
-    double d;
-    bool b;
-    Colorful c;
-    char ch;
-    string[string] as;
-    string s;
-    string t;
-    string[] sd;
-
-    new Document("<root>29192</root>").convert!int(i);
-    new Document("<root>1.0</root>").convert!double(d);
-    new Document("<root>true</root>").convert!bool(b);
-    new Document("<root>yes</root>").convert!Colorful(c);
-    new Document("<root>a</root>").convert!char(ch);
-    new Document("<root><test>t</test><pest>p</pest></root>").convert!(string[string])(as);
-    new Document("<root><v>second one</v><v>third one</v></root>").convert!(string[])(sd);
-
-    assert(i == 29192);
-    assert(d == 1.0);
-    assert(b == true);
-    assert(c == Colorful.yes);
-    assert(as == ["pest" : "p", "test" : "t"]);
-    assert(sd == ["second one", "third one"]);
+	assert(convertor.convert(new Document("<root>yes</root>"), typeid(string))
+			.unwrap!string == "yes");
+	assert(convertor.convert(new Document("<root>yes</root>"), typeid(Text[]))
+			.unwrap!(Text[]) == [new Text("yes")]);
+	assert(convertor.convert(new Document("<root><?xml version=\"1.0\"?></root>"), typeid(ProcessingInstruction[]))
+			.unwrap!(ProcessingInstruction[]) == [new ProcessingInstruction("xml version=\"1.0\"")]);
+	assert(convertor.convert(new Document("<root><![CDATA[some binary data]]></root>"),
+			typeid(CData[])).unwrap!(CData[]) == [new CData("some binary data")]);
+	assert(convertor.convert(new Document("<root><v>second one</v><v>third one</v></root>"),
+			typeid(Element[])).unwrap!(Element[]) == [new Element("v", "second one"),
+			new Element("v", "third one")]);
+	assert(convertor.convert(new Document("<root>yes</root>"), typeid(Tag))
+			.unwrap!Tag == new Tag("root"));
+	assert(convertor.convert(new Document("<root>yes</root>"), typeid(Item[]))
+			.unwrap!(Item[]) == [new Text("yes")]);
 }

@@ -29,6 +29,7 @@ Authors:
 **/
 module aermicioi.aedi_property_reader.json.inspector;
 
+import aermicioi.aedi.configurer.annotation.annotation;
 import aermicioi.aedi_property_reader.convertor.inspector;
 import aermicioi.aedi_property_reader.convertor.type_guesser;
 import std.string;
@@ -37,9 +38,15 @@ import std.json;
 import std.range;
 import std.algorithm;
 
+@component
+auto runtimeJsonInspector(JsonInspector inspector) {
+    return new RuntimeInspector!JSONValue(inspector);
+}
+
 /**
 Inspector for json values.
 **/
+@component
 class JsonInspector : Inspector!JSONValue {
 
     /**
@@ -108,13 +115,6 @@ class JsonInspector : Inspector!JSONValue {
         try {
 
             switch (component.type) {
-                case JSON_TYPE.ARRAY: {
-                    if (property.isNumeric) {
-                        return component.array.length > property.to!size_t;
-                    }
-                    break;
-                }
-
                 case JSON_TYPE.OBJECT: {
                     return (property in component.object) !is null;
                 }
@@ -143,10 +143,6 @@ class JsonInspector : Inspector!JSONValue {
         try {
 
             switch (component.type) {
-                case JSON_TYPE.ARRAY: {
-                    return component.array.length.iota.map!(to!string).array;
-                }
-
                 case JSON_TYPE.OBJECT: {
                     return component.object.byKey.array;
                 }
